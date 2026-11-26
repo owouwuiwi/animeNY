@@ -4,4 +4,16 @@
   "labels": ["Dependencies"],
   "includePaths": ["gradle/aniyomi.versions.toml"],
   "semanticCommits": "disabled",
+  "packageRules": [
+    {
+      "matchDatasources": ["maven"],
+      "matchPackageNames": ["androidx.constraintlayout:constraintlayout-compose", "androidx.media:media"],
+      "registryUrls": ["https://dl.google.com/dl/android/maven2"],
+    },
+    {
+      "matchDatasources": ["maven"],
+      "matchPackageNames": ["com.github.jmir1:ffmpeg-kit"],
+      "registryUrls": ["https://jitpack.io"],
+    },
+  ],
 }
