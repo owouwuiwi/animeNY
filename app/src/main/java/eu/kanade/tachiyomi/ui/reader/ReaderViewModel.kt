@@ -44,6 +44,7 @@ import eu.kanade.tachiyomi.ui.reader.loader.HttpPageLoader
 import eu.kanade.tachiyomi.ui.reader.model.InsertPage
 import eu.kanade.tachiyomi.ui.reader.model.ReaderChapter
 import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
+import eu.kanade.tachiyomi.ui.reader.model.pageForProgress
 import eu.kanade.tachiyomi.ui.reader.model.ViewerChapters
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderPreferences
@@ -549,7 +550,7 @@ class ReaderViewModel(
     fun onPageSelected(
         page: ReaderPage,
         currentPageText: String = page.number.toString(),
-        hasExtraPage: Boolean = false,
+        extraPage: ReaderPage? = null,
     ) {
         // InsertPage doesn't change page progress
         if (page is InsertPage) {
@@ -559,7 +560,7 @@ class ReaderViewModel(
         mutableState.update {
             it.copy(
                 currentPageText = currentPageText,
-                lastShiftDoubleState = hasExtraPage,
+                lastShiftDoubleState = extraPage != null,
             )
         }
 
@@ -567,7 +568,7 @@ class ReaderViewModel(
         val pages = selectedChapter.pages ?: return
 
         // Save last page read and mark as read if needed
-        updateChapterProgress(selectedChapter, page)
+        updateChapterProgress(page, page.pageForProgress(extraPage))
 
         if (selectedChapter != getCurrentChapter()) {
             logcat { "Setting ${selectedChapter.chapter.url} as active" }
@@ -653,7 +654,8 @@ class ReaderViewModel(
      * Completing a chapter is saved right away. Other page changes are saved once the reader settles on a page, or
      * when [saveChapterProgress] is called, so flipping through pages doesn't write to the database on every page.
      */
-    private fun updateChapterProgress(readerChapter: ReaderChapter, page: Page) {
+    private fun updateChapterProgress(page: ReaderPage, progressPage: ReaderPage) {
+        val readerChapter = page.chapter
         val pageIndex = page.index
 
         mutableState.update {
@@ -662,15 +664,16 @@ class ReaderViewModel(
         readerChapter.requestedPage = pageIndex
         chapterPageIndex = pageIndex
 
-        if (incognitoMode || page.status == Page.State.ERROR) return
+        if (incognitoMode || progressPage.status == Page.State.ERROR) return
 
-        val read = readerChapter.chapter.read || readerChapter.pages?.lastIndex == pageIndex
+        val progressIndex = progressPage.index
+        val reachedEnd = readerChapter.pages?.lastIndex == progressIndex
         if (pendingProgressChapter != readerChapter) saveChapterProgress()
-        readerChapter.chapter.read = read
-        readerChapter.chapter.last_page_read = pageIndex
+        readerChapter.chapter.read = readerChapter.chapter.read || reachedEnd
+        readerChapter.chapter.last_page_read = progressIndex
         pendingProgressSave?.cancel()
 
-        if (readerChapter.pages?.lastIndex == pageIndex) {
+        if (reachedEnd) {
             pendingProgressChapter = null
             writeChapterProgress(readerChapter, onComplete = true)
         } else {

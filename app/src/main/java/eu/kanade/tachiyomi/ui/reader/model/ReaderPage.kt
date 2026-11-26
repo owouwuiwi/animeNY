@@ -35,3 +35,13 @@ open class ReaderPage(
     @Volatile
     var downloadStream: DownloadStream? = null
 }
+
+/** The last source page visible in this spread that can be used for reading progress. */
+internal fun ReaderPage.pageForProgress(extraPage: ReaderPage?): ReaderPage {
+    return extraPage?.takeIf {
+        status != Page.State.ERROR &&
+            it.status != Page.State.ERROR &&
+            it.chapter == chapter &&
+            it.index > index
+    } ?: this
+}

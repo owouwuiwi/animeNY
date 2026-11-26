@@ -1087,19 +1087,19 @@ class ReaderActivity : BaseActivity() {
      * bottom menu and delegates the change to the presenter.
      */
     @SuppressLint("SetTextI18n")
-    fun onPageSelected(page: ReaderPage, hasExtraPage: Boolean = false) {
+    fun onPageSelected(page: ReaderPage, extraPage: ReaderPage? = null) {
         // SY -->
-        val currentPageText = if (hasExtraPage) {
+        val currentPageText = if (extraPage != null) {
             val invertDoublePage = (viewer as? PagerViewer)?.config?.invertDoublePages ?: false
             if ((resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_LTR) xor invertDoublePage) {
-                "${page.number}-${page.number + 1}"
+                "${page.number}-${extraPage.number}"
             } else {
-                "${page.number + 1}-${page.number}"
+                "${extraPage.number}-${page.number}"
             }
         } else {
             "${page.number}"
         }
-        viewModel.onPageSelected(page, currentPageText, hasExtraPage)
+        viewModel.onPageSelected(page, currentPageText, extraPage)
         // SY <--
 
         // AM (DISCORD) -->

@@ -88,7 +88,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
 
     private val tracker = PagerPageTracker(
         activity,
-        { position -> adapter.joinedItems.getOrNull(position)?.let { it.first to (it.second != null) } },
+        { position -> adapter.joinedItems.getOrNull(position)?.let { it.first to (it.second as? ReaderPage) } },
         { adapter.currentChapter },
         { adapter.nextTransition },
         ::setChaptersInternal,
@@ -261,7 +261,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
                 val joinedItem = adapter.joinedItems.firstOrNull { it.first == page || it.second == page }
                 activity.onPageSelected(
                     joinedItem?.first as? ReaderPage ?: page,
-                    joinedItem?.second != null,
+                    joinedItem?.second as? ReaderPage,
                 )
             }
         } else {

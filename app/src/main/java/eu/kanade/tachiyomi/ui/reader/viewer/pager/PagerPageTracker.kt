@@ -15,7 +15,7 @@ import tachiyomi.core.common.util.system.logcat
  */
 class PagerPageTracker(
     private val activity: ReaderActivity,
-    private val itemAt: (Int) -> Pair<Any, Boolean>?,
+    private val itemAt: (Int) -> Pair<Any, ReaderPage?>?,
     private val currentChapter: () -> ReaderChapter?,
     private val nextTransition: () -> ChapterTransition.Next?,
     private val setChaptersNow: (ViewerChapters) -> Unit,
@@ -28,7 +28,7 @@ class PagerPageTracker(
         onPageHolderSelected: (page: ReaderPage, forward: Boolean) -> Unit,
     ) : this(
         activity,
-        { position -> items.items.getOrNull(position)?.let { it to false } },
+        { position -> items.items.getOrNull(position)?.let { it to null } },
         { items.currentChapter },
         { items.nextTransition },
         setChaptersNow,
@@ -41,7 +41,7 @@ class PagerPageTracker(
     var currentPage: Any? = null
         private set
 
-    private var hasExtraPage = false
+    private var currentExtraPage: ReaderPage? = null
 
     /**
      * Viewer chapters to set when the pager enters idle mode. Otherwise, if the view was settling
@@ -83,7 +83,7 @@ class PagerPageTracker(
      */
     fun onPageChange(position: Int) {
         val (page, extraPage) = itemAt(position) ?: return
-        if (currentPage != page || hasExtraPage != extraPage) {
+        if (currentPage != page || currentExtraPage != extraPage) {
             val allowPreload = checkAllowPreload(page as? ReaderPage)
             val forward = when {
                 currentPage is ReaderPage && page is ReaderPage -> {
@@ -102,7 +102,7 @@ class PagerPageTracker(
                 else -> true
             }
             currentPage = page
-            hasExtraPage = extraPage
+            currentExtraPage = extraPage
             when (page) {
                 is ReaderPage -> onReaderPageSelected(page, allowPreload, forward, extraPage)
                 is ChapterTransition -> onTransitionSelected(page)
@@ -133,7 +133,12 @@ class PagerPageTracker(
      * Called when a [ReaderPage] is marked as active. It notifies the
      * activity of the change and requests the preload of the next chapter if this is the last page.
      */
-    private fun onReaderPageSelected(page: ReaderPage, allowPreload: Boolean, forward: Boolean, extraPage: Boolean) {
+    private fun onReaderPageSelected(
+        page: ReaderPage,
+        allowPreload: Boolean,
+        forward: Boolean,
+        extraPage: ReaderPage?,
+    ) {
         val pages = page.chapter.pages ?: return
         logcat { "onReaderPageSelected: ${page.number}/${pages.size}" }
         activity.onPageSelected(page, extraPage)
