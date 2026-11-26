@@ -78,11 +78,15 @@ data object MangaLibraryTab : Tab {
     override val options: TabOptions
         @Composable
         get() {
-            val fromMore = currentNavigationStyle() == NavStyle.MOVE_MANGA_TO_MORE
+            val navigation = currentNavigationStyle()
             val title = AYMR.strings.label_manga_library
             val isSelected = LocalTabNavigator.current.current.key == key
             val image = AnimatedImageVector.animatedVectorResource(R.drawable.anim_library_enter)
-            val index: UShort = if (fromMore) 5u else 1u
+            val index: UShort = when (navigation) {
+                NavStyle.MOVE_MANGA_TO_MORE -> 5u
+                NavStyle.MOVE_ANIME_TO_MORE -> 0u
+                else -> 1u
+            }
             return TabOptions(
                 index = index,
                 title = stringResource(title),

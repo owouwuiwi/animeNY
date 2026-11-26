@@ -265,6 +265,7 @@
     <string name="pref_bottom_nav_no_history">Sposta Cronologia nella scheda Altro</string>
     <string name="pref_bottom_nav_no_updates">Sposta Aggiornamenti nella scheda Altro</string>
     <string name="pref_bottom_nav_no_manga">Sposta Manga nella scheda Altro</string>
+    <string name="pref_bottom_nav_no_anime">Sposta Anime nella scheda Altro</string>
     <string name="pref_bottom_nav_no_browse">Sposta Sfoglia nella tab Altro</string>
     <string name="action_filter_unseen">Non visti</string>
     <string name="action_global_manga_search">Ricerca Manga Globale</string>

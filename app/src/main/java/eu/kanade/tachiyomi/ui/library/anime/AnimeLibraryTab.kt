@@ -30,6 +30,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.TabOptions
 import dev.zacsweers.metrox.viewmodel.metroViewModel
+import eu.kanade.domain.ui.model.NavStyle
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.entries.components.LibraryBottomActionMenu
 import eu.kanade.presentation.library.DeleteLibraryEntryDialog
@@ -86,8 +87,9 @@ data object AnimeLibraryTab : Tab {
             val image = AnimatedImageVector.animatedVectorResource(
                 R.drawable.anim_animelibrary_leave,
             )
+            val fromMore = currentNavigationStyle() == NavStyle.MOVE_ANIME_TO_MORE
             return TabOptions(
-                index = 0u,
+                index = if (fromMore) 5u else 0u,
                 title = stringResource(title),
                 icon = rememberAnimatedVectorPainter(image, isSelected),
             )
@@ -148,6 +150,18 @@ data object AnimeLibraryTab : Tab {
             )
         }
 
+        val fromMore = currentNavigationStyle() == NavStyle.MOVE_ANIME_TO_MORE
+        val navigateUp: (() -> Unit)? = if (fromMore) {
+            {
+                if (navigator.lastItem == HomeScreen) {
+                    scope.launch { HomeScreen.openTab(HomeScreen.Tab.Library()) }
+                } else {
+                    navigator.pop()
+                }
+            }
+        } else {
+            null
+        }
         val defaultTitle = stringResource(AYMR.strings.label_anime_library)
 
         Scaffold(
@@ -169,6 +183,7 @@ data object AnimeLibraryTab : Tab {
                             viewModel.activeCategoryIndex,
                         )
                     },
+                    navigateUp = navigateUp,
                     onClickFilter = viewModel::showSettingsDialog,
                     onClickRefresh = {
                         state.categories.getOrNull(viewModel.activeCategoryIndex)?.let(onClickRefresh)

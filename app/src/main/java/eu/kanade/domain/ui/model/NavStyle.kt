@@ -1,6 +1,7 @@
 package eu.kanade.domain.ui.model
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.outlined.CollectionsBookmark
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.History
@@ -12,6 +13,7 @@ import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.ui.browse.BrowseTab
 import eu.kanade.tachiyomi.ui.history.HistoriesTab
+import eu.kanade.tachiyomi.ui.home.HomeTab
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryTab
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import eu.kanade.tachiyomi.ui.more.MoreTab
@@ -26,6 +28,7 @@ enum class NavStyle(
     MOVE_UPDATES_TO_MORE(titleRes = AYMR.strings.pref_bottom_nav_no_updates, moreTab = UpdatesTab),
     MOVE_HISTORY_TO_MORE(titleRes = AYMR.strings.pref_bottom_nav_no_history, moreTab = HistoriesTab),
     MOVE_BROWSE_TO_MORE(titleRes = AYMR.strings.pref_bottom_nav_no_browse, moreTab = BrowseTab),
+    MOVE_ANIME_TO_MORE(titleRes = AYMR.strings.pref_bottom_nav_no_anime, moreTab = AnimeLibraryTab),
     ;
 
     val moreIcon: ImageVector
@@ -35,12 +38,13 @@ enum class NavStyle(
             MOVE_UPDATES_TO_MORE -> ImageVector.vectorResource(id = R.drawable.ic_updates_outline_24dp)
             MOVE_HISTORY_TO_MORE -> Icons.Outlined.History
             MOVE_BROWSE_TO_MORE -> Icons.Outlined.Explore
+            MOVE_ANIME_TO_MORE -> Icons.Default.VideoLibrary
         }
 
     val tabs: List<Tab>
         get() {
             return mutableListOf(
-                eu.kanade.tachiyomi.ui.home.HomeTab,
+                HomeTab,
                 AnimeLibraryTab,
                 MangaLibraryTab,
                 UpdatesTab,
@@ -49,4 +53,13 @@ enum class NavStyle(
                 MoreTab,
             ).apply { remove(this@NavStyle.moreTab) }
         }
+
+    fun resolveStartTab(configuredTab: Tab, showHome: Boolean): Tab {
+        val fallbackLibrary = if (moreTab == AnimeLibraryTab) MangaLibraryTab else AnimeLibraryTab
+        return when {
+            configuredTab == HomeTab && !showHome -> fallbackLibrary
+            configuredTab == moreTab -> if (showHome) HomeTab else fallbackLibrary
+            else -> configuredTab
+        }
+    }
 }

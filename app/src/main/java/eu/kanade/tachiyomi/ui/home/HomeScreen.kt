@@ -108,14 +108,7 @@ object HomeScreen : Screen() {
         val showHomeTab by uiPreferences.showHomeTab.collectAsState()
         val startScreenPref by uiPreferences.startScreen.collectAsState()
 
-        val effectiveStartTab = remember(showHomeTab, startScreenPref) {
-            val configuredTab = startScreenPref.tab
-            if (configuredTab == HomeTab && !showHomeTab) {
-                AnimeLibraryTab
-            } else {
-                configuredTab
-            }
-        }
+        val effectiveStartTab = navStyle.resolveStartTab(startScreenPref.tab, showHomeTab)
 
         TabNavigator(
             tab = effectiveStartTab,
@@ -199,20 +192,13 @@ object HomeScreen : Screen() {
                 }
             }
 
-            val goToStartScreen = {
-                if (effectiveStartTab != navStyle.moreTab) {
-                    tabNavigator.current = effectiveStartTab
-                } else {
-                    tabNavigator.current = if (showHomeTab) HomeTab else AnimeLibraryTab
-                }
-            }
+            val goToStartScreen = { tabNavigator.current = effectiveStartTab }
             BackHandler(
-                enabled = (tabNavigator.current == navStyle.moreTab || tabNavigator.current != effectiveStartTab) &&
-                    (tabNavigator.current != AnimeLibraryTab || effectiveStartTab != navStyle.moreTab),
+                enabled = tabNavigator.current != effectiveStartTab,
                 onBack = goToStartScreen,
             )
 
-            LaunchedEffect(Unit) {
+            LaunchedEffect(effectiveStartTab, showHomeTab, navStyle) {
                 launch {
                     librarySearchEvent.receiveAsFlow().collectLatest {
                         goToStartScreen()
@@ -226,7 +212,7 @@ object HomeScreen : Screen() {
                 launch {
                     openTabEvent.receiveAsFlow().collectLatest {
                         tabNavigator.current = when (it) {
-                            is Tab.Home -> if (showHomeTab) HomeTab else AnimeLibraryTab
+                            is Tab.Home -> navStyle.resolveStartTab(HomeTab, showHomeTab)
 
                             is Tab.AnimeLib -> AnimeLibraryTab
 
