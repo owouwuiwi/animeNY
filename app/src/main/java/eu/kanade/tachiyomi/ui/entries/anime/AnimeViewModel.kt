@@ -2037,7 +2037,7 @@ class AnimeViewModel(
 
         data class SetEpisodeDate(val episodes: List<Episode>) : Dialog
         data class EditEpisodeTitle(val episode: Episode) : Dialog
-        internal data class ImportEpisodes(val files: List<EpisodeImportCandidate>) : Dialog
+        data class ImportEpisodes(val files: List<EpisodeImportCandidate>) : Dialog
         data object RemoveFromLibrary : Dialog
         data object ChangeAnimeSkipIntro : Dialog
         data class ChangeAnimeAudioLanguage(val originalLanguage: String?) : Dialog
