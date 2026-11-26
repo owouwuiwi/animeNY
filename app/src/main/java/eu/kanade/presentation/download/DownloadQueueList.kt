@@ -382,8 +382,19 @@ private fun ReorderableCollectionItemScope.DownloadQueueItem(
                     val context = LocalContext.current
                     val size = Formatter.formatShortFileSize(context, transfer.bytes)
                     val rate = Formatter.formatShortFileSize(context, transfer.bytesPerSecond)
+                    val totalBytes = transfer.totalBytes
+                    val details = if (totalBytes == null) {
+                        stringResource(TLMR.strings.anime_download_transfer_details, size, rate)
+                    } else {
+                        val total = Formatter.formatShortFileSize(context, totalBytes)
+                        if (transfer.bytesPerSecond > 0L) {
+                            stringResource(TLMR.strings.anime_download_transfer_with_total, size, total, rate)
+                        } else {
+                            stringResource(TLMR.strings.anime_download_transfer_total, size, total)
+                        }
+                    }
                     Text(
-                        text = stringResource(TLMR.strings.anime_download_transfer_details, size, rate),
+                        text = details,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelSmall,
                     )

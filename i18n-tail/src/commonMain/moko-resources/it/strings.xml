@@ -340,6 +340,10 @@
   <string name="network_stream_header_error">L\'intestazione sulla riga %1$d deve usare il formato \"Nome: Valore\"</string>
   <string name="network_stream_play">Riproduci stream</string>
   <string name="network_stream_reset">Cancella campi</string>
+  <string name="pref_parallel_anime_downloads">Download anime in parallelo</string>
+  <string name="pref_parallel_anime_downloads_summary">Usa fino a quattro richieste contemporanee per i file video diretti compatibili</string>
+  <string name="anime_download_transfer_total">%1$s di %2$s</string>
+  <string name="anime_download_transfer_with_total">%1$s di %2$s · %3$s/s</string>
   <string name="show_splash_ovals_on_double_tap_to_seek" comment="show_splash_ovals_on_double_tap_to_seek Video Player">Mostra ondulazione quando si cerca doppio tocco</string>
   <string name="show_seek_icon">Mostra icona ricerca</string>
   <string name="show_seek_time">Mostra ora di ricerca</string>

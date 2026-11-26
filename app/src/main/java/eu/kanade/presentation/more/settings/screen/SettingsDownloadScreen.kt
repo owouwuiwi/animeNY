@@ -107,6 +107,11 @@ object SettingsDownloadScreen : SearchableSettings {
                 },
                 title = stringResource(TLMR.strings.pref_anime_download_quality),
             ),
+            Preference.PreferenceItem.SwitchPreference(
+                preference = downloadPreferences.parallelAnimeHttpDownloads,
+                title = stringResource(TLMR.strings.pref_parallel_anime_downloads),
+                subtitle = stringResource(TLMR.strings.pref_parallel_anime_downloads_summary),
+            ),
             getDeleteChaptersGroup(
                 downloadPreferences = downloadPreferences,
                 animeCategories = allAnimeCategories.toList(),

@@ -45,7 +45,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -61,6 +63,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.suspendCancellableCoroutine
 import logcat.LogPriority
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.Request
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.storage.extension
 import tachiyomi.core.common.util.lang.launchIO
@@ -517,7 +521,7 @@ class AnimeDownloader(
                             download.video = download.video?.copyHttpServer(httpServer?.listeningPort ?: 0)
                         }
 
-                        downloadVideo(download, tmpDir, filename)
+                        downloadVideo(download, tmpDir, filename, allowParallel = !video.usesHttpServer())
                     } else {
                         if (download.video!!.usesHttpServer()) {
                             val (success, port) = MainActivity.startHttpServerService(context, download.source.id)
@@ -563,7 +567,9 @@ class AnimeDownloader(
         download: AnimeDownload,
         tmpDir: UniFile,
         filename: String,
+        allowParallel: Boolean,
     ): UniFile {
+        var tryParallel = allowParallel && preferences.parallelAnimeHttpDownloads.get()
         return flow {
             tmpDir.findFile("$filename.tmp")?.delete()
             val videoFile = tmpDir.createFile("$filename.tmp")!!
@@ -571,7 +577,13 @@ class AnimeDownloader(
                 if (torrentPreferences.torrServerEnable().get() && isTorrent(download.video)) {
                     torrentDownload(download, tmpDir, videoFile, filename)
                 } else {
-                    ffmpegDownload(download, tmpDir, videoFile, filename)
+                    val request = if (tryParallel) parallelHttpRequest(download) else null
+                    tryParallel = false
+                    if (request == null) {
+                        ffmpegDownload(download, tmpDir, videoFile, filename)
+                    } else {
+                        downloadHttpVideo(download, tmpDir, videoFile, filename, request)
+                    }
                 }
             } catch (e: HttpException) {
                 if (e.code == 416) {
@@ -593,6 +605,77 @@ class AnimeDownloader(
             }
             .flowOn(Dispatchers.IO)
             .first()
+    }
+
+    private fun parallelHttpRequest(download: AnimeDownload): Request? {
+        val video = download.video ?: return null
+        if (isTorrent(video) || video.audioTracks.isNotEmpty() || video.subtitleTracks.isNotEmpty() ||
+            video.ffmpegStreamArgs.isNotEmpty() || video.ffmpegVideoArgs.isNotEmpty()
+        ) {
+            return null
+        }
+        val url = video.videoUrl.toHttpUrlOrNull() ?: return null
+        if (url.username.isNotEmpty() || url.password.isNotEmpty()) return null
+        val headers = video.headers ?: download.source.headers
+        if (headers.values("Accept-Encoding").any { !it.equals("identity", ignoreCase = true) }) return null
+        if (RANGE_INCOMPATIBLE_HEADERS.any { headers[it] != null }) return null
+        return Request.Builder().url(url).headers(headers).build()
+    }
+
+    private suspend fun downloadHttpVideo(
+        download: AnimeDownload,
+        tmpDir: UniFile,
+        videoFile: UniFile,
+        filename: String,
+        request: Request,
+    ) {
+        val cache = File(context.externalCacheDir ?: context.cacheDir, "parallel_downloads")
+        val input = try {
+            cache.mkdirs()
+            File.createTempFile("video-", ".tmp", cache)
+        } catch (_: IOException) {
+            ffmpegDownload(download, tmpDir, videoFile, filename)
+            return
+        }
+
+        try {
+            val isSaf = videoFile.uri.scheme == "content"
+            val storageSpace = DiskUtil.getAvailableStorageSpace(tmpDir)
+            val staged = try {
+                var sampledBytes = 0L
+                var sampledTime = SystemClock.elapsedRealtime()
+                withProgressTimeout(STALL_TIMEOUT) { onProgress ->
+                    ParallelHttpDownload(download.source.client).stage(
+                        request = request,
+                        destination = input,
+                        canStore = { length ->
+                            val copies = if (isSaf) 3 else 2
+                            val cacheCapacity = (cache.usableSpace - MIN_DISK_SPACE) / copies
+                            cacheCapacity >= length && (storageSpace < 0 || storageSpace >= length)
+                        },
+                        onProgress = { bytes, total ->
+                            onProgress()
+                            download.progress = (bytes.toDouble() / total * PARALLEL_STAGE_PERCENT).toInt()
+                            val now = SystemClock.elapsedRealtime()
+                            val elapsed = now - sampledTime
+                            if (elapsed >= 1_000L || bytes == total) {
+                                val speed = if (bytes == total) 0L else (bytes - sampledBytes) * 1_000L / elapsed
+                                download.updateTransfer(bytes, speed, total)
+                                sampledBytes = bytes
+                                sampledTime = now
+                            }
+                        },
+                    )
+                }
+            } catch (_: IOException) {
+                currentCoroutineContext().ensureActive()
+                false
+            }
+            if (!staged) download.progress = 0
+            ffmpegDownload(download, tmpDir, videoFile, filename, stagedInput = input.takeIf { staged })
+        } finally {
+            input.delete()
+        }
     }
 
     private fun isTorrent(video: Video?): Boolean {
@@ -637,9 +720,11 @@ class AnimeDownloader(
         tmpDir: UniFile,
         videoFile: UniFile,
         filename: String,
+        stagedInput: File? = null,
     ) {
-        val video = download.video!!
-        download.updateTransfer()
+        val original = download.video!!
+        val video = stagedInput?.let { original.copy(videoUrl = it.absolutePath) } ?: original
+        if (stagedInput == null) download.updateTransfer()
 
         val isSaf = videoFile.uri.scheme == "content"
         val localTmpFile = if (isSaf) {
@@ -675,10 +760,10 @@ class AnimeDownloader(
             }
         }
 
-        val ffprobeOptions = if (video.videoUrl.startsWith("http")) {
-            "$FFMPEG_NETWORK_INPUT_OPTIONS $headerOptions"
-        } else {
-            headerOptions
+        val ffprobeOptions = when {
+            stagedInput != null -> ""
+            video.videoUrl.startsWith("http") -> "$FFMPEG_NETWORK_INPUT_OPTIONS $headerOptions"
+            else -> headerOptions
         }
         val probeCommand = "$ffprobeOptions ${SourceProbe.FFPROBE_ARGS} \"${video.videoUrl}\""
         val probe = SourceProbe.parse(runFFprobe(FFmpegKitConfig.parseArguments(probeCommand)))
@@ -700,7 +785,7 @@ class AnimeDownloader(
 
                 val now = SystemClock.elapsedRealtime()
                 val elapsed = now - previousMetricTime
-                if (elapsed >= 1_000L && s.size >= 0L) {
+                if (stagedInput == null && elapsed >= 1_000L && s.size >= 0L) {
                     val rate = (s.size - previousMetricSize).coerceAtLeast(0L) * 1_000L / elapsed
                     download.updateTransfer(s.size, rate)
                     previousMetricSize = s.size
@@ -709,7 +794,12 @@ class AnimeDownloader(
 
                 val outTime = (s.time / 1000.0).toLong()
                 if (duration != 0L && outTime > 0) {
-                    download.progress = (100 * outTime / duration).toInt()
+                    val progress = (100 * outTime / duration).toInt().coerceIn(0, 100)
+                    download.progress = if (stagedInput == null) {
+                        progress
+                    } else {
+                        PARALLEL_STAGE_PERCENT + progress * (100 - PARALLEL_STAGE_PERCENT) / 100
+                    }
                 }
             }
 
@@ -1079,6 +1169,15 @@ class AnimeDownloader(
 private const val MIN_DISK_SPACE = 200L * 1024 * 1024
 private const val MIN_VIDEO_SIZE = 512L * 1024
 private const val MIN_DURATION_RATIO = 0.9f
+private const val PARALLEL_STAGE_PERCENT = 95
+private val RANGE_INCOMPATIBLE_HEADERS = setOf(
+    "Range",
+    "If-Range",
+    "If-Match",
+    "If-None-Match",
+    "If-Modified-Since",
+    "If-Unmodified-Since",
+)
 
 /**
  * Whether this episode directory holds exactly one finished video. A `.tmp` file is a download that

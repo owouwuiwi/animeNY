@@ -482,6 +482,10 @@
     <string name="episode_import_read_error">Could not read the selected files.</string>
     <string name="episode_import_result">Imported %1$d · Skipped %2$d</string>
     <string name="pref_anime_download_quality">Preferred anime download quality</string>
+    <string name="pref_parallel_anime_downloads">Parallel anime downloads</string>
+    <string name="pref_parallel_anime_downloads_summary">Use up to four concurrent requests for compatible direct video files</string>
+    <string name="anime_download_transfer_total">%1$s of %2$s</string>
+    <string name="anime_download_transfer_with_total">%1$s of %2$s · %3$s/s</string>
     <string name="download_source_quality">Source default</string>
     <string name="torrent_startup_buffer">Buffer before playing torrents</string>
     <string name="torrent_server_unavailable">Could not connect to the local torrent server</string>

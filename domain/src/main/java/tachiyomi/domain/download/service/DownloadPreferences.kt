@@ -22,6 +22,10 @@ class DownloadPreferences(
         "pref_preferred_anime_download_height",
         0,
     )
+    val parallelAnimeHttpDownloads: Preference<Boolean> = preferenceStore.getBoolean(
+        "pref_parallel_anime_http_downloads",
+        false,
+    )
 
     val externalDownloaderSelection: Preference<String> = preferenceStore.getString(
         "external_downloader_selection",

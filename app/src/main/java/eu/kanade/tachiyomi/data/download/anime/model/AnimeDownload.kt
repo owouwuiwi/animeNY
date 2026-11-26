@@ -46,8 +46,8 @@ data class AnimeDownload(
     private val transferState = MutableStateFlow(AnimeTransferMetrics(0L, 0L))
     internal val transferFlow = transferState.asStateFlow()
 
-    internal fun updateTransfer(bytes: Long = 0L, bytesPerSecond: Long = 0L) {
-        transferState.value = AnimeTransferMetrics(bytes, bytesPerSecond)
+    internal fun updateTransfer(bytes: Long = 0L, bytesPerSecond: Long = 0L, totalBytes: Long? = null) {
+        transferState.value = AnimeTransferMetrics(bytes, bytesPerSecond, totalBytes)
     }
 
     /**
@@ -90,4 +90,4 @@ data class AnimeDownload(
     }
 }
 
-internal data class AnimeTransferMetrics(val bytes: Long, val bytesPerSecond: Long)
+internal data class AnimeTransferMetrics(val bytes: Long, val bytesPerSecond: Long, val totalBytes: Long? = null)
