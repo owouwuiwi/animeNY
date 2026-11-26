@@ -101,6 +101,8 @@ import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
 import eu.kanade.tachiyomi.ui.player.utils.LanguageTags
 import eu.kanade.tachiyomi.ui.player.utils.TrackSelect
 import eu.kanade.tachiyomi.ui.player.utils.applyVideoAspect
+import eu.kanade.tachiyomi.ui.player.utils.localSeekPreviewFrames
+import eu.kanade.tachiyomi.ui.player.utils.localSeekPreviewUri
 import eu.kanade.tachiyomi.ui.reader.SaveImageNotifier
 import eu.kanade.tachiyomi.util.editBackground
 import eu.kanade.tachiyomi.util.editCover
@@ -352,6 +354,7 @@ class PlayerViewModel(
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, Bitmap>?) = size > 3
         }
     private var thumbnailFetchJob: Job? = null
+    private var localSeekPreviewJob: Job? = null
 
     val duration = MutableStateFlow(0f)
 
@@ -704,6 +707,26 @@ class PlayerViewModel(
     fun updateSeekPos(pos: Float) {
         _seekPosition.update { _ -> pos }
 
+        val videoUrl = currentVideo.value?.videoUrl
+        val localUri = videoUrl?.let(::localSeekPreviewUri)
+        if (localUri != null) {
+            if (localSeekPreviewJob == null) {
+                localSeekPreviewJob = viewModelScope.launchIO {
+                    try {
+                        localSeekPreviewFrames(context, localUri, seekPosition).collect { frame ->
+                            if (isSeeking.value && currentVideo.value?.videoUrl == videoUrl) {
+                                _thumbnailImage.value = frame.asImageBitmap()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        logcat(LogPriority.DEBUG, e) { "Could not preview local video" }
+                    }
+                }
+            }
+            return
+        }
+
         val thumbInfo = thumbnailInfo.value ?: return
         val info = thumbInfo.tileInfo.lastOrNull { it.timeMs <= pos * 1000L }
         if (info != null) {
@@ -745,6 +768,9 @@ class PlayerViewModel(
     fun updateIsSeeking(value: Boolean) {
         _isSeeking.update { _ -> value }
         if (!value) {
+            localSeekPreviewJob?.cancel()
+            localSeekPreviewJob = null
+            thumbnailFetchJob?.cancel()
             _thumbnailImage.update { _ -> null }
         }
     }
@@ -2071,6 +2097,7 @@ class PlayerViewModel(
     }
 
     suspend fun loadThumbnails(video: Video, source: AnimeSource?) {
+        if (localSeekPreviewUri(video.videoUrl) != null) return
         if (source is AnimeHttpSource) {
             try {
                 val thumbInfo = source.getVideoThumbnails(video)

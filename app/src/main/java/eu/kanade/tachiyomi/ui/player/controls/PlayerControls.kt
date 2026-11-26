@@ -413,8 +413,8 @@ fun PlayerControls(
                         duration = duration,
                         readAheadValue = readAhead,
                         onValueChange = {
-                            viewModel.updateSeekPos(it)
                             viewModel.updateIsSeeking(true)
+                            viewModel.updateSeekPos(it)
                         },
                         onValueChangeFinished = {
                             viewModel.updatePlayBackPos(it)

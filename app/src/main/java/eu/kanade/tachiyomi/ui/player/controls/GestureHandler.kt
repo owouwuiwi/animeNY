@@ -198,6 +198,11 @@ fun GestureHandler(
                         viewModel.hideSeekBar()
                         if (!wasPlayerAlreadyPause) viewModel.unpause()
                     },
+                    onDragCancel = {
+                        viewModel.updateIsSeeking(false)
+                        viewModel.gestureSeekAmount.update { null }
+                        viewModel.hideSeekBar()
+                    },
                 ) { change, dragAmount ->
                     if (position <= 0f && dragAmount < 0) return@detectHorizontalDragGestures
                     if (position >= duration && dragAmount > 0) return@detectHorizontalDragGestures
