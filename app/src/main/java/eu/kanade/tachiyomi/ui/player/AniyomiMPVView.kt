@@ -23,6 +23,7 @@ import android.os.Environment
 import android.util.AttributeSet
 import android.view.KeyCharacterMap
 import android.view.KeyEvent
+import android.view.SurfaceHolder
 import animetail.feature.mpvfiles.MpvConfig
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.ui.player.controls.components.panels.toColorHexString
@@ -33,6 +34,7 @@ import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.SubtitleAssOverride
 import eu.kanade.tachiyomi.ui.player.settings.SubtitlePreferences
 import eu.kanade.tachiyomi.ui.player.utils.LanguageTags
+import eu.kanade.tachiyomi.ui.player.utils.applyVideoAspect
 import `is`.xyz.mpv.BaseMPVView
 import `is`.xyz.mpv.KeyMapping
 import `is`.xyz.mpv.MPV
@@ -79,6 +81,19 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet?) : BaseMPVView(
 
     private val videoOutput: String
         get() = if (decoderPreferences.gpuNext().get()) "gpu-next" else "gpu"
+
+    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+        super.surfaceChanged(holder, format, width, height)
+        // The surface is resized by folding, rotating and the tabletop split; Stretch has to follow it.
+        val mpv = mpv ?: return
+        if (width <= 0 || height <= 0) return
+        mpv.applyVideoAspect(playerPreferences.aspectState().get(), width / height.toDouble())
+        // mpv only renders the resized surface with the next frame, so a paused video would keep showing a
+        // stale, wrongly sized buffer. Re-decoding the current frame is how mpv itself refreshes paused video.
+        if (mpv.getPropertyBoolean("pause") == true && mpv.getPropertyDouble("time-pos") != null) {
+            mpv.command("seek", "0", "relative+exact")
+        }
+    }
 
     fun init(mpvInst: MPV) {
         this.mpv = mpvInst
