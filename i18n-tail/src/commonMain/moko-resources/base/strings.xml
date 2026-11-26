@@ -448,6 +448,7 @@
     <string name="pref_top_align_cover_summary">Align the cover image to the top instead of center</string>
 
     <!-- Audio language -->
+    <string name="torrent_startup_buffer">Buffer before playing torrents</string>
     <string name="torrent_server_unavailable">Could not connect to the local torrent server</string>
     <string name="seasonal_episode_numbering">Use season.episode numbering</string>
     <string name="pref_perceptual_brightness">Fine brightness control</string>

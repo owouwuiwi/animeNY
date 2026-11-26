@@ -25,6 +25,7 @@ import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
 import kotlinx.collections.immutable.toPersistentMap
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
@@ -106,6 +107,14 @@ object PlayerSettingsTorrentScreen : Screen(), SearchableSettings {
                     stringResource(AYMR.strings.pref_player_torrents_port_error)
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                enabled = torrentEnable,
+            ),
+            Preference.PreferenceItem.ListPreference(
+                preference = torrentPreferences.startupBufferSeconds(),
+                entries = listOf(0, 5, 15, 30).associateWith {
+                    if (it == 0) stringResource(MR.strings.off) else "${it}s"
+                }.toPersistentMap(),
+                title = stringResource(TLMR.strings.torrent_startup_buffer),
                 enabled = torrentEnable,
             ),
             Preference.PreferenceItem.MultiLineEditTextPreference(

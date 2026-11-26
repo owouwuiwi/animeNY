@@ -15,6 +15,7 @@ class TorrentPreferences(
     fun torrServerShownNotice() = preferenceStore.getBoolean("pref_torrserver_shownotice", false)
 
     fun torrServerPort() = preferenceStore.getString("pref_torrserver_port", "8090")
+    fun startupBufferSeconds() = preferenceStore.getInt("pref_torrserver_startup_buffer_seconds", 0)
     fun torrServerTrackers() = preferenceStore.getString(
         "pref_torrserver_tackers",
         """http://nyaa.tracker.wf:7777/announce

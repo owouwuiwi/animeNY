@@ -89,6 +89,7 @@ import eu.kanade.tachiyomi.ui.player.settings.SubtitlePreferences
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
 import eu.kanade.tachiyomi.ui.player.utils.LanguageTags
+import eu.kanade.tachiyomi.ui.player.utils.torrentBufferOptions
 import eu.kanade.tachiyomi.util.system.powerManager
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
@@ -1255,17 +1256,22 @@ class PlayerActivity : BaseActivity() {
             }
         }
 
-        val videoOptions = video.mpvArgs.joinToString(",") { (option, value) ->
-            "$option=\"$value\""
-        }
-
-        if (torrentPreferences.torrServerEnable().get() &&
+        val useTorrentServer = torrentPreferences.torrServerEnable().get() &&
             (
                 video.videoUrl.startsWith(torrentServerApi.hostUrl) ||
                     video.videoUrl.startsWith("magnet") ||
                     video.videoUrl.endsWith("torrent")
                 )
-        ) {
+        val options = if (useTorrentServer) {
+            torrentBufferOptions(video.mpvArgs, torrentPreferences.startupBufferSeconds().get())
+        } else {
+            video.mpvArgs
+        }
+        val videoOptions = options.joinToString(",") { (option, value) ->
+            "$option=\"$value\""
+        }
+
+        if (useTorrentServer) {
             val playbackId = viewModel.playbackId
             lifecycleScope.launchIO {
                 try {
