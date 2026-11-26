@@ -2,8 +2,6 @@ package eu.kanade.tachiyomi.ui.entries.anime
 
 import android.content.res.Configuration
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -18,16 +16,12 @@ import eu.kanade.core.preference.asState
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.presentation.browse.anime.RelatedAnimesContent
 import eu.kanade.presentation.browse.anime.components.BrowseSourceSimpleToolbar
-import eu.kanade.presentation.components.AppBar
 import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.GlobalAnimeSearchScreen
-import eu.kanade.tachiyomi.ui.entries.TrackerRecommendationsScreen
 import kotlinx.coroutines.CoroutineScope
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.domain.library.service.LibraryPreferences
-import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.components.material.Scaffold
-import tachiyomi.presentation.core.i18n.stringResource
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 
@@ -56,15 +50,6 @@ fun RelatedAnimesScreen(
                 scrollBehavior = scrollBehavior,
                 toggleSelectionMode = {},
                 isRunning = false,
-                additionalActions = listOf(
-                    AppBar.Action(
-                        title = stringResource(TLMR.strings.anilist_recommendations),
-                        icon = Icons.Outlined.Star,
-                        onClick = {
-                            navigator.push(TrackerRecommendationsScreen(successState.anime.id, anime = true))
-                        },
-                    ),
-                ),
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },

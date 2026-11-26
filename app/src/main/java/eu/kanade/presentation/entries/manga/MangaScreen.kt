@@ -158,6 +158,7 @@ fun MangaScreen(
 
     downloadProgressProvider: (Long) -> Int = { 0 },
     onTrackRepeat: (() -> Unit)? = null,
+    onTrackerRecommendations: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val onCopyTagToClipboard: (tag: String) -> Unit = {
@@ -199,6 +200,7 @@ fun MangaScreen(
             onEditIntervalClicked = onEditFetchIntervalClicked,
             onMigrateClicked = onMigrateClicked,
             onTrackRepeat = onTrackRepeat,
+            onTrackerRecommendations = onTrackerRecommendations,
             onEditNotesClicked = onEditNotesClicked,
             // SY -->
             onEditInfoClicked = onEditInfoClicked,
@@ -248,6 +250,7 @@ fun MangaScreen(
             onEditIntervalClicked = onEditFetchIntervalClicked,
             onMigrateClicked = onMigrateClicked,
             onTrackRepeat = onTrackRepeat,
+            onTrackerRecommendations = onTrackerRecommendations,
             onEditNotesClicked = onEditNotesClicked,
             // SY -->
             onEditInfoClicked = onEditInfoClicked,
@@ -337,6 +340,7 @@ private fun MangaScreenSmallImpl(
 
     downloadProgressProvider: (Long) -> Int = { 0 },
     onTrackRepeat: (() -> Unit)? = null,
+    onTrackerRecommendations: (() -> Unit)? = null,
 ) {
     val chapterListState = rememberLazyListState()
 
@@ -354,6 +358,7 @@ private fun MangaScreenSmallImpl(
     val sourcePreferences = remember { context.appGraph.sourcePreferences }
     val relatedMangasEnabled by sourcePreferences.relatedAnimes.collectAsState()
     val expandRelatedMangas by uiPreferences.expandRelatedAnimes.collectAsState()
+    val showRelatedMangasInOverflow by uiPreferences.relatedAnimesInOverflow.collectAsState()
     val showRelatedMangasInOverflow by uiPreferences.relatedAnimesInOverflow.collectAsState()
     // KMK <--
 
@@ -395,6 +400,7 @@ private fun MangaScreenSmallImpl(
                 onClickRefresh = onRefresh,
                 onClickMigrate = onMigrateClicked,
                 onTrackRepeat = onTrackRepeat,
+                onTrackerRecommendations = onTrackerRecommendations,
                 onClickEditNotes = onEditNotesClicked,
                 // SY -->
                 onClickEditInfo = onEditInfoClicked.takeIf { state.manga.favorite },
@@ -409,7 +415,9 @@ private fun MangaScreenSmallImpl(
                 titleAlphaProvider = { titleAlpha },
                 backgroundAlphaProvider = { backgroundAlpha },
                 isManga = true,
-                onClickRelatedAnimes = null,
+                onClickRelatedAnimes = onRelatedMangasScreenClick.takeIf {
+                    !expandRelatedMangas && showRelatedMangasInOverflow
+                },
             )
         },
         bottomBar = {
@@ -670,6 +678,7 @@ fun MangaScreenLargeImpl(
 
     downloadProgressProvider: (Long) -> Int = { 0 },
     onTrackRepeat: (() -> Unit)? = null,
+    onTrackerRecommendations: (() -> Unit)? = null,
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val density = LocalDensity.current
@@ -688,6 +697,7 @@ fun MangaScreenLargeImpl(
     val sourcePreferences = remember { context.appGraph.sourcePreferences }
     val relatedMangasEnabled by sourcePreferences.relatedAnimes.collectAsState()
     val expandRelatedMangas by uiPreferences.expandRelatedAnimes.collectAsState()
+    val showRelatedMangasInOverflow by uiPreferences.relatedAnimesInOverflow.collectAsState()
     val showRelatedMangasInOverflow by uiPreferences.relatedAnimesInOverflow.collectAsState()
     // KMK <--
 
@@ -721,6 +731,7 @@ fun MangaScreenLargeImpl(
                 onClickRefresh = onRefresh,
                 onClickMigrate = onMigrateClicked,
                 onTrackRepeat = onTrackRepeat,
+                onTrackerRecommendations = onTrackerRecommendations,
                 onClickEditNotes = onEditNotesClicked,
                 onCancelActionMode = { onAllChapterSelected(false) },
                 // SY -->
@@ -735,7 +746,9 @@ fun MangaScreenLargeImpl(
                 titleAlphaProvider = { 1f },
                 backgroundAlphaProvider = { 1f },
                 isManga = true,
-                onClickRelatedAnimes = null,
+                onClickRelatedAnimes = onRelatedMangasScreenClick.takeIf {
+                    !expandRelatedMangas && showRelatedMangasInOverflow
+                },
             )
         },
         bottomBar = {

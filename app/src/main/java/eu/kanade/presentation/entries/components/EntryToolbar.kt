@@ -68,6 +68,7 @@ fun EntryToolbar(
     onPrepareDownloadFolder: (() -> Unit)? = null,
     onImportEpisodes: (() -> Unit)? = null,
     onTrackRepeat: (() -> Unit)? = null,
+    onTrackerRecommendations: (() -> Unit)? = null,
 ) {
     val navigator = LocalNavigator.current
     fun onHomeClicked() = navigator?.popUntil { screen ->
@@ -239,6 +240,14 @@ fun EntryToolbar(
                         )
                     }
                     // KMK <--
+                    if (onTrackerRecommendations != null) {
+                        add(
+                            AppBar.OverflowAction(
+                                title = stringResource(TLMR.strings.anilist_recommendations),
+                                onClick = onTrackerRecommendations,
+                            ),
+                        )
+                    }
                     if (onClickSettings != null) {
                         add(
                             AppBar.OverflowAction(

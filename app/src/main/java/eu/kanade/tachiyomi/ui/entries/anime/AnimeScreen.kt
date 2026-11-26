@@ -13,7 +13,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -72,6 +71,7 @@ import eu.kanade.tachiyomi.ui.browse.anime.migration.search.MigrateAnimeDialogSc
 import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.GlobalAnimeSearchScreen
 import eu.kanade.tachiyomi.ui.category.CategoriesTab
+import eu.kanade.tachiyomi.ui.entries.TrackerRecommendationsScreen
 import eu.kanade.tachiyomi.ui.entries.anime.notes.AnimeNotesScreen
 import eu.kanade.tachiyomi.ui.entries.anime.track.AnimeTrackInfoDialogHomeScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
@@ -294,6 +294,9 @@ class AnimeScreen(
                 }
             },
             onTrackRepeat = onTrackRepeat,
+            onTrackerRecommendations = {
+                navigator.push(TrackerRecommendationsScreen(successState.anime.id, anime = true))
+            },
             onSearch = { query, global -> scope.launch { performSearch(navigator, query, global) } },
             onCoverClicked = viewModel::showImagesDialog,
             onShareClicked = {

@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
@@ -27,12 +25,10 @@ import eu.kanade.presentation.browse.InLibraryBadge
 import eu.kanade.presentation.browse.anime.RelatedAnimeTitle
 import eu.kanade.presentation.browse.anime.RelatedAnimesLoadingItem
 import eu.kanade.presentation.browse.anime.components.BrowseSourceSimpleToolbar
-import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.library.components.CommonEntryItemDefaults
 import eu.kanade.presentation.library.components.EntryComfortableGridItem
 import eu.kanade.tachiyomi.ui.browse.manga.source.browse.BrowseMangaSourceScreen
 import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.GlobalMangaSearchScreen
-import eu.kanade.tachiyomi.ui.entries.TrackerRecommendationsScreen
 import kotlinx.coroutines.CoroutineScope
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.domain.entries.manga.model.Manga
@@ -73,15 +69,6 @@ fun RelatedMangasScreen(
                 scrollBehavior = scrollBehavior,
                 toggleSelectionMode = {},
                 isRunning = false,
-                additionalActions = listOf(
-                    AppBar.Action(
-                        title = stringResource(TLMR.strings.anilist_recommendations),
-                        icon = Icons.Outlined.Star,
-                        onClick = {
-                            navigator.push(TrackerRecommendationsScreen(successState.manga.id, anime = false))
-                        },
-                    ),
-                ),
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },

@@ -55,6 +55,7 @@ import eu.kanade.tachiyomi.ui.browse.manga.migration.search.MigrateMangaDialogSc
 import eu.kanade.tachiyomi.ui.browse.manga.source.browse.BrowseMangaSourceScreen
 import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.GlobalMangaSearchScreen
 import eu.kanade.tachiyomi.ui.category.CategoriesTab
+import eu.kanade.tachiyomi.ui.entries.TrackerRecommendationsScreen
 import eu.kanade.tachiyomi.ui.entries.manga.notes.MangaNotesScreen
 import eu.kanade.tachiyomi.ui.entries.manga.track.MangaTrackInfoDialogHomeScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
@@ -407,6 +408,9 @@ class MangaScreen(
             onRefresh = viewModel::fetchAllFromSource,
             onContinueReading = { continueReading(context, viewModel.getNextUnreadChapter()) },
             onTrackRepeat = onTrackRepeat,
+            onTrackerRecommendations = {
+                navigator.push(TrackerRecommendationsScreen(successState.manga.id, anime = false))
+            },
             onSearch = { query, global -> scope.launch { performSearch(navigator, query, global) } },
             onCoverClicked = viewModel::showCoverDialog,
             onShareClicked = { shareManga(context, viewModel.manga, viewModel.source) }.takeIf { isHttpSource },
