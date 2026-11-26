@@ -122,6 +122,8 @@ class MangaBaka(id: Long) :
         return api.search(query)
     }
 
+    internal suspend fun getExternalTrackerIds(id: Long) = api.getExternalTrackerIds(id)
+
     override suspend fun refresh(track: MangaTrack): MangaTrack {
         val remoteTrack = api.findLibManga(track) ?: throw Exception("Could not find manga")
         track.copyPersonalFrom(remoteTrack)

@@ -98,6 +98,7 @@ fun MangaTrackerSearch(
     onConfirmSelection: (private: Boolean) -> Unit,
     onDismissRequest: () -> Unit,
     supportsPrivateTracking: Boolean,
+    suggestedBy: String? = null,
 ) {
     val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
@@ -214,6 +215,16 @@ fun MangaTrackerSearch(
                         contentPadding = innerPadding + PaddingValues(vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
+                        if (suggestedBy != null) {
+                            item {
+                                Text(
+                                    text = stringResource(MR.strings.track_suggested_by, suggestedBy),
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
+                        }
                         items(
                             items = availableTracks,
                             key = { it.hashCode() },

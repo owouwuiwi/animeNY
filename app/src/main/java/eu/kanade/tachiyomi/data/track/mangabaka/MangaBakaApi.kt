@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.core.net.toUri
 import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.data.database.models.manga.MangaTrack
+import eu.kanade.tachiyomi.data.track.mangabaka.dto.MangaBakaExternalTrackerIds
+import eu.kanade.tachiyomi.data.track.mangabaka.dto.MangaBakaExternalTrackerResult
 import eu.kanade.tachiyomi.data.track.mangabaka.dto.MangaBakaItem
 import eu.kanade.tachiyomi.data.track.mangabaka.dto.MangaBakaItemResult
 import eu.kanade.tachiyomi.data.track.mangabaka.dto.MangaBakaListResult
@@ -231,6 +233,15 @@ class MangaBakaApi(
                     throw e
                 }
             }
+        }
+    }
+
+    internal suspend fun getExternalTrackerIds(id: Long): MangaBakaExternalTrackerIds? = withIOContext {
+        with(json) {
+            client.newCall(GET("$API_BASE_URL/v1/series/$id"))
+                .awaitSuccess()
+                .parseAs<MangaBakaExternalTrackerResult>()
+                .data.source
         }
     }
 

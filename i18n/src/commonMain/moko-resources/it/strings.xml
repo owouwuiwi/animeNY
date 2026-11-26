@@ -248,6 +248,7 @@
     <string name="source_not_installed">Fonte non installata: %1$s</string>
     <string name="repeating">Rileggendo</string>
     <string name="track_status">Stato</string>
+    <string name="track_suggested_by">Suggerito da %1$s</string>
     <string name="track_type">Tipo</string>
     <string name="snack_categories_deleted">Categorie rimosse</string>
     <string name="migration_dialog_what_to_include">Seleziona i dati da includere</string>

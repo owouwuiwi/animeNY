@@ -42,6 +42,7 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import dev.zacsweers.metrox.viewmodel.assistedMetroViewModel
+import eu.kanade.domain.track.manga.interactor.FindLinkedMangaTrackerMatch
 import eu.kanade.domain.track.manga.interactor.RefreshMangaTracks
 import eu.kanade.domain.track.manga.model.toDbTrack
 import eu.kanade.domain.ui.UiPreferences
@@ -62,6 +63,8 @@ import eu.kanade.tachiyomi.util.lang.convertEpochMillisZone
 import eu.kanade.tachiyomi.util.system.copyToClipboard
 import eu.kanade.tachiyomi.util.system.openInBrowser
 import eu.kanade.tachiyomi.util.system.toast
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -70,6 +73,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import logcat.LogPriority
@@ -92,6 +96,7 @@ import tachiyomi.presentation.core.components.material.AlertDialogContent
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import tachiyomi.domain.track.manga.model.MangaTrack as DbMangaTrack
 
@@ -766,6 +771,7 @@ data class TrackServiceSearchScreen(
             },
             onDismissRequest = navigator::pop,
             supportsPrivateTracking = viewModel.supportsPrivateTracking,
+            suggestedBy = state.suggestedBy,
         )
     }
 
@@ -776,6 +782,7 @@ data class TrackServiceSearchScreen(
         @Assisted initialQuery: String,
         @Assisted private val trackerId: Long,
         trackerManager: TrackerManager,
+        private val findLinkedMatch: FindLinkedMangaTrackerMatch,
     ) : ViewModel() {
 
         val state: StateFlow<Model.State>
@@ -794,35 +801,49 @@ data class TrackServiceSearchScreen(
         }
 
         private val tracker = trackerManager.get(trackerId)!!
+        private var searchJob: Job? = null
 
         val supportsPrivateTracking = tracker.supportsPrivateTracking
 
         init {
             // Run search on first launch
             if (initialQuery.isNotBlank()) {
-                trackingSearch(initialQuery)
+                search(initialQuery, useLinkedMatch = currentUrl == null)
             }
         }
 
-        fun trackingSearch(query: String) {
-            viewModelScope.launch {
-                // To show loading state
-                state.update { it.copy(queryResult = null, selected = null) }
+        fun trackingSearch(query: String) = search(query, useLinkedMatch = false)
 
-                val result = withIOContext {
+        private fun search(query: String, useLinkedMatch: Boolean) {
+            searchJob?.cancel()
+            searchJob = viewModelScope.launch {
+                state.value = State()
+                state.value = withIOContext {
                     try {
-                        val results = tracker.mangaService.searchManga(query)
-                        Result.success(results)
-                    } catch (e: Throwable) {
-                        Result.failure(e)
+                        val match = if (useLinkedMatch) linkedMatchOrNull() else null
+                        val results = match?.let { listOf(it.result) } ?: tracker.mangaService.searchManga(query)
+                        State(
+                            queryResult = Result.success(results),
+                            selected = results.find { it.tracking_url == currentUrl },
+                            suggestedBy = match?.trackerName,
+                        )
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        State(queryResult = Result.failure(e))
                     }
                 }
-                state.update { oldState ->
-                    oldState.copy(
-                        queryResult = result,
-                        selected = result.getOrNull()?.find { it.tracking_url == currentUrl },
-                    )
-                }
+            }
+        }
+
+        private suspend fun linkedMatchOrNull(): FindLinkedMangaTrackerMatch.Match? {
+            return try {
+                withTimeoutOrNull(5.seconds) { findLinkedMatch.await(mangaId, tracker) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e) { "Failed to look up a linked tracker match" }
+                null
             }
         }
 
@@ -838,6 +859,7 @@ data class TrackServiceSearchScreen(
         data class State(
             val queryResult: Result<List<MangaTrackSearch>>? = null,
             val selected: MangaTrackSearch? = null,
+            val suggestedBy: String? = null,
         )
     }
 }
