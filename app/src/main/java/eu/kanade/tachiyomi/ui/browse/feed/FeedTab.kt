@@ -2,23 +2,35 @@ package eu.kanade.tachiyomi.ui.browse.feed
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.SortByAlpha
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
-import cafe.adriel.voyager.core.stack.StackEvent
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import cafe.adriel.voyager.core.model.rememberScreenModel
+import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.browse.FeedAddDialog
@@ -40,13 +52,64 @@ import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.domain.source.anime.interactor.GetRemoteAnime
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.tail.TLMR
+import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 
 @Composable
-fun feedTab(
-    // KMK -->
+fun Screen.feedTab(active: Boolean): TabContent {
+    var section by rememberSaveable { mutableStateOf(FeedSection.ANIME) }
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    val visible = active && lifecycleState.isAtLeast(Lifecycle.State.STARTED)
+    val selected = when (section) {
+        FeedSection.ANIME -> animeFeedTab(rememberScreenModel { FeedScreenModel() }, visible)
+        FeedSection.MANGA -> mangaFeedTab(rememberScreenModel { MangaFeedScreenModel() }, visible)
+    }
+
+    return selected.copy(
+        content = { contentPadding, snackbarHostState ->
+            Column(Modifier.fillMaxSize()) {
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = MaterialTheme.padding.medium,
+                            vertical = MaterialTheme.padding.small,
+                        ),
+                ) {
+                    FeedSection.entries.forEach { option ->
+                        SegmentedButton(
+                            selected = section == option,
+                            onClick = { section = option },
+                            shape = SegmentedButtonDefaults.itemShape(option.ordinal, FeedSection.entries.size),
+                        ) {
+                            Text(
+                                stringResource(
+                                    when (option) {
+                                        FeedSection.ANIME -> MR.strings.label_anime
+                                        FeedSection.MANGA -> MR.strings.label_manga
+                                    },
+                                ),
+                            )
+                        }
+                    }
+                }
+                key(section) {
+                    selected.content(contentPadding, snackbarHostState)
+                }
+            }
+        },
+    )
+}
+
+private enum class FeedSection {
+    ANIME,
+    MANGA,
+}
+
+@Composable
+private fun animeFeedTab(
     screenModel: FeedScreenModel,
-    // KMK <--
+    active: Boolean,
 ): TabContent {
     val navigator = LocalNavigator.currentOrThrow
     val state by screenModel.state.collectAsState()
@@ -62,25 +125,15 @@ fun feedTab(
 
     val haptic = LocalHapticFeedback.current
 
-    BackHandler(enabled = showingFeedOrderScreen.value) {
+    BackHandler(enabled = active && showingFeedOrderScreen.value) {
         when {
             showingFeedOrderScreen.value -> showingFeedOrderScreen.value = false
         }
     }
     // KMK <--
 
-    DisposableEffect(navigator.lastEvent) {
-        if (navigator.lastEvent == StackEvent.Push) {
-            screenModel.pushed = true
-        } else if (!screenModel.pushed) {
-            screenModel.init()
-        }
-
-        onDispose {
-            if (navigator.lastEvent == StackEvent.Idle && screenModel.pushed) {
-                screenModel.pushed = false
-            }
-        }
+    LaunchedEffect(screenModel, active) {
+        if (active) screenModel.loadWhileVisible()
     }
 
     return TabContent(
@@ -188,7 +241,7 @@ fun feedTab(
                             }
                         },
                         // KMK <--
-                        onRefresh = screenModel::init,
+                        onRefresh = screenModel::refresh,
                         getAnimeState = { anime -> screenModel.getManga(initialanime = anime) },
                     )
                 }

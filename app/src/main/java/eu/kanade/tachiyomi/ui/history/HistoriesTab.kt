@@ -10,7 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.TabOptions
@@ -21,7 +20,6 @@ import eu.kanade.domain.ui.model.NavStyle
 import eu.kanade.presentation.components.TabbedScreen
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
-import eu.kanade.tachiyomi.ui.browse.feed.FeedScreenModel
 import eu.kanade.tachiyomi.ui.history.anime.AnimeHistoryViewModel
 import eu.kanade.tachiyomi.ui.history.anime.animeHistoryTab
 import eu.kanade.tachiyomi.ui.history.anime.resumeLastEpisodeSeenEvent
@@ -75,9 +73,6 @@ data object HistoriesTab : Tab {
         val mangaHistoryViewModel = metroViewModel<MangaHistoryViewModel>()
         val mangaHistoryState by mangaHistoryViewModel.state.collectAsStateWithLifecycle()
         val mangaSearchQuery = mangaHistoryState.searchQuery
-        // KMK -->
-        val feedScreenModel = rememberScreenModel { FeedScreenModel() }
-        // KMK <--
         val animeHistoryViewModel = metroViewModel<AnimeHistoryViewModel>()
         val animeHistoryState by animeHistoryViewModel.state.collectAsStateWithLifecycle()
         val animeSearchQuery = animeHistoryState.searchQuery
@@ -94,9 +89,6 @@ data object HistoriesTab : Tab {
             onChangeAnimeSearchQuery = animeHistoryViewModel::search,
             animeExtensionsTabIndex = TAB_ANIME,
             mangaExtensionsTabIndex = TAB_MANGA,
-            // KMK -->
-            feedScreenModel = feedScreenModel,
-            // KMK <--
 
         )
 

@@ -276,6 +276,8 @@
   <string name="feed">Feed</string>
   <string name="feed_delete">Eliminare l\'elemento del feed?</string>
   <string name="feed_tab_empty">Non hai nessuna fonte nel tuo feed, vai in alto a destra per aggiungerne una</string>
+  <string name="feed_manga_no_sources">Non ci sono fonti manga da aggiungere</string>
+  <string name="feed_manga_source_unavailable">Fonte non disponibile</string>
   <string name="feed_add">Aggiungere %1$s al feed?</string>
   <string name="saved_searches">Ricerche Salvate</string>
   <string name="save_search">Salvare la ricerca corrente?</string>

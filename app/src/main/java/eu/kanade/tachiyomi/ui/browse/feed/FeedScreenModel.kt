@@ -19,11 +19,12 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -60,7 +61,7 @@ open class FeedScreenModel(
     val sourcePreferences: SourcePreferences = Injekt.get(),
     private val getAnime: GetAnime = Injekt.get(),
     val networkToLocalAnime: NetworkToLocalAnime = Injekt.get(),
-    getFeedSavedSearchGlobal: GetFeedSavedSearchGlobal = Injekt.get(),
+    private val getFeedSavedSearchGlobal: GetFeedSavedSearchGlobal = Injekt.get(),
     private val getSavedSearchGlobalFeed: GetSavedSearchGlobalFeed = Injekt.get(),
     private val countFeedSavedSearchGlobal: CountFeedSavedSearchGlobal = Injekt.get(),
     private val getSavedSearchBySourceId: GetSavedSearchBySourceId = Injekt.get(),
@@ -75,42 +76,37 @@ open class FeedScreenModel(
     val events = _events.receiveAsFlow()
 
     private val coroutineDispatcher = Executors.newFixedThreadPool(1).asCoroutineDispatcher()
-    var pushed: Boolean = false
+    private val refreshRevision = MutableStateFlow(0L)
 
-    init {
-        getFeedSavedSearchGlobal.subscribe()
-            .distinctUntilChanged()
-            .onEach {
-                val items = getSourcesToGetFeed(it).map { (feed, savedSearch) ->
-                    createCatalogueSearchItem(
-                        feed = feed,
-                        savedSearch = savedSearch,
-                        source = sourceManager.get(feed.source) as? AnimeCatalogueSource,
-                        results = null,
-                    )
-                }
-                mutableState.update { state ->
-                    state.copy(
-                        items = items,
-                    )
-                }
-                getFeed(items)
-            }
+    suspend fun loadWhileVisible() {
+        combine(getFeedSavedSearchGlobal.subscribe().distinctUntilChanged(), refreshRevision) { feeds, _ -> feeds }
             .catch { _events.send(Event.FailedFetchingSources) }
-            .launchIn(screenModelScope)
+            .collectLatest { feeds ->
+                try {
+                    loadFeeds(feeds)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    _events.send(Event.FailedFetchingSources)
+                }
+            }
     }
 
-    fun init() {
-        pushed = false
-        screenModelScope.launchIO {
-            val newItems = state.value.items?.map { it.copy(results = null) } ?: return@launchIO
-            mutableState.update { state ->
-                state.copy(
-                    items = newItems,
-                )
-            }
-            getFeed(newItems)
+    fun refresh() {
+        refreshRevision.update { it + 1 }
+    }
+
+    private suspend fun loadFeeds(feeds: List<FeedSavedSearch>) {
+        val items = getSourcesToGetFeed(feeds).map { (feed, savedSearch) ->
+            createCatalogueSearchItem(
+                feed = feed,
+                savedSearch = savedSearch,
+                source = sourceManager.get(feed.source) as? AnimeCatalogueSource,
+                results = null,
+            )
         }
+        mutableState.update { it.copy(items = items) }
+        getFeed(items)
     }
 
     fun openAddDialog() {
@@ -291,8 +287,8 @@ open class FeedScreenModel(
     /**
      * Initiates get manga per feed.
      */
-    private fun getFeed(feedSavedSearch: List<FeedItemUI>) {
-        screenModelScope.launch {
+    private suspend fun getFeed(feedSavedSearch: List<FeedItemUI>) {
+        coroutineScope {
             feedSavedSearch.map { itemUI ->
                 async {
                     val page = try {

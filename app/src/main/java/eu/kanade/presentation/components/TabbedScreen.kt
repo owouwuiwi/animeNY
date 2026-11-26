@@ -16,8 +16,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -27,7 +25,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.icerock.moko.resources.StringResource
-import eu.kanade.tachiyomi.ui.browse.feed.FeedScreenModel
 import kotlinx.coroutines.launch
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.components.material.TabText
@@ -46,17 +43,9 @@ fun TabbedScreen(
     onChangeAnimeSearchQuery: (String?) -> Unit = {},
     animeExtensionsTabIndex: Int = -1,
     mangaExtensionsTabIndex: Int = -1,
-    // KMK -->
-    feedScreenModel: FeedScreenModel,
-    // KMK <--
-
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    // KMK -->
-    val feedState by feedScreenModel.state.collectAsState()
-    // KMK <--
-
     Scaffold(
         topBar = {
             if (titleRes != null) {

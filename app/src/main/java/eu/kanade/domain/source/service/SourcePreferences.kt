@@ -105,6 +105,7 @@ class SourcePreferences(
     val hideInLibraryFeedItems = preferenceStore.getBoolean("feed_hide_in_library_items", false)
     val feedGroupBySource = preferenceStore.getBoolean("feed_group_by_source", false)
     val feedSortOrder = preferenceStore.getEnum("feed_sort_order", FeedSortOrder.MANUAL)
+    val mangaFeedSourceIds = preferenceStore.getLongArray("manga_feed_source_ids", emptyList())
 
     val disabledRepos = preferenceStore.getStringSet("disabled_repos", emptySet())
     // KMK <--

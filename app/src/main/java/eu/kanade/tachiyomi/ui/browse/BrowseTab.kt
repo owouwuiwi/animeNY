@@ -11,7 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.TabOptions
@@ -27,7 +26,6 @@ import eu.kanade.tachiyomi.ui.browse.anime.extension.animeExtensionsTab
 import eu.kanade.tachiyomi.ui.browse.anime.migration.sources.migrateAnimeSourceTab
 import eu.kanade.tachiyomi.ui.browse.anime.source.animeSourcesTab
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.GlobalAnimeSearchScreen
-import eu.kanade.tachiyomi.ui.browse.feed.FeedScreenModel
 import eu.kanade.tachiyomi.ui.browse.feed.feedTab
 import eu.kanade.tachiyomi.ui.browse.manga.extension.MangaExtensionsViewModel
 import eu.kanade.tachiyomi.ui.browse.manga.extension.mangaExtensionsTab
@@ -97,51 +95,21 @@ data object BrowseTab : Tab {
         val animeExtensionsTabContent = animeExtensionsTab(animeExtensionsViewModel)
         val mangaExtensionsTabContent = mangaExtensionsTab(mangaExtensionsViewModel)
 
-        // KMK -->
-        val feedScreenModel = rememberScreenModel { FeedScreenModel() }
-        // KMK <--
-
-        val tabs = when {
-            hideFeedTab ->
-                listOf(
-                    animeSourcesTab(),
-                    mangaSourcesTab(),
-                    animeExtensionsTabContent,
-                    mangaExtensionsTabContent,
-                    migrateAnimeSourceTab(),
-                    migrateMangaSourceTab(),
-                )
-
-            feedTabInFront ->
-                listOf(
-                    feedTab(
-                        // KMK -->
-                        feedScreenModel,
-                        // KMK <--
-                    ),
-                    animeSourcesTab(),
-                    mangaSourcesTab(),
-                    animeExtensionsTabContent,
-                    mangaExtensionsTabContent,
-                    migrateAnimeSourceTab(),
-                    migrateMangaSourceTab(),
-                )
-
-            else ->
-                listOf(
-                    animeSourcesTab(),
-                    mangaSourcesTab(),
-                    feedTab(
-                        // KMK -->
-                        feedScreenModel,
-                        // KMK <--
-                    ),
-                    animeExtensionsTabContent,
-                    mangaExtensionsTabContent,
-                    migrateAnimeSourceTab(),
-                    migrateMangaSourceTab(),
-                )
-            // SY <--
+        val sourceTabs = listOf(
+            animeSourcesTab(),
+            mangaSourcesTab(),
+            animeExtensionsTabContent,
+            mangaExtensionsTabContent,
+            migrateAnimeSourceTab(),
+            migrateMangaSourceTab(),
+        )
+        val state = rememberPagerState { sourceTabs.size + if (hideFeedTab) 0 else 1 }
+        val tabs = if (hideFeedTab) {
+            sourceTabs
+        } else {
+            val feedIndex = if (feedTabInFront) 0 else 2
+            val feed = feedTab(active = state.settledPage == feedIndex)
+            sourceTabs.toMutableList().apply { add(feedIndex, feed) }
         }
 
         val animeExtensionsTabIndex = remember(tabs, animeExtensionsTabContent) {
@@ -150,8 +118,6 @@ data object BrowseTab : Tab {
         val mangaExtensionsTabIndex = remember(tabs, mangaExtensionsTabContent) {
             tabs.indexOf(mangaExtensionsTabContent)
         }
-
-        val state = rememberPagerState { tabs.size }
 
         TabbedScreen(
             titleRes = MR.strings.browse,
@@ -163,9 +129,6 @@ data object BrowseTab : Tab {
             onChangeAnimeSearchQuery = animeExtensionsViewModel::search,
             animeExtensionsTabIndex = animeExtensionsTabIndex,
             mangaExtensionsTabIndex = mangaExtensionsTabIndex,
-            // KMK -->
-            feedScreenModel = feedScreenModel,
-            // KMK <--
             scrollable = true,
         )
         LaunchedEffect(animeExtensionsTabIndex, mangaExtensionsTabIndex) {
