@@ -1,11 +1,12 @@
 package mihon.feature.upcoming.components.calendar
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -15,14 +16,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.os.ConfigurationCompat
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toJavaLocalDate
 import kotlinx.datetime.toLocalDateTime
 import tachiyomi.presentation.core.components.material.DISABLED_ALPHA
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 import kotlin.time.Clock
 
 private const val MAX_EVENTS = 3
@@ -33,8 +43,18 @@ fun CalendarDay(
     events: Int,
     onDayClick: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean = false,
 ) {
     val today = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date }
+    val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.getDefault()
+    val dateLabel = remember(date, locale) {
+        date.toJavaLocalDate().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale))
+    }
+    val foreground = if (selected) {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    } else {
+        MaterialTheme.colorScheme.onBackground
+    }
 
     Box(
         modifier = modifier
@@ -52,7 +72,11 @@ fun CalendarDay(
                 },
             )
             .clip(shape = CircleShape)
-            .clickable(onClick = onDayClick)
+            .then(
+                if (selected) Modifier.background(MaterialTheme.colorScheme.secondaryContainer) else Modifier,
+            )
+            .selectable(selected = selected, role = Role.Button, onClick = onDayClick)
+            .semantics { contentDescription = dateLabel }
             .circleLayout(),
         contentAlignment = Alignment.Center,
     ) {
@@ -60,11 +84,7 @@ fun CalendarDay(
             text = date.day.toString(),
             textAlign = TextAlign.Center,
             fontSize = 16.sp,
-            color = if (date < today) {
-                MaterialTheme.colorScheme.onBackground.copy(alpha = DISABLED_ALPHA)
-            } else {
-                MaterialTheme.colorScheme.onBackground
-            },
+            color = if (date < today && !selected) foreground.copy(alpha = DISABLED_ALPHA) else foreground,
             fontWeight = FontWeight.SemiBold,
         )
         Row(Modifier.offset(y = 12.dp)) {

@@ -1,7 +1,6 @@
 package mihon.feature.upcoming.anime
 
 import androidx.compose.runtime.Immutable
-import androidx.compose.ui.util.fastMapIndexedNotNull
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -22,13 +21,11 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.YearMonth
 import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
-import kotlinx.datetime.yearMonth
 import mihon.domain.upcoming.anime.interactor.GetUpcomingAnime
+import mihon.feature.upcoming.components.UpcomingAgendaDay
 import tachiyomi.core.common.preference.getAndSet
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
@@ -50,24 +47,7 @@ class UpcomingAnimeViewModel(
     val excludedCategories = upcomingPreferences.animeFilterExcludedCategories
     val includedCategories = upcomingPreferences.animeFilterIncludedCategories
 
-    private val selectedYearMonth = MutableStateFlow(
-        value = Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
-            .yearMonth,
-    )
-
     private val dialog = MutableStateFlow<Dialog?>(null)
-
-    private val hasActiveFilters = getUpcomingItemPreferenceFlow()
-        .map { prefs ->
-            listOf(
-                prefs.filterIncludedCategories,
-                prefs.filterExcludedCategories,
-            )
-                .any { it.isNotEmpty() }
-        }
-        .distinctUntilChanged()
 
     private val upcoming = getUpcomingItemPreferenceFlow()
         .distinctUntilChanged()
@@ -77,83 +57,58 @@ class UpcomingAnimeViewModel(
                 includedCategories = prefs.filterIncludedCategories,
             )
                 .distinctUntilChanged()
-                .map { items -> items.toUpcomingAnimeUIModels() }
+                .map { items -> items.toAgenda(prefs.confirmedOnly) }
         }
         .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5.seconds), emptyList())
 
     val state: StateFlow<State> = combine(
         upcoming,
-        selectedYearMonth,
         dialog,
-        hasActiveFilters,
-    ) { upcoming, selectedYearMonth, dialog, hasActiveFilters ->
+        getUpcomingItemPreferenceFlow(),
+    ) { upcoming, dialog, prefs ->
         State(
-            selectedYearMonth = selectedYearMonth,
-            items = upcoming,
-            events = upcoming.toEvents(),
-            headerIndexes = upcoming.getHeaderIndexes(),
-            hasActiveFilters = hasActiveFilters,
+            days = upcoming,
+            hasActiveFilters = prefs.confirmedOnly ||
+                prefs.filterIncludedCategories.isNotEmpty() ||
+                prefs.filterExcludedCategories.isNotEmpty(),
             dialog = dialog,
         )
     }
         .stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5.seconds),
-            State(selectedYearMonth = selectedYearMonth.value),
+            State(),
         )
 
-    private fun List<Anime>.toUpcomingAnimeUIModels(): List<UpcomingAnimeUIModel> {
+    private fun List<Anime>.toAgenda(confirmedOnly: Boolean): List<UpcomingAgendaDay<UpcomingAnimeUIModel>> {
         val timezone = TimeZone.currentSystemDefault()
         val startOfDay = Clock.System.now().toLocalDateTime(timezone).date.atStartOfDayIn(timezone)
-        val byDate = mapNotNull { anime ->
+        return mapNotNull { anime ->
             val schedule = upcomingAnimeTime(
                 startOfDay,
                 anime.nextEpisodeAiringAt,
                 anime.nextEpisodeToAir,
                 anime.expectedNextUpdate,
             ) ?: return@mapNotNull null
-            UpcomingAnimeUIModel.Item(anime, schedule)
+            if (confirmedOnly && schedule.estimated) return@mapNotNull null
+            UpcomingAnimeUIModel(anime, schedule)
         }
             .sortedWith(compareBy({ it.schedule.time }, { it.anime.id }))
             .groupBy { it.schedule.time.toLocalDateTime(timezone).date }
-
-        return buildList {
-            for ((date, items) in byDate) {
-                add(UpcomingAnimeUIModel.Header(date, items.size))
-                addAll(items)
-            }
-        }
-    }
-
-    private fun List<UpcomingAnimeUIModel>.toEvents(): Map<LocalDate, Int> {
-        return filterIsInstance<UpcomingAnimeUIModel.Header>()
-            .associate { it.date to it.animeCount }
-    }
-
-    private fun List<UpcomingAnimeUIModel>.getHeaderIndexes(): Map<LocalDate, Int> {
-        return fastMapIndexedNotNull { index, upcomingUIModel ->
-            if (upcomingUIModel is UpcomingAnimeUIModel.Header) {
-                upcomingUIModel.date to index
-            } else {
-                null
-            }
-        }
-            .toMap()
-    }
-
-    fun setSelectedYearMonth(yearMonth: YearMonth) {
-        selectedYearMonth.update { yearMonth }
+            .map { (date, entries) -> UpcomingAgendaDay(date, entries) }
     }
 
     private fun getUpcomingItemPreferenceFlow(): Flow<ItemPreferences> {
         return combine(
             upcomingPreferences.animeFilterExcludedCategories.changes(),
             upcomingPreferences.animeFilterIncludedCategories.changes(),
-        ) { excluded, included ->
+            upcomingPreferences.animeConfirmedAiringOnly.changes(),
+        ) { excluded, included, confirmedOnly ->
             ItemPreferences(
                 filterExcludedCategories = excluded,
                 filterIncludedCategories = included,
+                confirmedOnly = confirmedOnly,
             )
         }
     }
@@ -183,13 +138,11 @@ class UpcomingAnimeViewModel(
     private data class ItemPreferences(
         val filterExcludedCategories: List<Long>,
         val filterIncludedCategories: List<Long>,
+        val confirmedOnly: Boolean,
     )
 
     data class State(
-        val selectedYearMonth: YearMonth,
-        val items: List<UpcomingAnimeUIModel> = listOf(),
-        val events: Map<LocalDate, Int> = mapOf(),
-        val headerIndexes: Map<LocalDate, Int> = mapOf(),
+        val days: List<UpcomingAgendaDay<UpcomingAnimeUIModel>> = emptyList(),
         val hasActiveFilters: Boolean = false,
         val dialog: Dialog? = null,
     )

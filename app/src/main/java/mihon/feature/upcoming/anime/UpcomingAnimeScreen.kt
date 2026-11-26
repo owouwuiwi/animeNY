@@ -24,10 +24,14 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 import eu.kanade.presentation.category.visualName
 import eu.kanade.presentation.components.TabbedDialog
 import eu.kanade.presentation.components.TabbedDialogPaddings
+import eu.kanade.presentation.more.settings.widget.SwitchPreferenceWidget
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
+import mihon.feature.upcoming.anime.components.UpcomingItem
+import mihon.feature.upcoming.components.UpcomingAgendaScreen
 import tachiyomi.core.common.preference.TriState
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.components.SettingsItemsPaddings
 import tachiyomi.presentation.core.components.TriStateItem
 import tachiyomi.presentation.core.components.material.padding
@@ -54,13 +58,19 @@ class UpcomingAnimeScreen : Screen() {
             null -> {}
         }
 
-        UpcomingAnimeScreenContent(
-            state = state,
-            setSelectedYearMonth = viewModel::setSelectedYearMonth,
-            onClickUpcoming = { navigator.push(AnimeScreen(it.id)) },
+        UpcomingAgendaScreen(
+            title = stringResource(TLMR.strings.upcoming_anime_title),
+            days = state.days,
             hasActiveFilters = state.hasActiveFilters,
-            onClickFilter = viewModel::showFilterDialog,
-        )
+            onFilterClick = viewModel::showFilterDialog,
+            entryKey = { it.anime.id },
+        ) { entry ->
+            UpcomingItem(
+                upcoming = entry.anime,
+                schedule = entry.schedule,
+                onClick = { navigator.push(AnimeScreen(entry.anime.id)) },
+            )
+        }
     }
 }
 
@@ -119,10 +129,12 @@ private fun ColumnScope.CategoryFilterSheet(
 fun UpcomingFilterDialog(
     viewModel: UpcomingAnimeViewModel,
 ) {
+    val showConfirmedOnly = viewModel.upcomingPreferences.animeConfirmedAiringOnly
+    val confirmedOnly by showConfirmedOnly.collectAsState()
     TabbedDialog(
         onDismissRequest = viewModel::resetDialog,
         tabTitles = listOf(
-            stringResource(MR.strings.categories),
+            stringResource(MR.strings.action_filter),
         ),
     ) {
         Column(
@@ -130,6 +142,11 @@ fun UpcomingFilterDialog(
                 .padding(vertical = TabbedDialogPaddings.Vertical)
                 .verticalScroll(rememberScrollState()),
         ) {
+            SwitchPreferenceWidget(
+                title = stringResource(TLMR.strings.upcoming_confirmed_airing_only),
+                checked = confirmedOnly,
+                onCheckedChanged = showConfirmedOnly::set,
+            )
             CategoryFilterSheet(viewModel = viewModel)
         }
     }

@@ -1,8 +1,6 @@
 package mihon.feature.upcoming.manga
 
 import androidx.compose.runtime.Immutable
-import androidx.compose.ui.util.fastMap
-import androidx.compose.ui.util.fastMapIndexedNotNull
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.zacsweers.metro.AppScope
@@ -10,7 +8,6 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
-import eu.kanade.core.util.insertSeparatorsReversed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,12 +21,11 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
-import kotlinx.datetime.YearMonth
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
-import kotlinx.datetime.yearMonth
 import mihon.domain.upcoming.manga.interactor.GetUpcomingManga
+import mihon.feature.upcoming.components.UpcomingAgendaDay
 import tachiyomi.core.common.preference.getAndSet
 import tachiyomi.domain.category.manga.interactor.GetMangaCategories
 import tachiyomi.domain.category.model.Category
@@ -49,13 +45,6 @@ class UpcomingMangaViewModel(
 
     val excludedCategories = upcomingPreferences.mangaFilterExcludedCategories
     val includedCategories = upcomingPreferences.mangaFilterIncludedCategories
-
-    private val selectedYearMonth = MutableStateFlow(
-        value = Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
-            .yearMonth,
-    )
 
     private val dialog = MutableStateFlow<Dialog?>(null)
 
@@ -77,22 +66,18 @@ class UpcomingMangaViewModel(
                 includedCategories = prefs.filterIncludedCategories,
             )
                 .distinctUntilChanged()
-                .map { items -> items.toUpcomingMangaUIModels() }
+                .map { items -> items.toAgenda() }
         }
         .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5.seconds), emptyList())
 
     val state: StateFlow<State> = combine(
         upcoming,
-        selectedYearMonth,
         dialog,
         hasActiveFilters,
-    ) { upcoming, selectedYearMonth, dialog, hasActiveFilters ->
+    ) { upcoming, dialog, hasActiveFilters ->
         State(
-            selectedYearMonth = selectedYearMonth,
-            items = upcoming,
-            events = upcoming.toEvents(),
-            headerIndexes = upcoming.getHeaderIndexes(),
+            days = upcoming,
             hasActiveFilters = hasActiveFilters,
             dialog = dialog,
         )
@@ -100,50 +85,19 @@ class UpcomingMangaViewModel(
         .stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5.seconds),
-            State(selectedYearMonth = selectedYearMonth.value),
+            State(),
         )
 
-    private fun List<Manga>.toUpcomingMangaUIModels(): List<UpcomingMangaUIModel> {
-        var mangaCount = 0
-        return fastMap { UpcomingMangaUIModel.Item(it) }
-            .insertSeparatorsReversed { before, after ->
-                if (after != null) mangaCount++
-
-                val beforeDate = before?.manga
-                    ?.expectedNextUpdate
-                    ?.toLocalDateTime(TimeZone.currentSystemDefault())
-                    ?.date
-                val afterDate = after?.manga
-                    ?.expectedNextUpdate
-                    ?.toLocalDateTime(TimeZone.currentSystemDefault())
-                    ?.date
-
-                if (beforeDate != afterDate && afterDate != null) {
-                    UpcomingMangaUIModel.Header(afterDate, mangaCount).also { mangaCount = 0 }
-                } else {
-                    null
-                }
-            }
-    }
-
-    private fun List<UpcomingMangaUIModel>.toEvents(): Map<LocalDate, Int> {
-        return filterIsInstance<UpcomingMangaUIModel.Header>()
-            .associate { it.date to it.mangaCount }
-    }
-
-    private fun List<UpcomingMangaUIModel>.getHeaderIndexes(): Map<LocalDate, Int> {
-        return fastMapIndexedNotNull { index, upcomingUIModel ->
-            if (upcomingUIModel is UpcomingMangaUIModel.Header) {
-                upcomingUIModel.date to index
-            } else {
-                null
-            }
+    private fun List<Manga>.toAgenda(): List<UpcomingAgendaDay<Manga>> {
+        val timezone = TimeZone.currentSystemDefault()
+        val startOfDay = Clock.System.now().toLocalDateTime(timezone).date.atStartOfDayIn(timezone)
+        return mapNotNull { manga ->
+            val expected = manga.expectedNextUpdate?.takeIf { it >= startOfDay } ?: return@mapNotNull null
+            expected to manga
         }
-            .toMap()
-    }
-
-    fun setSelectedYearMonth(yearMonth: YearMonth) {
-        selectedYearMonth.update { yearMonth }
+            .sortedWith(compareBy({ it.first }, { it.second.id }))
+            .groupBy({ (expected, _) -> expected.toLocalDateTime(timezone).date }, { (_, manga) -> manga })
+            .map { (date, entries) -> UpcomingAgendaDay(date, entries) }
     }
 
     private fun getUpcomingItemPreferenceFlow(): Flow<ItemPreferences> {
@@ -186,10 +140,7 @@ class UpcomingMangaViewModel(
     )
 
     data class State(
-        val selectedYearMonth: YearMonth,
-        val items: List<UpcomingMangaUIModel> = listOf(),
-        val events: Map<LocalDate, Int> = mapOf(),
-        val headerIndexes: Map<LocalDate, Int> = mapOf(),
+        val days: List<UpcomingAgendaDay<Manga>> = emptyList(),
         val hasActiveFilters: Boolean = false,
         val dialog: Dialog? = null,
     )

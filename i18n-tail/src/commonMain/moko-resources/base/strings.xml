@@ -489,5 +489,13 @@
     <string name="cover_url_hint">Image or tracking page URL</string>
     <string name="upcoming_episode_time">Episode %1$d · %2$s</string>
     <string name="upcoming_estimated_time">Estimated %s</string>
+    <string name="upcoming_anime_title">Upcoming anime</string>
+    <string name="upcoming_manga_title">Upcoming manga</string>
+    <string name="upcoming_view_week">Week</string>
+    <string name="upcoming_view_month">Month</string>
+    <string name="upcoming_week_previous">Previous week</string>
+    <string name="upcoming_week_next">Next week</string>
+    <string name="upcoming_empty_period">No upcoming entries for these dates.</string>
+    <string name="upcoming_confirmed_airing_only">Confirmed airing times only</string>
     <string name="backup_custom_manga_covers">Custom manga covers</string>
 </resources>

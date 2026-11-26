@@ -26,8 +26,11 @@ import eu.kanade.presentation.components.TabbedDialog
 import eu.kanade.presentation.components.TabbedDialogPaddings
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
+import mihon.feature.upcoming.components.UpcomingAgendaScreen
+import mihon.feature.upcoming.manga.components.UpcomingItem
 import tachiyomi.core.common.preference.TriState
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.components.SettingsItemsPaddings
 import tachiyomi.presentation.core.components.TriStateItem
 import tachiyomi.presentation.core.components.material.padding
@@ -54,13 +57,18 @@ class UpcomingMangaScreen : Screen() {
             null -> {}
         }
 
-        UpcomingMangaScreenContent(
-            state = state,
-            setSelectedYearMonth = viewModel::setSelectedYearMonth,
-            onClickUpcoming = { navigator.push(MangaScreen(it.id)) },
+        UpcomingAgendaScreen(
+            title = stringResource(TLMR.strings.upcoming_manga_title),
+            days = state.days,
             hasActiveFilters = state.hasActiveFilters,
-            onClickFilter = viewModel::showFilterDialog,
-        )
+            onFilterClick = viewModel::showFilterDialog,
+            entryKey = { it.id },
+        ) { manga ->
+            UpcomingItem(
+                upcoming = manga,
+                onClick = { navigator.push(MangaScreen(manga.id)) },
+            )
+        }
     }
 }
 

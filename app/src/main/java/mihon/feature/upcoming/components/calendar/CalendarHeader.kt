@@ -20,7 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.core.os.ConfigurationCompat
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.YearMonth
 import kotlinx.datetime.toJavaYearMonth
@@ -94,7 +96,8 @@ private fun AnimatedContentTransitionScope<YearMonth>.getAnimation(): ContentTra
 @Composable
 @ReadOnlyComposable
 private fun getTitleText(monthYear: YearMonth): String {
-    val formatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault())
+    val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.getDefault()
+    val formatter = DateTimeFormatter.ofPattern("MMMM yyyy", locale)
     return formatter.format(monthYear.toJavaYearMonth())
 }
 

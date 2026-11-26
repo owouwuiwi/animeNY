@@ -32,4 +32,9 @@ class UpcomingPreferences(
         "pref_filter_upcoming_anime_excluded_categories",
         emptyList(),
     )
+
+    val animeConfirmedAiringOnly: Preference<Boolean> = preferenceStore.getBoolean(
+        "pref_upcoming_anime_confirmed_only",
+        false,
+    )
 }

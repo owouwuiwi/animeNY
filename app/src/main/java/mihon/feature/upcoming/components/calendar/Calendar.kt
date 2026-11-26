@@ -12,11 +12,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
+import androidx.core.os.ConfigurationCompat
 import com.cheonjaeung.compose.grid.SimpleGridCells
 import com.cheonjaeung.compose.grid.VerticalGrid
 import kotlinx.datetime.LocalDate
@@ -42,6 +44,7 @@ fun Calendar(
     setSelectedYearMonth: (YearMonth) -> Unit,
     onClickDay: (day: LocalDate) -> Unit,
     modifier: Modifier = Modifier,
+    selectedDate: LocalDate? = null,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -61,6 +64,7 @@ fun Calendar(
             selectedYearMonth = selectedYearMonth,
             events = events,
             onClickDay = onClickDay,
+            selectedDate = selectedDate,
         )
     }
 }
@@ -70,9 +74,11 @@ private fun CalendarGrid(
     selectedYearMonth: YearMonth,
     events: Map<LocalDate, Int>,
     onClickDay: (day: LocalDate) -> Unit,
+    selectedDate: LocalDate?,
 ) {
-    val localeFirstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek.value
-    val weekDays = remember {
+    val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.getDefault()
+    val localeFirstDayOfWeek = WeekFields.of(locale).firstDayOfWeek.value
+    val weekDays = remember(localeFirstDayOfWeek) {
         (0 until DAYS_OF_WEEK)
             .map { DayOfWeek.of((localeFirstDayOfWeek - 1 + it) % DAYS_OF_WEEK + 1) }
     }
@@ -92,7 +98,7 @@ private fun CalendarGrid(
             Text(
                 text = item.getDisplayName(
                     TextStyle.NARROW,
-                    Locale.getDefault(),
+                    locale,
                 ),
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.SemiBold,
@@ -106,6 +112,7 @@ private fun CalendarGrid(
                 date = localDate,
                 onDayClick = { onClickDay(localDate) },
                 events = events[localDate] ?: 0,
+                selected = selectedDate == localDate,
             )
         }
     }
