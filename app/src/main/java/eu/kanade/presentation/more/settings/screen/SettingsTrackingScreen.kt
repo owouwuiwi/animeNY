@@ -181,6 +181,11 @@ object SettingsTrackingScreen : SearchableSettings {
                 title = stringResource(TLMR.strings.pref_tracking_sync_enhanced),
             ),
             Preference.PreferenceItem.SwitchPreference(
+                preference = trackPreferences.importTrackerProgress,
+                title = stringResource(TLMR.strings.pref_import_tracker_progress),
+                subtitle = stringResource(TLMR.strings.pref_import_tracker_progress_summary),
+            ),
+            Preference.PreferenceItem.SwitchPreference(
                 preference = trackPreferences.smartTrackerSync(),
                 title = stringResource(TLMR.strings.pref_smart_sync_tracker),
                 subtitle = stringResource(TLMR.strings.pref_smart_sync_tracker_summary),
