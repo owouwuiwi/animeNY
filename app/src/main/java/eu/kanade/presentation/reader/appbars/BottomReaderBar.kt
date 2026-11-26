@@ -2,16 +2,17 @@ package eu.kanade.presentation.reader.appbars
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -42,18 +43,18 @@ fun BottomReaderBar(
     dualPageSplitEnabled: Boolean,
     doublePages: Boolean,
     onClickWebView: (() -> Unit)?,
+    onClickBrowser: (() -> Unit)?,
     onClickShare: (() -> Unit)?,
     onClickPageLayout: () -> Unit,
     onClickShiftPage: () -> Unit,
     // SY <--
 ) {
-    Row(
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(backgroundColor)
             .padding(8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
     ) {
         // SY -->
         if (ReaderBottomButton.WebView.isIn(enabledButtons) && onClickWebView != null) {
@@ -65,11 +66,20 @@ fun BottomReaderBar(
             }
         }
 
-        if (ReaderBottomButton.Share.isIn(enabledButtons) && onClickShare != null) {
-            IconButton(onClick = onClickOrientation) {
+        if (ReaderBottomButton.Browser.isIn(enabledButtons) && onClickBrowser != null) {
+            IconButton(onClick = onClickBrowser) {
                 Icon(
-                    imageVector = orientation.icon,
-                    contentDescription = stringResource(MR.strings.rotation_type),
+                    imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                    contentDescription = stringResource(MR.strings.action_open_in_browser),
+                )
+            }
+        }
+
+        if (ReaderBottomButton.Share.isIn(enabledButtons) && onClickShare != null) {
+            IconButton(onClick = onClickShare) {
+                Icon(
+                    imageVector = Icons.Outlined.Share,
+                    contentDescription = stringResource(MR.strings.action_share),
                 )
             }
         }

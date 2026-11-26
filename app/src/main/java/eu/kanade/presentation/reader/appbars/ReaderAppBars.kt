@@ -283,6 +283,7 @@ fun ReaderAppBars(
                     dualPageSplitEnabled = dualPageSplitEnabled,
                     doublePages = doublePages,
                     onClickWebView = onOpenInWebView,
+                    onClickBrowser = onOpenInBrowser,
                     onClickShare = onShare,
                     onClickPageLayout = onClickPageLayout,
                     onClickShiftPage = onClickShiftPage,
