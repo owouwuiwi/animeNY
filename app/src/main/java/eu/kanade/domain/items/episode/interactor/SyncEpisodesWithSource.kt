@@ -10,6 +10,7 @@ import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadProvider
+import eu.kanade.tachiyomi.data.download.anime.matchEpisodeDownloadReplacements
 import tachiyomi.data.items.episode.EpisodeSanitizer
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.items.episode.interactor.GetEpisodesByAnimeId
@@ -73,6 +74,8 @@ class SyncEpisodesWithSource(
 
         val newEpisodes = mutableListOf<Episode>()
         val updatedEpisodes = mutableListOf<Episode>()
+        val refreshedEpisodes = mutableListOf<Episode>()
+        val downloadedPathChanges = mutableListOf<Pair<Episode, Episode>>()
         val removedEpisodes = dbEpisodes.filterNot { dbEpisode ->
             sourceEpisodes.any { sourceEpisode ->
                 dbEpisode.url == sourceEpisode.url
@@ -100,6 +103,7 @@ class SyncEpisodesWithSource(
                 episode.episodeNumber,
             )
             episode = episode.copy(episodeNumber = episodeNumber)
+            refreshedEpisodes.add(episode)
 
             val dbEpisode = dbEpisodes.find { it.url == episode.url }
 
@@ -114,20 +118,8 @@ class SyncEpisodesWithSource(
                 newEpisodes.add(toAddEpisode)
             } else {
                 if (shouldUpdateDbEpisode.await(dbEpisode, episode)) {
-                    val shouldRenameEpisode = downloadProvider.isEpisodeDirNameChanged(
-                        dbEpisode,
-                        episode,
-                    ) &&
-                        downloadManager.isEpisodeDownloaded(
-                            dbEpisode.name,
-                            dbEpisode.scanlator,
-                            dbEpisode.url,
-                            anime.title,
-                            anime.source,
-                        )
-
-                    if (shouldRenameEpisode) {
-                        downloadManager.renameEpisode(source, anime, dbEpisode, episode)
+                    if (downloadProvider.isEpisodeDirNameChanged(dbEpisode, episode)) {
+                        downloadedPathChanges.add(dbEpisode to episode)
                     }
                     var toChangeEpisode = dbEpisode.copy(
                         name = episode.name,
@@ -234,6 +226,14 @@ class SyncEpisodesWithSource(
             val episodeUpdates = updatedEpisodes.map { it.toEpisodeUpdate() }
             updateEpisode.awaitAll(episodeUpdates)
         }
+
+        if (removedEpisodes.isNotEmpty() && newEpisodes.isNotEmpty()) {
+            downloadedPathChanges.addAll(matchEpisodeDownloadReplacements(dbEpisodes, refreshedEpisodes))
+        }
+        downloadedPathChanges.forEach { (old, new) ->
+            downloadManager.renameEpisode(source, anime, old, new)
+        }
+
         updateAnime.awaitUpdateFetchInterval(anime, now, fetchWindow)
 
         // Set this anime as updated since episodes were changed

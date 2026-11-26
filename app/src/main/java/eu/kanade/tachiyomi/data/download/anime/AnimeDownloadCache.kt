@@ -234,8 +234,9 @@ class AnimeDownloadCache(
      * @param episodeDirName the downloaded episode's directory name.
      * @param animeUniFile the directory of the anime.
      * @param anime the anime of the episode.
+     * @param previousName the cached name if the file was moved.
      */
-    suspend fun addEpisode(episodeDirName: String, animeUniFile: UniFile, anime: Anime) {
+    suspend fun addEpisode(episodeDirName: String, animeUniFile: UniFile, anime: Anime, previousName: String? = null) {
         rootDownloadsDirMutex.withLock {
             // Retrieve the cached source directory or cache a new one
             var sourceDir = rootDownloadsDir.sourceDirs[anime.source]
@@ -255,6 +256,7 @@ class AnimeDownloadCache(
             }
 
             // Save the chapter directory
+            if (previousName != null) animeDir.episodeDirs -= previousName
             animeDir.episodeDirs += episodeDirName
         }
 

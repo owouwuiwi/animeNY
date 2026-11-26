@@ -9,6 +9,7 @@ import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
 import eu.kanade.tachiyomi.util.size
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -19,9 +20,11 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.storage.extension
+import tachiyomi.core.common.storage.nameWithoutExtension
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
@@ -184,14 +187,11 @@ class AnimeDownloadManager(
     fun buildVideo(source: AnimeSource, anime: Anime, episode: Episode): Video {
         val episodeDir =
             provider.findEpisodeDir(episode.name, episode.scanlator, episode.url, anime.title, source)
-        val files = episodeDir?.listFiles().orEmpty()
-            .filter { "video" in it.type.orEmpty() }
-
-        if (files.isEmpty()) {
-            throw Exception(context.stringResource(AYMR.strings.video_list_empty_error))
-        }
-
-        val file = files[0]
+        val file = if (episodeDir?.isFile == true) {
+            episodeDir
+        } else {
+            episodeDir?.listFiles()?.firstOrNull { "video" in it.type.orEmpty() }
+        } ?: throw Exception(context.stringResource(AYMR.strings.video_list_empty_error))
 
         return Video(
             videoUrl = file.uri.toString(),
@@ -424,30 +424,30 @@ class AnimeDownloadManager(
      * @param newEpisode the target episode with the new name.
      */
     suspend fun renameEpisode(source: AnimeSource, anime: Anime, oldEpisode: Episode, newEpisode: Episode) {
-        val oldNames = provider.getValidEpisodeDirNames(oldEpisode.name, oldEpisode.scanlator, oldEpisode.url)
-        val animeDir = provider.getAnimeDir(anime.title, source)
+        withContext(Dispatchers.IO) {
+            val animeDir = provider.findAnimeDir(anime.title, source) ?: return@withContext
+            val oldNames = provider.getValidEpisodeDirNames(oldEpisode.name, oldEpisode.scanlator, oldEpisode.url)
+            val oldFile = provider.findDownloadedEpisode(animeDir, oldNames) ?: return@withContext
+            val newNames = provider.getValidEpisodeDirNames(newEpisode.name, newEpisode.scanlator, newEpisode.url)
+            if (provider.findDownloadedEpisode(animeDir, newNames) != null) return@withContext
 
-        // Assume there's only 1 version of the episode name formats present
-        val oldFolder = oldNames.asSequence()
-            .mapNotNull { animeDir.findFile(it) }
-            .firstOrNull()
+            val newName = provider.getEpisodeDirName(newEpisode.name, newEpisode.scanlator, newEpisode.url)
+            val oldName = if (oldFile.isFile) oldFile.nameWithoutExtension else oldFile.name
+            val newFileName = if (oldFile.isFile) "$newName.${oldFile.extension}" else newName
 
-        var newName = provider.getEpisodeDirName(newEpisode.name, newEpisode.scanlator, newEpisode.url)
-
-        if (oldFolder?.isFile == true) {
-            when (oldFolder.extension) {
-                "mp4" -> newName += ".mp4"
-                "mkv" -> newName += ".mkv"
+            val renamed = try {
+                oldFile.renameTo(newFileName)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                logcat(LogPriority.ERROR, e) { "Could not move downloaded episode" }
+                false
             }
-        }
 
-        if (oldFolder?.name == newName) return
-
-        if (oldFolder?.renameTo(newName) == true) {
-            cache.removeEpisode(oldEpisode, anime)
-            cache.addEpisode(newName, animeDir, anime)
-        } else {
-            logcat(LogPriority.ERROR) { "Could not rename downloaded episode: ${oldNames.joinToString()}" }
+            if (renamed) {
+                cache.addEpisode(newName, animeDir, anime, previousName = oldName)
+            } else {
+                logcat(LogPriority.ERROR) { "Could not rename downloaded episode: ${oldNames.joinToString()}" }
+            }
         }
     }
 

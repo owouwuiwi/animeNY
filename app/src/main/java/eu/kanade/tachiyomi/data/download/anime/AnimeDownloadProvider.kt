@@ -12,6 +12,7 @@ import eu.kanade.tachiyomi.util.storage.DiskUtil
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.storage.displayablePath
+import tachiyomi.core.common.storage.extension
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.download.service.DownloadPreferences
 import tachiyomi.domain.entries.anime.model.Anime
@@ -101,10 +102,8 @@ class AnimeDownloadProvider(
         animeTitle: String,
         source: AnimeSource,
     ): UniFile? {
-        val animeDir = findAnimeDir(animeTitle, source)
-        return getValidEpisodeDirNames(episodeName, episodeScanlator, episodeUrl).asSequence()
-            .mapNotNull { animeDir?.findFile(it) }
-            .firstOrNull()
+        val animeDir = findAnimeDir(animeTitle, source) ?: return null
+        return findDownloadedEpisode(animeDir, getValidEpisodeDirNames(episodeName, episodeScanlator, episodeUrl))
     }
 
     /**
@@ -117,9 +116,15 @@ class AnimeDownloadProvider(
     fun findEpisodeDirs(episodes: List<Episode>, anime: Anime, source: AnimeSource): Pair<UniFile?, List<UniFile>> {
         val animeDir = findAnimeDir(anime.title, source) ?: return null to emptyList()
         return animeDir to episodes.mapNotNull { episode ->
-            getValidEpisodeDirNames(episode.name, episode.scanlator, episode.url).asSequence()
-                .mapNotNull { animeDir.findFile(it) }
-                .firstOrNull()
+            findDownloadedEpisode(animeDir, getValidEpisodeDirNames(episode.name, episode.scanlator, episode.url))
+        }
+    }
+
+    internal fun findDownloadedEpisode(animeDir: UniFile, names: List<String>): UniFile? {
+        return names.asSequence().distinct().flatMap { name ->
+            sequenceOf(name, "$name.mp4", "$name.mkv")
+        }.firstNotNullOfOrNull { name ->
+            animeDir.findFile(name)?.takeIf { it.isDirectory || (it.isFile && it.extension in videoFileExtensions) }
         }
     }
 
@@ -314,3 +319,5 @@ class AnimeDownloadProvider(
     }
     // <-- AM (FILE_SIZE)
 }
+
+private val videoFileExtensions = setOf("mp4", "mkv")
