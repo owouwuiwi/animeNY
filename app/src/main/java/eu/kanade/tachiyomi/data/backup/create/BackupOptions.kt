@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.data.backup.create
 import dev.icerock.moko.resources.StringResource
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.i18n.tail.TLMR
 
 data class BackupOptions(
     val libraryEntries: Boolean = true,
@@ -18,6 +19,7 @@ data class BackupOptions(
     val privateSettings: Boolean = false,
     val extensions: Boolean = false,
     val categoryFilter: BackupCategoryFilter? = null,
+    val customCovers: Boolean = false,
 ) {
 
     fun asBooleanArray() = booleanArrayOf(
@@ -33,6 +35,7 @@ data class BackupOptions(
         sourceSettings,
         privateSettings,
         extensions,
+        customCovers,
     )
 
     fun canCreate() = categoryFilter?.isEmpty != true &&
@@ -74,6 +77,13 @@ data class BackupOptions(
                 setter = { options, enabled -> options.copy(readEntries = enabled) },
                 enabled = { it.libraryEntries && it.categoryFilter == null },
             ),
+        )
+
+        val manualLibraryOptions = libraryOptions + Entry(
+            label = TLMR.strings.backup_custom_manga_covers,
+            getter = BackupOptions::customCovers,
+            setter = { options, enabled -> options.copy(customCovers = enabled) },
+            enabled = { it.libraryEntries },
         )
 
         val settingsOptions = listOf(
@@ -126,6 +136,7 @@ data class BackupOptions(
             sourceSettings = array[9],
             privateSettings = array[10],
             extensions = array[11],
+            customCovers = array.getOrElse(12) { false },
         )
     }
 

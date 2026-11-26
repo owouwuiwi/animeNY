@@ -489,4 +489,5 @@
     <string name="cover_url_hint">Image or tracking page URL</string>
     <string name="upcoming_episode_time">Episode %1$d · %2$s</string>
     <string name="upcoming_estimated_time">Estimated %s</string>
+    <string name="backup_custom_manga_covers">Custom manga covers</string>
 </resources>

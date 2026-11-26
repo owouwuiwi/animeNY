@@ -105,7 +105,7 @@ class CreateBackupScreen : Screen() {
 
                 item {
                     SectionCard(MR.strings.label_library) {
-                        Options(BackupOptions.libraryOptions, state, viewModel)
+                        Options(BackupOptions.manualLibraryOptions, state, viewModel)
                         LabeledCheckbox(
                             label = stringResource(TLMR.strings.backup_limit_to_categories),
                             checked = state.options.categoryFilter != null,
@@ -246,7 +246,7 @@ class CreateBackupViewModel(
 
     @Immutable
     data class State(
-        val options: BackupOptions = BackupOptions(),
+        val options: BackupOptions = BackupOptions(customCovers = true),
         val animeCategories: List<Category> = emptyList(),
         val mangaCategories: List<Category> = emptyList(),
         val categoryListsLoaded: Boolean = false,

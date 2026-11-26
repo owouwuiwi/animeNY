@@ -20,11 +20,14 @@ import eu.kanade.tachiyomi.data.backup.models.BooleanPreferenceValue
 import eu.kanade.tachiyomi.data.backup.models.LegacyBackup
 import eu.kanade.tachiyomi.data.backup.models.StringPreferenceValue
 import eu.kanade.tachiyomi.data.backup.models.StringSetPreferenceValue
+import eu.kanade.tachiyomi.data.backup.restore.chunkBySize
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -91,6 +94,29 @@ class BackupStreamTest {
             Triple(it.source, it.url, it.tracking.map(::encode))
         }
         encode(reader.readMetadata()) shouldBe encode(backup.copy(backupManga = emptyList()))
+    }
+
+    @Test
+    fun `custom cover is optional and uses an unknown field for older readers`() {
+        val original = backup().backupManga.first()
+        val cover = byteArrayOf(1, 2, 3)
+        val bytes = write(Backup(listOf(original.copy(customCoverBytes = cover))))
+
+        read(bytes).first.single().customCoverBytes shouldBe cover
+        read(write(Backup(listOf(original)))).first.single().customCoverBytes shouldBe null
+
+        val olderReader = BackupReader(Buffer().write(bytes), parser)
+        olderReader.nextEntry() shouldBe true
+        val restored = olderReader.readEntry(PartialManga.serializer())
+        restored.source shouldBe original.source
+        restored.url shouldBe original.url
+    }
+
+    @Test
+    fun `restore batches are limited by entry count and image bytes`() = runTest {
+        listOf(0L, 0L, 0L, 8L, 8L, 20L, 0L, 3L).asFlow()
+            .chunkBySize(maxItems = 2, maxBytes = 12L) { it }
+            .toList() shouldBe listOf(listOf(0L, 0L), listOf(0L, 8L), listOf(8L), listOf(20L), listOf(0L, 3L))
     }
 
     @Test

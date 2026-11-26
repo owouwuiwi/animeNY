@@ -9,6 +9,9 @@ import tachiyomi.domain.entries.manga.model.Manga
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * Class used to create cover cache.
@@ -33,6 +36,7 @@ class MangaCoverCache(private val context: Context) {
     private val cacheDir = getCacheDir(COVERS_DIR)
 
     private val customCoverCacheDir = getCacheDir(CUSTOM_COVERS_DIR)
+    private val customCoverLock = Any()
 
     /**
      * Returns the cover from cache.
@@ -65,8 +69,34 @@ class MangaCoverCache(private val context: Context) {
      */
     @Throws(IOException::class)
     fun setCustomCoverToCache(manga: Manga, inputStream: InputStream) {
-        getCustomCoverFile(manga.id).outputStream().use {
-            inputStream.copyTo(it)
+        synchronized(customCoverLock) {
+            writeCustomCover(getCustomCoverFile(manga.id), inputStream)
+        }
+    }
+
+    fun restoreCustomCoverIfMissing(mangaId: Long, image: ByteArray): Boolean = synchronized(customCoverLock) {
+        val target = getCustomCoverFile(mangaId)
+        if (target.exists()) return@synchronized false
+        image.inputStream().use { writeCustomCover(target, it) }
+        true
+    }
+
+    private fun writeCustomCover(target: File, inputStream: InputStream) {
+        val temporary = File.createTempFile("custom-cover-", ".tmp", customCoverCacheDir)
+        try {
+            temporary.outputStream().use { inputStream.copyTo(it) }
+            try {
+                Files.move(
+                    temporary.toPath(),
+                    target.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            temporary.delete()
         }
     }
 
@@ -97,8 +127,8 @@ class MangaCoverCache(private val context: Context) {
      * @param mangaId the manga id.
      * @return whether the cover was deleted.
      */
-    fun deleteCustomCover(mangaId: Long?): Boolean {
-        return getCustomCoverFile(mangaId).let {
+    fun deleteCustomCover(mangaId: Long?): Boolean = synchronized(customCoverLock) {
+        getCustomCoverFile(mangaId).let {
             it.exists() && it.delete()
         }
     }

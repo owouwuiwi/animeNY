@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.data.backup.create.creators
 
 import dev.zacsweers.metro.Inject
+import eu.kanade.tachiyomi.data.backup.MangaCoverBackup
 import eu.kanade.tachiyomi.data.backup.create.BackupOptions
 import eu.kanade.tachiyomi.data.backup.create.includesBackupCategory
 import eu.kanade.tachiyomi.data.backup.models.BackupHistory
@@ -9,6 +10,7 @@ import eu.kanade.tachiyomi.data.backup.models.toBackupChapter
 import eu.kanade.tachiyomi.data.backup.models.toBackupTracking
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import mihon.core.common.extensions.toByteArray
 import tachiyomi.domain.category.manga.repository.MangaCategoryRepository
@@ -25,6 +27,7 @@ class MangaBackupCreator(
     private val categoryRepository: MangaCategoryRepository,
     private val historyRepository: MangaHistoryRepository,
     private val trackRepository: MangaTrackRepository,
+    private val mangaCoverBackup: MangaCoverBackup,
 ) {
 
     /**
@@ -32,11 +35,11 @@ class MangaBackupCreator(
      */
     operator fun invoke(mangas: List<Manga>, options: BackupOptions): Flow<BackupManga> = flow {
         mangas.chunked(CHUNK_SIZE).forEach { chunk ->
-            backupMangas(chunk, options).forEach { emit(it) }
+            emitMangaBackups(chunk, options)
         }
     }
 
-    private suspend fun backupMangas(mangas: List<Manga>, options: BackupOptions): List<BackupManga> {
+    private suspend fun FlowCollector<BackupManga>.emitMangaBackups(mangas: List<Manga>, options: BackupOptions) {
         val selectedCategoryIds = options.categoryFilter?.mangaIds
         val categoriesByMangaId = if (options.categories || selectedCategoryIds != null) {
             categoryRepository.getCategoriesByMangaIds(mangas.map { it.id })
@@ -48,7 +51,7 @@ class MangaBackupCreator(
         } else {
             mangas.filter { selectedCategoryIds.includesBackupCategory(categoriesByMangaId[it.id].orEmpty()) }
         }
-        if (selected.isEmpty()) return emptyList()
+        if (selected.isEmpty()) return
         val mangaIds = selected.map { it.id }
 
         val excludedScanlatorsByMangaId = mangaRepository.getExcludedScanlatorsByMangaIds(mangaIds)
@@ -65,7 +68,7 @@ class MangaBackupCreator(
         }
         val historyByMangaId = if (options.history) historyRepository.getHistoryByMangaIds(mangaIds) else emptyMap()
 
-        return selected.map { manga ->
+        selected.forEach { manga ->
             val mangaObject = manga.toBackupManga()
             val chapters = chaptersByMangaId[manga.id].orEmpty()
 
@@ -94,7 +97,10 @@ class MangaBackupCreator(
                 }
             }
 
-            mangaObject
+            if (options.customCovers) {
+                mangaObject.customCoverBytes = mangaCoverBackup.read(manga.id)
+            }
+            emit(mangaObject)
         }
     }
 

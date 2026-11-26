@@ -7,6 +7,8 @@ import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
 import eu.kanade.tachiyomi.data.backup.BackupDecoder
 import eu.kanade.tachiyomi.data.backup.BackupNotifier
+import eu.kanade.tachiyomi.data.backup.MAX_CUSTOM_COVER_BYTES
+import eu.kanade.tachiyomi.data.backup.MangaCoverBackup
 import eu.kanade.tachiyomi.data.backup.models.BackupAnime
 import eu.kanade.tachiyomi.data.backup.models.BackupAnimeSource
 import eu.kanade.tachiyomi.data.backup.models.BackupCategory
@@ -31,6 +33,7 @@ import eu.kanade.tachiyomi.util.system.createFileInCacheDir
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.chunked
 import kotlinx.coroutines.launch
@@ -66,6 +69,7 @@ class BackupRestorer(
     private val customButtonRestorer: CustomButtonRestorer,
     private val animeRestorer: AnimeRestorer,
     private val mangaRestorer: MangaRestorer,
+    private val mangaCoverBackup: MangaCoverBackup,
     private val extensionsRestorer: ExtensionsRestorer,
     private val mangaSourceManager: MangaSourceManager,
     private val animeSourceManager: AnimeSourceManager,
@@ -289,7 +293,9 @@ class BackupRestorer(
         categoriesRestoreJob?.join()
 
         backupDecoder.decodeMangaEntries(uri)
-            .chunked(100)
+            .chunkBySize(maxItems = 100, maxBytes = MAX_CUSTOM_COVER_BYTES) {
+                it.customCoverBytes?.size?.toLong() ?: 0L
+            }
             .collect { chunk ->
                 val restoredAsBatch = try {
                     ensureActive()
@@ -302,6 +308,7 @@ class BackupRestorer(
                 }
 
                 if (restoredAsBatch) {
+                    chunk.forEach { restoreMangaCover(it) }
                     restoreProgress.addAndGet(chunk.size)
                 } else {
                     chunk.forEach {
@@ -309,10 +316,10 @@ class BackupRestorer(
 
                         try {
                             mangaRestorer.restore(listOf(it), backupMangaCategories)
+                            restoreMangaCover(it)
                         } catch (e: Exception) {
                             ensureActive()
-                            val sourceName = mangaSourceMapping[it.source] ?: it.source.toString()
-                            errors.add(Date() to "${it.title} [$sourceName]: ${e.message}")
+                            recordMangaRestoreError(it, e)
                         }
 
                         restoreProgress.incrementAndGet()
@@ -321,6 +328,23 @@ class BackupRestorer(
 
                 notifier.showRestoreProgress(chunk.last().title, restoreProgress.get(), restoreAmount, isSync)
             }
+    }
+
+    private suspend fun restoreMangaCover(entry: BackupManga) {
+        val image = entry.customCoverBytes ?: return
+        try {
+            currentCoroutineContext().ensureActive()
+            mangaCoverBackup.restore(entry.source, entry.url, image)
+        } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
+            logcat(LogPriority.WARN, e) { "Could not restore custom manga cover" }
+            recordMangaRestoreError(entry, e)
+        }
+    }
+
+    private fun recordMangaRestoreError(entry: BackupManga, error: Exception) {
+        val sourceName = mangaSourceMapping[entry.source] ?: entry.source.toString()
+        errors.add(Date() to "${entry.title} [$sourceName]: ${error.message}")
     }
 
     private fun CoroutineScope.restoreAppPreferences(
