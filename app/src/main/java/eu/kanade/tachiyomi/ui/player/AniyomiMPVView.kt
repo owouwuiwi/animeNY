@@ -53,7 +53,7 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet?) : BaseMPVView(
 
     var isExiting = false
 
-    private val optionNameRegex = Regex("""^(?:--)?([\w-]+)(?:=|$)""", RegexOption.MULTILINE)
+    private val optionNameRegex = Regex("""^[ \t]*(?:--)?([\w-]+)[ \t]*(?:=|#|$)""", RegexOption.MULTILINE)
     private val mpvOptionNames = optionNameRegex.findAll(advancedPreferences.mpvConf().get()).map {
         it.groupValues[1].removePrefix("no-")
     }.toSet()
@@ -100,7 +100,7 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet?) : BaseMPVView(
         setVo(videoOutput)
         mpv?.setPropertyBoolean("pause", true)
         setSafeOptionString("profile", "fast")
-        mpv?.setOptionString("hwdec", if (decoderPreferences.tryHWDecoding().get()) "auto" else "no")
+        setSafeOptionString("hwdec", if (decoderPreferences.tryHWDecoding().get()) "auto" else "no")
 
         if (decoderPreferences.useYUV420P().get()) {
             mpv?.setOptionString("vf", "format=yuv420p")
