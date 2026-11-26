@@ -274,7 +274,7 @@ class MangaViewModel(
             }
 
             val needRefreshInfo = !manga.initialized
-            val needRefreshChapter = chapters.isEmpty()
+            val needRefreshChapter = chapters.isEmpty() && getMangaAndChapters.awaitChapters(mangaId).isEmpty()
 
             // Show what we have earlier
             state.update {
@@ -294,10 +294,8 @@ class MangaViewModel(
             observeTrackers()
 
             // Fetch info-chapters when needed
-            if (viewModelScope.isActive) {
-                if (needRefreshInfo || needRefreshChapter) {
-                    fetchMangaAndChaptersFromSource()
-                }
+            if (viewModelScope.isActive && (needRefreshInfo || needRefreshChapter)) {
+                refreshFromSource(fetchDetails = needRefreshInfo, fetchChapters = needRefreshChapter)
             }
 
             // Initial loading finished
@@ -313,8 +311,11 @@ class MangaViewModel(
     fun fetchAllFromSource(manualFetch: Boolean = true) {
         viewModelScope.launch {
             updateSuccessState { it.copy(isRefreshingData = true) }
-            fetchMangaAndChaptersFromSource(manualFetch)
-            updateSuccessState { it.copy(isRefreshingData = false) }
+            try {
+                refreshFromSource(fetchDetails = true, fetchChapters = true, manualFetch = manualFetch)
+            } finally {
+                updateSuccessState { it.copy(isRefreshingData = false) }
+            }
         }
     }
 
@@ -400,38 +401,41 @@ class MangaViewModel(
 
     // Manga info - start
 
-    /**
-     * Fetch manga information and chapters from source using getMangaUpdate.
-     */
-    private suspend fun fetchMangaAndChaptersFromSource(manualFetch: Boolean = false) {
+    private suspend fun refreshFromSource(
+        fetchDetails: Boolean,
+        fetchChapters: Boolean,
+        manualFetch: Boolean = false,
+    ) {
         val state = successState ?: return
         val source = sourceManager.get(state.manga.source) ?: state.source
         if (source is StubMangaSource) return
         try {
             withIOContext {
-                val currentChapters = state.chapters.map { it.chapter.toSChapter() }
+                val currentChapters = getMangaAndChapters.awaitChapters(mangaId).map { it.toSChapter() }
                 val mangaUpdate = source.getMangaUpdate(
                     state.manga.toSManga(),
                     currentChapters,
-                    fetchDetails = true,
-                    fetchChapters = true,
+                    fetchDetails = fetchDetails,
+                    fetchChapters = fetchChapters,
                 )
 
-                updateManga.awaitUpdateFromSource(state.manga, mangaUpdate.manga, manualFetch)
-
-                val newChapters = syncChaptersWithSource.await(
-                    mangaUpdate.chapters,
-                    state.manga,
-                    source,
-                    manualFetch,
-                )
-
-                if (manualFetch) {
-                    downloadNewChapters(newChapters)
+                if (fetchDetails) {
+                    updateManga.awaitUpdateFromSource(state.manga, mangaUpdate.manga, manualFetch)
+                }
+                if (fetchChapters) {
+                    val newChapters = syncChaptersWithSource.await(
+                        mangaUpdate.chapters,
+                        state.manga,
+                        source,
+                        manualFetch,
+                    )
+                    if (manualFetch) downloadNewChapters(newChapters)
                 }
             }
         } catch (e: Throwable) {
+            if (e is CancellationException) throw e
             if (e is HttpException && e.code == 103) return
+            if (!fetchChapters && e is UnsupportedOperationException) return
             val message = if (e is NoChaptersException || e is UnsupportedOperationException) {
                 context.stringResource(MR.strings.no_chapters_error)
             } else {
@@ -441,37 +445,6 @@ class MangaViewModel(
 
             viewModelScope.launch {
                 snackbarHostState.showSnackbar(message = message)
-            }
-        }
-    }
-
-    /**
-     * Fetch manga information from source.
-     */
-    private suspend fun fetchMangaFromSource(manualFetch: Boolean = false) {
-        val state = successState ?: return
-        val source = sourceManager.get(state.manga.source) ?: state.source
-        if (source is StubMangaSource) return
-        try {
-            withIOContext {
-                val currentChapters = state.chapters.map { it.chapter.toSChapter() }
-                val mangaUpdate = source.getMangaUpdate(
-                    state.manga.toSManga(),
-                    currentChapters,
-                    fetchDetails = true,
-                    fetchChapters = false,
-                )
-                updateManga.awaitUpdateFromSource(state.manga, mangaUpdate.manga, manualFetch)
-            }
-        } catch (e: UnsupportedOperationException) {
-            // Ignore if source does not implement/support mangaDetailsRequest
-        } catch (e: Throwable) {
-            // Ignore early hints "errors" that aren't handled by OkHttp
-            if (e is HttpException && e.code == 103) return
-
-            logcat(LogPriority.ERROR, e)
-            viewModelScope.launch {
-                snackbarHostState.showSnackbar(message = with(context) { e.formattedMessage })
             }
         }
     }
@@ -822,50 +795,6 @@ class MangaViewModel(
                 downloadProgress = activeDownload?.progress ?: 0,
                 selected = chapter.id in selectedChapterIds,
             )
-        }
-    }
-
-    /**
-     * Requests an updated list of chapters from the source.
-     */
-    private suspend fun fetchChaptersFromSource(manualFetch: Boolean = false) {
-        val state = successState ?: return
-        val source = sourceManager.get(state.manga.source) ?: state.source
-        if (source is StubMangaSource) return
-        try {
-            withIOContext {
-                val currentChapters = state.chapters.map { it.chapter.toSChapter() }
-                val mangaUpdate = source.getMangaUpdate(
-                    state.manga.toSManga(),
-                    currentChapters,
-                    fetchDetails = false,
-                    fetchChapters = true,
-                )
-
-                val newChapters = syncChaptersWithSource.await(
-                    mangaUpdate.chapters,
-                    state.manga,
-                    source,
-                    manualFetch,
-                )
-
-                if (manualFetch) {
-                    downloadNewChapters(newChapters)
-                }
-            }
-        } catch (e: Throwable) {
-            val message = if (e is NoChaptersException || e is UnsupportedOperationException) {
-                context.stringResource(MR.strings.no_chapters_error)
-            } else {
-                logcat(LogPriority.ERROR, e)
-                with(context) { e.formattedMessage }
-            }
-
-            viewModelScope.launch {
-                snackbarHostState.showSnackbar(message = message)
-            }
-            val newManga = mangaRepository.getMangaById(mangaId)
-            updateSuccessState { it.copy(manga = newManga, isRefreshingData = false) }
         }
     }
 
