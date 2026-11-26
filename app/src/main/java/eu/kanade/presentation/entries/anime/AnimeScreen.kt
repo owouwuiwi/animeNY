@@ -767,33 +767,19 @@ private fun AnimeScreenSmallImpl(
                         }
 
                         FetchType.Episodes -> {
-                            if (state.airingTime > 0L) {
+                            if (
+                                showNextEpisodeAirTime && state.airingTime > 0L &&
+                                state.anime.status.toInt() != SAnime.COMPLETED
+                            ) {
                                 item(
                                     key = EntryScreenItem.AIRING_TIME,
                                     contentType = EntryScreenItem.AIRING_TIME,
                                     span = { GridItemSpan(maxLineSpan) },
                                 ) {
-                                    // Handles the second by second countdown
-                                    var timer by remember { mutableLongStateOf(state.airingTime) }
-                                    LaunchedEffect(key1 = timer) {
-                                        if (timer > 0L) {
-                                            delay(1000L)
-                                            timer -= 1000L
-                                        }
-                                    }
-                                    if (timer > 0L &&
-                                        showNextEpisodeAirTime &&
-                                        state.anime.status.toInt() != SAnime.COMPLETED
-                                    ) {
-                                        NextEpisodeAiringListItem(
-                                            title = stringResource(
-                                                AYMR.strings.display_mode_episode,
-                                                formatEpisodeNumber(state.airingEpisodeNumber),
-                                            ),
-                                            date = formatTime(state.airingTime, useDayFormat = true),
-                                            modifier = Modifier.ignorePadding(offsetGridPaddingPx),
-                                        )
-                                    }
+                                    AiringEpisodeCountdown(
+                                        schedule = state.nextAiringEpisode,
+                                        modifier = Modifier.ignorePadding(offsetGridPaddingPx),
+                                    )
                                 }
                             }
 
@@ -1222,32 +1208,18 @@ fun AnimeScreenLargeImpl(
                                 }
 
                                 FetchType.Episodes -> {
-                                    if (state.airingTime > 0L) {
+                                    if (
+                                        showNextEpisodeAirTime && state.airingTime > 0L &&
+                                        state.anime.status.toInt() != SAnime.COMPLETED
+                                    ) {
                                         item(
                                             key = EntryScreenItem.AIRING_TIME,
                                             contentType = EntryScreenItem.AIRING_TIME,
                                         ) {
-                                            // Handles the second by second countdown reseting
-                                            var timer by remember { mutableLongStateOf(state.airingTime) }
-                                            LaunchedEffect(key1 = timer) {
-                                                if (timer > 0L) {
-                                                    delay(1000L)
-                                                    timer -= 1000L
-                                                }
-                                            }
-                                            if (timer > 0L &&
-                                                showNextEpisodeAirTime &&
-                                                state.anime.status.toInt() != SAnime.COMPLETED
-                                            ) {
-                                                NextEpisodeAiringListItem(
-                                                    title = stringResource(
-                                                        AYMR.strings.display_mode_episode,
-                                                        formatEpisodeNumber(state.airingEpisodeNumber),
-                                                    ),
-                                                    date = formatTime(state.airingTime, useDayFormat = true),
-                                                    modifier = Modifier.ignorePadding(offsetGridPaddingPx),
-                                                )
-                                            }
+                                            AiringEpisodeCountdown(
+                                                schedule = state.nextAiringEpisode,
+                                                modifier = Modifier.ignorePadding(offsetGridPaddingPx),
+                                            )
                                         }
                                     }
 
@@ -1512,6 +1484,28 @@ private fun onEpisodeItemClick(
         episodeItem.selected -> onToggleSelection(false)
         isAnyEpisodeSelected -> onToggleSelection(true)
         else -> onEpisodeClicked(episodeItem.episode, false)
+    }
+}
+
+@Composable
+private fun AiringEpisodeCountdown(schedule: Pair<Int, Long>, modifier: Modifier = Modifier) {
+    val (episode, airingAtSeconds) = schedule
+    val airingAtMillis = airingAtSeconds * 1000L
+    var remaining by remember(airingAtMillis) {
+        mutableLongStateOf(airingAtMillis - System.currentTimeMillis())
+    }
+    LaunchedEffect(airingAtMillis) {
+        while (remaining > 0L) {
+            delay(minOf(1000L, remaining))
+            remaining = airingAtMillis - System.currentTimeMillis()
+        }
+    }
+    if (remaining > 0L) {
+        NextEpisodeAiringListItem(
+            title = stringResource(AYMR.strings.display_mode_episode, formatEpisodeNumber(episode.toDouble())),
+            date = formatTime(remaining, useDayFormat = true),
+            modifier = modifier,
+        )
     }
 }
 

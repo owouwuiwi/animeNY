@@ -166,6 +166,7 @@ class AnimeViewModel(
     internal val gesturePreferences: GesturePreferences,
     private val torrentPreferences: TorrentPreferences,
     private val trackerManager: TrackerManager,
+    private val airingSchedule: AniChartApi,
     private val trackEpisode: TrackEpisode,
     private val downloadManager: AnimeDownloadManager,
     private val downloadCache: AnimeDownloadCache,
@@ -414,7 +415,10 @@ class AnimeViewModel(
                 },
             )
             updateSuccessState { it.copy(isRefreshingData = false) }
-            successState?.let { updateAiringTime(it.anime, it.trackItems, manualFetch) }
+            val anime = successState?.anime ?: return@launch
+            val tracks = getTracks.await(anime.id).associateBy { it.trackerId }
+            val linkedTrackers = trackerManager.loggedInTrackers().map { AnimeTrackItem(tracks[it.id], it) }
+            updateAiringTime(anime, linkedTrackers, manualFetch)
         }
     }
 
@@ -1893,7 +1897,7 @@ class AnimeViewModel(
             }
                 .distinctUntilChanged()
                 .collectLatest { trackItems ->
-                    updateAiringTime(anime, trackItems, manualFetch = false)
+                    successState?.let { updateAiringTime(it.anime, trackItems, manualFetch = false) }
                 }
         }
     }
@@ -1903,7 +1907,7 @@ class AnimeViewModel(
         trackItems: List<AnimeTrackItem>,
         manualFetch: Boolean,
     ) {
-        val airingEpisodeData = AniChartApi().loadAiringTime(anime, trackItems, manualFetch)
+        val airingEpisodeData = airingSchedule.loadAiringTime(anime, trackItems, manualFetch)
         setAnimeViewerFlags.awaitSetNextEpisodeAiring(anime.id, airingEpisodeData)
         updateSuccessState { it.copy(nextAiringEpisode = airingEpisodeData) }
     }
@@ -2095,9 +2099,6 @@ class AnimeViewModel(
 
             val trackingAvailable: Boolean
                 get() = trackItems.isNotEmpty()
-
-            val airingEpisodeNumber: Double
-                get() = nextAiringEpisode.first.toDouble()
 
             val airingTime: Long
                 get() = nextAiringEpisode.second.times(1000L).minus(
