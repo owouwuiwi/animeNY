@@ -49,6 +49,7 @@ import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.entries.manga.repository.MangaRepository
 import tachiyomi.i18n.MR
 import java.io.FileOutputStream
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -83,19 +84,11 @@ class BackupCreator(
     }
 
     suspend fun backup(uri: Uri, options: BackupOptions): String {
+        val directory = if (isAutoBackup) UniFile.fromUri(context, uri) else null
         var file: UniFile? = null
-        try {
+        val validatedUri = try {
             file = if (isAutoBackup) {
-                // Get dir of file and create
-                val dir = UniFile.fromUri(context, uri)
-                // Delete older backups
-                dir?.listFiles { _, filename -> FILENAME_REGEX.matches(filename) }
-                    .orEmpty()
-                    .sortedByDescending { it.name }
-                    .drop(MAX_AUTO_BACKUPS - 1)
-                    .forEach { it.delete() }
-                // Create new file to place backup
-                dir?.createFile(getFilename())
+                directory?.let(::createAutomaticBackupFile)
             } else {
                 UniFile.fromUri(context, uri)
             }
@@ -160,17 +153,38 @@ class BackupCreator(
 
             // Make sure it's a valid backup file
             backupFileValidator.validate(fileUri)
-
-            if (isAutoBackup) {
-                backupPreferences.lastAutoBackupTimestamp.set(Clock.System.now().toEpochMilliseconds())
-            }
-
-            return fileUri.toString()
+            fileUri
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
-            file?.delete()
+            runCatching { file?.takeIf { it.isFile }?.delete() }
+                .onFailure { if (it !== e) e.addSuppressed(it) }
             throw e
         }
+
+        if (directory != null) {
+            backupPreferences.lastAutoBackupTimestamp.set(Clock.System.now().toEpochMilliseconds())
+            removeExpiredAutomaticBackups(directory, validatedUri)
+        }
+        return validatedUri.toString()
+    }
+
+    private fun createAutomaticBackupFile(directory: UniFile): UniFile? {
+        val filename = filename("yyyy-MM-dd_HH-mm-ss")
+        if (directory.findFile(filename) != null) {
+            throw IOException("A backup with the same timestamp already exists")
+        }
+        return directory.createFile(filename)
+    }
+
+    private fun removeExpiredAutomaticBackups(directory: UniFile, validatedUri: Uri) {
+        runCatching {
+            directory.listFiles { _, filename -> FILENAME_REGEX.matches(filename) }
+                .orEmpty()
+                .filterNot { it.uri == validatedUri }
+                .sortedByDescending { it.name }
+                .drop(MAX_AUTO_BACKUPS - 1)
+                .forEach { it.delete() }
+        }.onFailure { logcat(LogPriority.WARN, it) { "Could not rotate automatic backups" } }
     }
 
     suspend fun backupAnimeCategories(options: BackupOptions): List<BackupCategory> {
@@ -251,10 +265,13 @@ class BackupCreator(
 
     companion object {
         private const val MAX_AUTO_BACKUPS: Int = 4
-        private val FILENAME_REGEX = """${BuildConfig.APPLICATION_ID}_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}.tachibk""".toRegex()
+        private val FILENAME_REGEX =
+            """${Regex.escape(BuildConfig.APPLICATION_ID)}_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2})?\.tachibk""".toRegex()
 
-        fun getFilename(): String {
-            val date = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.ENGLISH).format(Date())
+        fun getFilename(): String = filename("yyyy-MM-dd_HH-mm")
+
+        private fun filename(pattern: String): String {
+            val date = SimpleDateFormat(pattern, Locale.ENGLISH).format(Date())
             return "${BuildConfig.APPLICATION_ID}_$date.tachibk"
         }
     }

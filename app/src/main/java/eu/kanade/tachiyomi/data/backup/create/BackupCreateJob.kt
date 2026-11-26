@@ -24,12 +24,14 @@ import eu.kanade.tachiyomi.util.system.cancelNotification
 import eu.kanade.tachiyomi.util.system.isRunning
 import eu.kanade.tachiyomi.util.system.setForegroundSafely
 import eu.kanade.tachiyomi.util.system.workManager
+import kotlinx.coroutines.CancellationException
 import logcat.LogPriority
 import mihon.app.di.AppGraph
 import mihon.app.di.appGraph
 import mihon.core.metro.metroGraph
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.storage.service.StorageManager
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 class BackupCreateJob(private val context: Context, workerParams: WorkerParameters) :
@@ -67,10 +69,12 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
                 notifier.showBackupComplete(UniFile.fromUri(context, location.toUri())!!)
             }
             Result.success()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
             if (!isAutoBackup) notifier.showBackupError(e.message)
-            Result.failure()
+            if (isAutoBackup && e is IOException) Result.retry() else Result.failure()
         } finally {
             context.cancelNotification(Notifications.ID_BACKUP_PROGRESS)
         }
