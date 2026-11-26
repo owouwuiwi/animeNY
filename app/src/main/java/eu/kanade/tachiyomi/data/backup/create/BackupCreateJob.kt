@@ -8,6 +8,7 @@ import androidx.core.net.toUri
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
+import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
@@ -60,8 +61,17 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
 
         setForegroundSafely()
 
-        val options = inputData.getBooleanArray(OPTIONS_KEY)?.let { BackupOptions.fromBooleanArray(it) }
+        val baseOptions = inputData.getBooleanArray(OPTIONS_KEY)?.let { BackupOptions.fromBooleanArray(it) }
             ?: BackupOptions()
+        val animeCategories = inputData.getLongArray(ANIME_CATEGORY_IDS_KEY)
+        val mangaCategories = inputData.getLongArray(MANGA_CATEGORY_IDS_KEY)
+        val options = if (!isAutoBackup && (animeCategories != null || mangaCategories != null)) {
+            baseOptions.copy(
+                categoryFilter = BackupCategoryFilter(animeCategories?.toSet().orEmpty(), mangaCategories?.toSet().orEmpty()),
+            )
+        } else {
+            baseOptions
+        }
 
         return try {
             val location = backupCreatorFactory.create(isAutoBackup = isAutoBackup).backup(uri, options)
@@ -128,11 +138,17 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
         }
 
         fun startNow(context: Context, uri: Uri, options: BackupOptions) {
-            val inputData = workDataOf(
-                IS_AUTO_BACKUP_KEY to false,
-                LOCATION_URI_KEY to uri.toString(),
-                OPTIONS_KEY to options.asBooleanArray(),
-            )
+            val inputData = Data.Builder()
+                .putBoolean(IS_AUTO_BACKUP_KEY, false)
+                .putString(LOCATION_URI_KEY, uri.toString())
+                .putBooleanArray(OPTIONS_KEY, options.asBooleanArray())
+                .apply {
+                    options.categoryFilter?.let {
+                        putLongArray(ANIME_CATEGORY_IDS_KEY, it.animeIds.toLongArray())
+                        putLongArray(MANGA_CATEGORY_IDS_KEY, it.mangaIds.toLongArray())
+                    }
+                }
+                .build()
             val request = OneTimeWorkRequestBuilder<BackupCreateJob>()
                 .addTag(TAG_MANUAL)
                 .setInputData(inputData)
@@ -148,3 +164,5 @@ private const val TAG_MANUAL = "$TAG_AUTO:manual"
 private const val IS_AUTO_BACKUP_KEY = "is_auto_backup" // Boolean
 private const val LOCATION_URI_KEY = "location_uri" // String
 private const val OPTIONS_KEY = "options" // BooleanArray
+private const val ANIME_CATEGORY_IDS_KEY = "anime_category_ids"
+private const val MANGA_CATEGORY_IDS_KEY = "manga_category_ids"

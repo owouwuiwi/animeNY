@@ -17,6 +17,7 @@ data class BackupOptions(
     val sourceSettings: Boolean = true,
     val privateSettings: Boolean = false,
     val extensions: Boolean = false,
+    val categoryFilter: BackupCategoryFilter? = null,
 ) {
 
     fun asBooleanArray() = booleanArrayOf(
@@ -34,12 +35,8 @@ data class BackupOptions(
         extensions,
     )
 
-    fun canCreate() = libraryEntries ||
-        categories ||
-        appSettings ||
-        extensionStores ||
-        customButton ||
-        sourceSettings
+    fun canCreate() = categoryFilter?.isEmpty != true &&
+        (libraryEntries || categories || appSettings || extensionStores || customButton || sourceSettings)
 
     companion object {
         val libraryOptions = listOf(
@@ -73,9 +70,9 @@ data class BackupOptions(
             ),
             Entry(
                 label = AYMR.strings.non_library_settings,
-                getter = BackupOptions::readEntries,
+                getter = { it.readEntries && it.categoryFilter == null },
                 setter = { options, enabled -> options.copy(readEntries = enabled) },
-                enabled = { it.libraryEntries },
+                enabled = { it.libraryEntries && it.categoryFilter == null },
             ),
         )
 

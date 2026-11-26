@@ -11,9 +11,10 @@ class AnimeCategoriesBackupCreator(
     private val getAnimeCategories: GetAnimeCategories,
 ) {
 
-    suspend operator fun invoke(): List<BackupCategory> {
+    suspend operator fun invoke(selectedCategoryIds: Set<Long>? = null): List<BackupCategory> {
         return getAnimeCategories.await()
             .filterNot(Category::isSystemCategory)
+            .filter { selectedCategoryIds == null || it.id in selectedCategoryIds }
             .map(backupCategoryMapper)
     }
 }

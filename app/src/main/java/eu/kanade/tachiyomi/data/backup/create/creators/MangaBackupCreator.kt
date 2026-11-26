@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.data.backup.create.creators
 
 import dev.zacsweers.metro.Inject
 import eu.kanade.tachiyomi.data.backup.create.BackupOptions
+import eu.kanade.tachiyomi.data.backup.create.includesBackupCategory
 import eu.kanade.tachiyomi.data.backup.models.BackupHistory
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.models.toBackupChapter
@@ -36,17 +37,22 @@ class MangaBackupCreator(
     }
 
     private suspend fun backupMangas(mangas: List<Manga>, options: BackupOptions): List<BackupManga> {
-        val mangaIds = mangas.map { it.id }
+        val selectedCategoryIds = options.categoryFilter?.mangaIds
+        val categoriesByMangaId = if (options.categories || selectedCategoryIds != null) {
+            categoryRepository.getCategoriesByMangaIds(mangas.map { it.id })
+        } else {
+            emptyMap()
+        }
+        val selected = if (selectedCategoryIds == null) mangas else {
+            mangas.filter { selectedCategoryIds.includesBackupCategory(categoriesByMangaId[it.id].orEmpty()) }
+        }
+        if (selected.isEmpty()) return emptyList()
+        val mangaIds = selected.map { it.id }
 
         val excludedScanlatorsByMangaId = mangaRepository.getExcludedScanlatorsByMangaIds(mangaIds)
         // History is backed up by chapter URL, so it needs the chapters too
         val chaptersByMangaId = if (options.chapters || options.history) {
             chapterRepository.getChaptersByMangaIds(mangaIds)
-        } else {
-            emptyMap()
-        }
-        val categoriesByMangaId = if (options.categories) {
-            categoryRepository.getCategoriesByMangaIds(mangaIds)
         } else {
             emptyMap()
         }
@@ -57,7 +63,7 @@ class MangaBackupCreator(
         }
         val historyByMangaId = if (options.history) historyRepository.getHistoryByMangaIds(mangaIds) else emptyMap()
 
-        return mangas.map { manga ->
+        return selected.map { manga ->
             val mangaObject = manga.toBackupManga()
             val chapters = chaptersByMangaId[manga.id].orEmpty()
 
@@ -68,7 +74,9 @@ class MangaBackupCreator(
             }
 
             if (options.categories) {
-                mangaObject.categories = categoriesByMangaId[manga.id].orEmpty().map { it.order }
+                mangaObject.categories = categoriesByMangaId[manga.id].orEmpty()
+                    .filter { selectedCategoryIds == null || it.id in selectedCategoryIds }
+                    .map { it.order }
             }
 
             if (options.tracking) {

@@ -477,4 +477,5 @@
     <string name="feed_order_source_name">Source name</string>
     <string name="feed_order_last_local_update">Latest local update</string>
     <string name="edit_episode_title">Edit episode title</string>
+    <string name="backup_limit_to_categories">Include only selected categories</string>
 </resources>

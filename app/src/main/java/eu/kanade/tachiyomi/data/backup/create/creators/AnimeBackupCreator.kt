@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.data.backup.create.creators
 
 import dev.zacsweers.metro.Inject
 import eu.kanade.tachiyomi.data.backup.create.BackupOptions
+import eu.kanade.tachiyomi.data.backup.create.includesBackupCategory
 import eu.kanade.tachiyomi.data.backup.models.BackupAnime
 import eu.kanade.tachiyomi.data.backup.models.BackupAnimeHistory
 import eu.kanade.tachiyomi.data.backup.models.toBackupEpisode
@@ -33,16 +34,21 @@ class AnimeBackupCreator(
     }
 
     private suspend fun backupAnimes(animes: List<Anime>, options: BackupOptions): List<BackupAnime> {
-        val animeIds = animes.map { it.id }
+        val selectedCategoryIds = options.categoryFilter?.animeIds
+        val categoriesByAnimeId = if (options.categories || selectedCategoryIds != null) {
+            categoryRepository.getCategoriesByAnimeIds(animes.map { it.id })
+        } else {
+            emptyMap()
+        }
+        val selected = if (selectedCategoryIds == null) animes else {
+            animes.filter { selectedCategoryIds.includesBackupCategory(categoriesByAnimeId[it.id].orEmpty()) }
+        }
+        if (selected.isEmpty()) return emptyList()
+        val animeIds = selected.map { it.id }
 
         // History is backed up by episode URL, so it needs the episodes too
         val episodesByAnimeId = if (options.chapters || options.history) {
             episodeRepository.getEpisodesByAnimeIds(animeIds)
-        } else {
-            emptyMap()
-        }
-        val categoriesByAnimeId = if (options.categories) {
-            categoryRepository.getCategoriesByAnimeIds(animeIds)
         } else {
             emptyMap()
         }
@@ -53,7 +59,7 @@ class AnimeBackupCreator(
         }
         val historyByAnimeId = if (options.history) historyRepository.getHistoryByAnimeIds(animeIds) else emptyMap()
 
-        return animes.map { anime ->
+        return selected.map { anime ->
             val animeObject = anime.toBackupAnime()
             val episodes = episodesByAnimeId[anime.id].orEmpty()
 
@@ -62,7 +68,9 @@ class AnimeBackupCreator(
             }
 
             if (options.categories) {
-                animeObject.categories = categoriesByAnimeId[anime.id].orEmpty().map { it.order }
+                animeObject.categories = categoriesByAnimeId[anime.id].orEmpty()
+                    .filter { selectedCategoryIds == null || it.id in selectedCategoryIds }
+                    .map { it.order }
             }
 
             if (options.tracking) {
