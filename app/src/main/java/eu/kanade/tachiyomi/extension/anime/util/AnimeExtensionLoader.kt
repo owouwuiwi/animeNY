@@ -46,6 +46,7 @@ internal object AnimeExtensionLoader {
     private const val METADATA_EXTENSION_LIB = "tachiyomix.extensionLib"
     private const val METADATA_EXTENSION_LIB_ALT = "tachiyomi.animeextension.lib"
     private const val METADATA_NSFW = "tachiyomi.animeextension.nsfw"
+    private const val METADATA_ANIYOMIX_CONTENT_WARNING = "aniyomix.contentWarning"
     private const val METADATA_CONTENT_WARNING = "tachiyomix.contentWarning"
     private const val METADATA_CONTENT_WARNING_ALT = "tachiyomi.animeextension.contentWarning"
     private const val METADATA_TORRENT = "tachiyomi.animeextension.torrent"
@@ -348,28 +349,15 @@ internal object AnimeExtensionLoader {
         val versionCode = PackageInfoCompat.getLongVersionCode(pkgInfo)
         val signatures = getSignatures(pkgInfo).orEmpty()
         val store = repos.firstOrNull { it.signingKey in signatures }
-        val contentWarning = when {
-            metaData == null -> ContentWarning.SAFE
-
-            metaData.containsKey(METADATA_CONTENT_WARNING) -> {
-                when (metaData.getInt(METADATA_CONTENT_WARNING)) {
-                    1 -> ContentWarning.MIXED
-                    2 -> ContentWarning.NSFW
-                    else -> ContentWarning.SAFE
-                }
-            }
-
-            metaData.containsKey(METADATA_CONTENT_WARNING_ALT) -> {
-                when (metaData.getInt(METADATA_CONTENT_WARNING_ALT)) {
-                    1 -> ContentWarning.MIXED
-                    2 -> ContentWarning.NSFW
-                    else -> ContentWarning.SAFE
-                }
-            }
-
-            metaData.getInt(METADATA_NSFW) == 1 -> ContentWarning.NSFW
-
-            else -> ContentWarning.SAFE
+        val declaredContentWarning = metaData?.let { metadata ->
+            listOf(METADATA_ANIYOMIX_CONTENT_WARNING, METADATA_CONTENT_WARNING, METADATA_CONTENT_WARNING_ALT)
+                .firstNotNullOfOrNull { key -> metadata.getInt(key, -1).takeIf { it in 0..2 } }
+        }
+        val contentWarning = when (declaredContentWarning) {
+            0 -> ContentWarning.SAFE
+            1 -> ContentWarning.MIXED
+            2 -> ContentWarning.NSFW
+            else -> if (metaData?.getInt(METADATA_NSFW) == 1) ContentWarning.NSFW else ContentWarning.SAFE
         }
 
         fun notLoaded(
