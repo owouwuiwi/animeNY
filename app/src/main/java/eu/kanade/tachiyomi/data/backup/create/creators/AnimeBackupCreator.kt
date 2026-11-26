@@ -40,7 +40,9 @@ class AnimeBackupCreator(
         } else {
             emptyMap()
         }
-        val selected = if (selectedCategoryIds == null) animes else {
+        val selected = if (selectedCategoryIds == null) {
+            animes
+        } else {
             animes.filter { selectedCategoryIds.includesBackupCategory(categoriesByAnimeId[it.id].orEmpty()) }
         }
         if (selected.isEmpty()) return emptyList()

@@ -39,11 +39,11 @@ import eu.kanade.presentation.entries.anime.AnimeAudioLanguageDialog
 import eu.kanade.presentation.entries.anime.AnimeScreen
 import eu.kanade.presentation.entries.anime.DuplicateAnimeDialog
 import eu.kanade.presentation.entries.anime.EpisodeOptionsDialogScreen
-import eu.kanade.presentation.entries.anime.components.EditEpisodeTitleDialog
-import eu.kanade.presentation.entries.components.CoverUrlDialog
 import eu.kanade.presentation.entries.anime.EpisodeSettingsDialog
 import eu.kanade.presentation.entries.anime.SeasonSettingsDialog
 import eu.kanade.presentation.entries.anime.components.AnimeImagesDialog
+import eu.kanade.presentation.entries.anime.components.EditEpisodeTitleDialog
+import eu.kanade.presentation.entries.components.CoverUrlDialog
 import eu.kanade.presentation.entries.components.DeleteItemsDialog
 import eu.kanade.presentation.entries.components.SetDateDialog
 import eu.kanade.presentation.entries.components.SetIntervalDialog
@@ -79,8 +79,8 @@ import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import mihon.app.di.appGraph
 import logcat.LogPriority
+import mihon.app.di.appGraph
 import mihon.feature.migration.config.AnimeMigrationConfigScreen
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
@@ -182,7 +182,8 @@ class AnimeScreen(
     ) {
         // KMK <--
         val isAnimeHttpSource = remember { successState.source is AnimeHttpSource }
-        val canDownloadEpisodes = !successState.source.isLocalOrStub() && successState.anime.fetchType == FetchType.Episodes
+        val canDownloadEpisodes =
+            !successState.source.isLocalOrStub() && successState.anime.fetchType == FetchType.Episodes
 
         LaunchedEffect(successState.anime, viewModel.source) {
             if (isAnimeHttpSource) {

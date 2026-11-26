@@ -119,6 +119,7 @@ fun FeedScreen(
                 val displayedFeeds = remember(feeds, sortOrder) {
                     when (sortOrder) {
                         FeedSortOrder.MANUAL -> feeds
+
                         FeedSortOrder.SOURCE_NAME -> feeds.sortedWith(
                             compareBy(String.CASE_INSENSITIVE_ORDER) { it.sourceLabel },
                         )

@@ -1667,7 +1667,9 @@ class PlayerViewModel(
         autoPlay: Boolean = true,
     ) {
         val requestedVideo = (hosterIndex to videoIndex).takeIf { hosterIndex != -1 }
-        val rememberedStream = if (autoPlay && requestedVideo == null && playerPreferences.rememberSeriesStream().get()) {
+        val rememberedStream = if (autoPlay && requestedVideo == null &&
+            playerPreferences.rememberSeriesStream().get()
+        ) {
             currentAnime.value?.id?.takeIf { it > 0 }?.let { id ->
                 PreferredSeriesStream.decode(playerPreferences.preferredSeriesStream(id).get())
             }

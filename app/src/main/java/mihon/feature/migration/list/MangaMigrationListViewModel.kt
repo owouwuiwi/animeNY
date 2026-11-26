@@ -157,14 +157,16 @@ class MangaMigrationListViewModel(
         val sources = sourceIds
             .mapNotNull { sourceManager.get(it) as? CatalogueSource }
 
-        return if (prioritizeByChapters) coroutineScope {
-            val results = sources.map { source ->
-                async { searchSource(manga, source, deepSearchMode) }
-            }
-                .awaitAll()
-                .filterNotNull()
+        return if (prioritizeByChapters) {
+            coroutineScope {
+                val results = sources.map { source ->
+                    async { searchSource(manga, source, deepSearchMode) }
+                }
+                    .awaitAll()
+                    .filterNotNull()
 
-            results.maxByOrNull { it.second.latestChapter ?: 0.0 }
+                results.maxByOrNull { it.second.latestChapter ?: 0.0 }
+            }
         } else {
             for (source in sources) {
                 val result = searchSource(manga, source, deepSearchMode)

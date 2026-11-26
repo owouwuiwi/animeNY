@@ -66,7 +66,8 @@ object MangaMigrationFlags {
         val flags = mutableListOf<MangaMigrationFlag>()
         flags += MangaMigrationFlag.create(CHAPTERS, defaultSelectedBitMap, MR.strings.chapters)
         flags += MangaMigrationFlag.create(CATEGORIES, defaultSelectedBitMap, MR.strings.categories)
-        flags += MangaMigrationFlag.create(MigrationFlag.TAGS.flag, defaultSelectedBitMap, MigrationFlag.TAGS.getLabel())
+        flags +=
+            MangaMigrationFlag.create(MigrationFlag.TAGS.flag, defaultSelectedBitMap, MigrationFlag.TAGS.getLabel())
 
         if (manga != null) {
             if (manga.hasCustomCover(coverCache)) {

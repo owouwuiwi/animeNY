@@ -76,6 +76,7 @@ import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreJob
 import eu.kanade.tachiyomi.data.cache.AnimeBackgroundCache
 import eu.kanade.tachiyomi.data.cache.AnimeCoverCache
 import eu.kanade.tachiyomi.data.cache.MangaCoverCache
+import eu.kanade.tachiyomi.data.coil.RemoteCoverLoader
 import eu.kanade.tachiyomi.data.connections.ConnectionsManager
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadJob
@@ -100,7 +101,6 @@ import eu.kanade.tachiyomi.extension.anime.util.AnimeExtensionInstallActivity
 import eu.kanade.tachiyomi.extension.manga.MangaExtensionManager
 import eu.kanade.tachiyomi.extension.manga.util.MangaExtensionInstallActivity
 import eu.kanade.tachiyomi.network.JavaScriptEngine
-import eu.kanade.tachiyomi.data.coil.RemoteCoverLoader
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.ui.base.delegate.SecureActivityDelegateImpl

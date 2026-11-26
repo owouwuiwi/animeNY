@@ -20,8 +20,8 @@ import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.TabContent
 import eu.kanade.presentation.components.TabSearch
 import eu.kanade.tachiyomi.ui.browse.anime.migration.anime.MigrateAnimeScreen
-import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.i18n.stringResource

@@ -192,8 +192,14 @@ class LibraryPreferences(
 
     val updateCategoriesExclude: Preference<Set<String>> =
         preferenceStore.getStringSet(LIBRARY_UPDATE_MANGA_CATEGORIES_EXCLUDE_PREF_KEY, emptySet())
-    val animeUpdateExtensionsExclude = preferenceStore.getStringSet("library_update_anime_extensions_exclude", emptySet())
-    val mangaUpdateExtensionsExclude = preferenceStore.getStringSet("library_update_manga_extensions_exclude", emptySet())
+    val animeUpdateExtensionsExclude = preferenceStore.getStringSet(
+        "library_update_anime_extensions_exclude",
+        emptySet(),
+    )
+    val mangaUpdateExtensionsExclude = preferenceStore.getStringSet(
+        "library_update_manga_extensions_exclude",
+        emptySet(),
+    )
     val updateMangaTitles: Preference<Boolean> = preferenceStore.getBoolean("pref_update_library_manga_titles", false)
 
     val disallowNonAsciiFilenames: Preference<Boolean> = preferenceStore.getBoolean(

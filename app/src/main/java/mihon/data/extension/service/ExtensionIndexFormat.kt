@@ -46,8 +46,13 @@ internal fun BufferedSource.extensionIndexFormat(jsonHint: Boolean): ExtensionIn
     }
     return when (marker) {
         '['.code -> ExtensionIndexFormat.JSON_ARRAY
+
         '{'.code -> ExtensionIndexFormat.JSON_OBJECT
-        '<'.code -> throw IllegalArgumentException("The extension repository returned a web page. Use a direct index URL.")
+
+        '<'.code -> throw IllegalArgumentException(
+            "The extension repository returned a web page. Use a direct index URL.",
+        )
+
         else -> ExtensionIndexFormat.PROTOBUF
     }
 }

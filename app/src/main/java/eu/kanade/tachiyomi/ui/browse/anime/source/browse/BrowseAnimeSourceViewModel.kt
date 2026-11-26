@@ -449,8 +449,16 @@ class BrowseAnimeSourceViewModel(
                 if (state.value.bulkSelection.isNullOrEmpty()) return@launch
                 when {
                     categories.any { it.id == defaultId } -> addSelectedToLibrary(listOf(defaultId), onError)
+
                     defaultId == 0L || categories.isEmpty() -> addSelectedToLibrary(emptyList(), onError)
-                    else -> setDialog(Dialog.BulkAddCategories(categories.mapAsCheckboxState { false }.toImmutableList()))
+
+                    else -> setDialog(
+                        Dialog.BulkAddCategories(
+                            categories.mapAsCheckboxState {
+                                false
+                            }.toImmutableList(),
+                        ),
+                    )
                 }
             } catch (e: CancellationException) {
                 throw e

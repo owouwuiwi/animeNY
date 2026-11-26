@@ -67,7 +67,10 @@ class BackupCreateJob(private val context: Context, workerParams: WorkerParamete
         val mangaCategories = inputData.getLongArray(MANGA_CATEGORY_IDS_KEY)
         val options = if (!isAutoBackup && (animeCategories != null || mangaCategories != null)) {
             baseOptions.copy(
-                categoryFilter = BackupCategoryFilter(animeCategories?.toSet().orEmpty(), mangaCategories?.toSet().orEmpty()),
+                categoryFilter = BackupCategoryFilter(
+                    animeCategories?.toSet().orEmpty(),
+                    mangaCategories?.toSet().orEmpty(),
+                ),
             )
         } else {
             baseOptions

@@ -90,7 +90,10 @@ class SimklApi(private val client: OkHttpClient, interceptor: SimklInterceptor) 
     private suspend fun updateProgress(track: AnimeTrack, previousEditedProgress: Double?) {
         val progress = SimklEpisodeHistoryChange.fromProgress(track.last_episode_seen, previousEditedProgress)
         if (!progress.unwatched.isEmpty()) {
-            val body = simklEpisodeHistoryPayload(track.remote_id, progress.unwatched).toString().toRequestBody(jsonMime)
+            val body = simklEpisodeHistoryPayload(
+                track.remote_id,
+                progress.unwatched,
+            ).toString().toRequestBody(jsonMime)
             authClient.newCall(POST("$API_URL/sync/history/remove", body = body)).awaitSuccess().close()
         }
         if (!progress.watched.isEmpty()) {

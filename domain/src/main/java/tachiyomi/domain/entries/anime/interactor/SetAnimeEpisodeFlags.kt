@@ -123,7 +123,8 @@ class SetAnimeEpisodeFlags(
         showSummaries: Long,
     ): Boolean {
         // The numbering format depends on each title's source and is not part of the default.
-        val seasonalNumbering = animeRepository.getAnimeById(animeId).episodeFlags and Anime.EPISODE_SEASONAL_NUMBERING_MASK
+        val seasonalNumbering =
+            animeRepository.getAnimeById(animeId).episodeFlags and Anime.EPISODE_SEASONAL_NUMBERING_MASK
         return animeRepository.updateAnime(
             AnimeUpdate(
                 id = animeId,

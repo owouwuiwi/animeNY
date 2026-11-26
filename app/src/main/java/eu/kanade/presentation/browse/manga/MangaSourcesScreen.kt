@@ -51,7 +51,11 @@ fun MangaSourcesScreen(
         state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
 
         state.isEmpty -> EmptyScreen(
-            stringRes = if (state.searchQuery.isNullOrBlank()) MR.strings.source_empty_screen else MR.strings.no_results_found,
+            stringRes = if (state.searchQuery.isNullOrBlank()) {
+                MR.strings.source_empty_screen
+            } else {
+                MR.strings.no_results_found
+            },
             modifier = Modifier.padding(contentPadding),
         )
 

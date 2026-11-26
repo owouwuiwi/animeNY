@@ -267,7 +267,9 @@ class BackupCreator(
     companion object {
         private const val MAX_AUTO_BACKUPS: Int = 4
         private val FILENAME_REGEX =
-            """${Regex.escape(BuildConfig.APPLICATION_ID)}_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2})?\.tachibk""".toRegex()
+            """${Regex.escape(
+                BuildConfig.APPLICATION_ID,
+            )}_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}(?:-\d{2})?\.tachibk""".toRegex()
 
         fun getFilename(): String = filename("yyyy-MM-dd_HH-mm")
 

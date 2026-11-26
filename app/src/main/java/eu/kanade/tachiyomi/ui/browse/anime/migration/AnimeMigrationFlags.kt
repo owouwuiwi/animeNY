@@ -79,7 +79,8 @@ object AnimeMigrationFlags {
             flags += AnimeMigrationFlag.create(EPISODES, defaultSelectedBitMap, AYMR.strings.episodes)
         }
         flags += AnimeMigrationFlag.create(CATEGORIES, defaultSelectedBitMap, MR.strings.categories)
-        flags += AnimeMigrationFlag.create(MigrationFlag.TAGS.flag, defaultSelectedBitMap, MigrationFlag.TAGS.getLabel())
+        flags +=
+            AnimeMigrationFlag.create(MigrationFlag.TAGS.flag, defaultSelectedBitMap, MigrationFlag.TAGS.getLabel())
 
         if (anime != null) {
             if (anime.hasCustomCover(coverCache)) {

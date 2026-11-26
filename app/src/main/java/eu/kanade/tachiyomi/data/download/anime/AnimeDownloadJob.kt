@@ -117,6 +117,7 @@ class AnimeDownloadJob(context: Context, workerParams: WorkerParameters) : Corou
 
     companion object {
         private const val TAG = "AnimeDownloader"
+
         // A newly enqueued worker must wait for a cancelled one to release the downloader.
         private val workerMutex = Mutex()
 

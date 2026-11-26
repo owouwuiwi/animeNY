@@ -30,13 +30,13 @@ import eu.kanade.presentation.browse.RemoveEntryDialog
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.components.NavigatorAdaptiveSheet
 import eu.kanade.presentation.entries.EditCoverAction
+import eu.kanade.presentation.entries.components.CoverUrlDialog
 import eu.kanade.presentation.entries.components.DeleteItemsDialog
 import eu.kanade.presentation.entries.components.SetDateDialog
 import eu.kanade.presentation.entries.components.SetIntervalDialog
 import eu.kanade.presentation.entries.manga.ChapterSettingsDialog
 import eu.kanade.presentation.entries.manga.DuplicateMangaDialog
 import eu.kanade.presentation.entries.manga.MangaScreen
-import eu.kanade.presentation.entries.components.CoverUrlDialog
 import eu.kanade.presentation.entries.manga.components.MangaCoverDialog
 import eu.kanade.presentation.entries.manga.components.ScanlatorFilterDialog
 import eu.kanade.presentation.theme.CoverBasedTheme

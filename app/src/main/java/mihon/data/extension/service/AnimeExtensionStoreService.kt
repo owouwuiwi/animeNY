@@ -57,7 +57,9 @@ class AnimeExtensionStoreService(
                         json.decodeFromBufferedSource<NetworkAnimeExtensionStore>(source)
                     }
 
-                    ExtensionIndexFormat.PROTOBUF -> protoBuf.decodeFromByteArray<NetworkAnimeExtensionStore>(source.readByteArray())
+                    ExtensionIndexFormat.PROTOBUF -> protoBuf.decodeFromByteArray<NetworkAnimeExtensionStore>(
+                        source.readByteArray(),
+                    )
                 }
 
                 if (networkStore is NetworkLegacyExtensionRepo) {
@@ -88,11 +90,19 @@ class AnimeExtensionStoreService(
                 val response = network.client.newCall(GET(store.extensionListUrl!!)).awaitSuccess()
                 response.readExtensionIndex { source, format ->
                     when (format) {
-                        ExtensionIndexFormat.JSON_OBJECT -> json.decodeFromBufferedSource<NetworkAnimeExtensionStore.ExtensionList>(source)
-                        ExtensionIndexFormat.PROTOBUF -> protoBuf.decodeFromByteArray<NetworkAnimeExtensionStore.ExtensionList>(
-                            source.readByteArray(),
+                        ExtensionIndexFormat.JSON_OBJECT -> {
+                            json.decodeFromBufferedSource<NetworkAnimeExtensionStore.ExtensionList>(source)
+                        }
+
+                        ExtensionIndexFormat.PROTOBUF -> {
+                            protoBuf.decodeFromByteArray<NetworkAnimeExtensionStore.ExtensionList>(
+                                source.readByteArray(),
+                            )
+                        }
+
+                        ExtensionIndexFormat.JSON_ARRAY -> throw IllegalArgumentException(
+                            "Expected an extension list object.",
                         )
-                        ExtensionIndexFormat.JSON_ARRAY -> throw IllegalArgumentException("Expected an extension list object.")
                     }
                         .let { toAvailableExtensions(it, store) }
                 }
@@ -100,9 +110,17 @@ class AnimeExtensionStoreService(
                 val response = network.client.newCall(GET(store.indexUrl)).awaitSuccess()
                 response.readExtensionIndex { source, format ->
                     val netStore = when (format) {
-                        ExtensionIndexFormat.JSON_OBJECT -> json.decodeFromBufferedSource<NetworkAnimeExtensionStore>(source)
-                        ExtensionIndexFormat.PROTOBUF -> protoBuf.decodeFromByteArray<NetworkAnimeExtensionStore>(source.readByteArray())
-                        ExtensionIndexFormat.JSON_ARRAY -> throw IllegalArgumentException("Expected an extension catalog object.")
+                        ExtensionIndexFormat.JSON_OBJECT -> json.decodeFromBufferedSource<NetworkAnimeExtensionStore>(
+                            source,
+                        )
+
+                        ExtensionIndexFormat.PROTOBUF -> protoBuf.decodeFromByteArray<NetworkAnimeExtensionStore>(
+                            source.readByteArray(),
+                        )
+
+                        ExtensionIndexFormat.JSON_ARRAY -> throw IllegalArgumentException(
+                            "Expected an extension catalog object.",
+                        )
                     }
                     val extensionList = netStore.extensionList
                     if (extensionList != null) {

@@ -109,7 +109,8 @@ class CreateBackupScreen : Screen() {
                         LabeledCheckbox(
                             label = stringResource(TLMR.strings.backup_limit_to_categories),
                             checked = state.options.categoryFilter != null,
-                            enabled = state.categoryListsLoaded && (state.options.libraryEntries || state.options.categories),
+                            enabled =
+                            state.categoryListsLoaded && (state.options.libraryEntries || state.options.categories),
                             onCheckedChange = viewModel::limitToCategories,
                         )
                     }

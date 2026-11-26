@@ -272,7 +272,9 @@ class ExternalIntents {
         return Intent(Intent.ACTION_VIEW).apply {
             if (isPackageInstalled(pkgName, context.packageManager)) {
                 val activity = getComponent(pkgName)
-                if (activity == null || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && pkgName == VLC_PLAYER)) {
+                if (activity == null ||
+                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && pkgName == VLC_PLAYER)
+                ) {
                     setPackage(pkgName)
                 } else {
                     component = activity

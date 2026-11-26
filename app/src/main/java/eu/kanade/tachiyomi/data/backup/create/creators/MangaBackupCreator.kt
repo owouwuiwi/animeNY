@@ -43,7 +43,9 @@ class MangaBackupCreator(
         } else {
             emptyMap()
         }
-        val selected = if (selectedCategoryIds == null) mangas else {
+        val selected = if (selectedCategoryIds == null) {
+            mangas
+        } else {
             mangas.filter { selectedCategoryIds.includesBackupCategory(categoriesByMangaId[it.id].orEmpty()) }
         }
         if (selected.isEmpty()) return emptyList()

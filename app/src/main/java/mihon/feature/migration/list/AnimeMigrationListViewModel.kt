@@ -161,14 +161,16 @@ class AnimeMigrationListViewModel(
         val sources = sourceIds
             .mapNotNull { sourceManager.get(it) as? AnimeCatalogueSource }
 
-        return if (prioritizeByEpisodes) coroutineScope {
-            val results = sources.map { source ->
-                async { searchSource(anime, source, deepSearchMode) }
-            }
-                .awaitAll()
-                .filterNotNull()
+        return if (prioritizeByEpisodes) {
+            coroutineScope {
+                val results = sources.map { source ->
+                    async { searchSource(anime, source, deepSearchMode) }
+                }
+                    .awaitAll()
+                    .filterNotNull()
 
-            results.maxByOrNull { it.second.latestEpisode ?: 0.0 }
+                results.maxByOrNull { it.second.latestEpisode ?: 0.0 }
+            }
         } else {
             for (source in sources) {
                 val result = searchSource(anime, source, deepSearchMode)
