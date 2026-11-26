@@ -27,10 +27,14 @@ class FilterSerializerTest {
 
     private class Box(name: String, state: Boolean = false) : AnimeFilter.CheckBox(name, state)
     private class Group(boxes: List<Box>) : AnimeFilter.Group<Box>("Categories", boxes)
-    private class Match(state: Int = 0) : AnimeFilter.Select<String>("Match", arrayOf("Any", "All", "None"), state)
+    private class Match(
+        state: Int = 0,
+        options: Array<String> = arrayOf("Any", "All", "None"),
+    ) : AnimeFilter.Select<String>("Match", options, state)
     private class Tri(state: Int = STATE_IGNORE) : AnimeFilter.TriState("Genre", state)
     private class Query : AnimeFilter.Text("Year")
-    private class Order : AnimeFilter.Sort("Order", arrayOf("Latest", "Popular"), Selection(0, false))
+    private class Order(options: Array<String> = arrayOf("Latest", "Popular")) :
+        AnimeFilter.Sort("Order", options, Selection(0, false))
     private class Tags : AnimeFilter.AutoComplete("Tags", "", emptyList(), state = emptyList())
     private class Title : AnimeFilter.Header("Title")
     private class Line : AnimeFilter.Separator()
@@ -133,5 +137,36 @@ class FilterSerializerTest {
 
         assertEquals(false, (restored[0] as Box).state)
         assertEquals(STATE_INCLUDE, (restored[1] as Tri).state)
+    }
+
+    @Test
+    fun `restores filters and nested options after the source reorders both`() {
+        val picked = AnimeFilterList(
+            Group(listOf(Box("English Subtitle"), Box("Reduce Mosaic", state = true))),
+            Match(state = 2),
+            Order().apply { state = AnimeFilter.Sort.Selection(1, true) },
+        )
+        val added = Box("New option")
+        val group = Group(listOf(Box("Reduce Mosaic"), added, Box("English Subtitle")))
+        val match = Match(options = arrayOf("None", "All", "Any"), state = 1)
+        val order = Order(arrayOf("Popular", "Latest", "New")).apply {
+            state = AnimeFilter.Sort.Selection(2, false)
+        }
+
+        roundTrip(picked, AnimeFilterList(Title(), order, group, match))
+
+        assertEquals(listOf(true, false, false), group.state.map { it.state })
+        assertEquals(0, match.state)
+        assertEquals(AnimeFilter.Sort.Selection(0, true), order.state)
+    }
+
+    @Test
+    fun `leaves a source default intact when an option no longer exists`() {
+        val picked = AnimeFilterList(Match(state = 2))
+        val target = Match(state = 1, options = arrayOf("Any", "All"))
+
+        roundTrip(picked, AnimeFilterList(target))
+
+        assertEquals(1, target.state)
     }
 }

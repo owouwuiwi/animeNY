@@ -3,6 +3,7 @@ package xyz.nulldev.ts.api.http.serializer
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -71,17 +72,23 @@ class FilterSerializer {
             } ?: throw IllegalArgumentException("Cannot serialize this Filter object!")
     }
 
-    fun deserialize(filters: AnimeFilterList, json: JsonArray) {
-        filters.filterIsInstance<Filter<Any?>>().zip(json).forEach { (filter, obj) ->
-            // KMK -->
+    fun deserialize(filters: AnimeFilterList, json: JsonArray) = deserializeFilters(filters, json)
+
+    internal fun deserializeFilters(filters: Iterable<*>, json: JsonArray) {
+        val savedFilters = json.filterIsInstance<JsonObject>()
+            .groupBy { obj ->
+                (obj[TYPE] as? JsonPrimitive)?.content to (obj[NAME] as? JsonPrimitive)?.content
+            }
+            .mapValues { (_, matches) -> ArrayDeque(matches) }
+
+        filters.filterIsInstance<Filter<Any?>>().forEach { filter ->
+            val type = serializers.firstOrNull { it.clazz.isInstance(filter) }?.type ?: return@forEach
+            val saved = savedFilters[type to filter.name]?.removeFirstOrNull() ?: return@forEach
             try {
-                // KMK <--
-                deserialize(filter, obj.jsonObject)
-                // KMK -->
+                deserialize(filter, saved)
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR) { e.asLog() }
             }
-            // KMK <--
         }
     }
 
@@ -89,12 +96,12 @@ class FilterSerializer {
         val serializer = serializers
             .filterIsInstance<Serializer<Filter<Any?>>>()
             .firstOrNull {
-                it.type == json[TYPE]!!.jsonPrimitive.content
+                it.type == json[TYPE]!!.jsonPrimitive.content && it.clazz.isInstance(filter)
             } ?: throw IllegalArgumentException("Cannot deserialize this type!")
 
         serializer.deserialize(json, filter)
 
-        serializer.mappings().forEach {
+        serializer.restoreMappings().forEach {
             if (it.second is KMutableProperty1) {
                 val obj = json[it.first]!!.jsonPrimitive
                 // serialize() records the runtime class of the boxed value ("java.lang.Boolean"),
@@ -122,6 +129,7 @@ class FilterSerializer {
     private fun KClass<*>.classNames() = setOf(java.name, javaObjectType.name)
 
     companion object {
+        private const val NAME = "name"
         const val TYPE = "_type"
         const val CLASS_MAPPINGS = "_cmaps"
     }

@@ -44,13 +44,17 @@ class GetExhSavedSearch(
 
     private fun loadSearch(search: SavedSearch, getFilterList: () -> FilterList): EXHSavedSearch {
         val originalFilters = getFilterList()
-        val filters = getFilters(search.filtersJson)
+        val filterList = if (search.filtersJson.isNullOrBlank()) {
+            originalFilters
+        } else {
+            getFilters(search.filtersJson)?.let { deserializeFilters(it, originalFilters) }
+        }
 
         return EXHSavedSearch(
             id = search.id,
             name = search.name,
             query = search.query?.nullIfBlank(),
-            filterList = filters?.let { deserializeFilters(it, originalFilters) },
+            filterList = filterList,
         )
     }
 

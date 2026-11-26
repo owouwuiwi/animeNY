@@ -1,14 +1,16 @@
 package xyz.nulldev.ts.api.http.serializer
 
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
@@ -24,6 +26,8 @@ interface Serializer<in T : Filter<out Any?>> {
      * Automatic two-way mappings between fields and JSON
      */
     fun mappings(): List<Pair<String, KProperty1<in T, *>>> = emptyList()
+
+    fun restoreMappings(): List<Pair<String, KProperty1<in T, *>>> = mappings()
 
     val serializer: FilterSerializer
     val type: String
@@ -73,6 +77,13 @@ class SelectSerializer(override val serializer: FilterSerializer) : Serializer<F
         Pair(NAME, Filter.Select<Any>::name),
         Pair(STATE, Filter.Select<Any>::state),
     )
+
+    override fun restoreMappings(): List<Pair<String, KProperty1<in Filter.Select<Any>, *>>> = emptyList()
+
+    override fun deserialize(json: JsonObject, filter: Filter.Select<Any>) {
+        val index = (json[STATE] as? JsonPrimitive)?.intOrNull ?: return
+        (json[VALUES] as? JsonArray).restoreOptionIndex(index, filter.values)?.let { filter.state = it }
+    }
 
     companion object {
         const val NAME = "name"
@@ -146,12 +157,7 @@ class GroupSerializer(override val serializer: FilterSerializer) : Serializer<Fi
     }
 
     override fun deserialize(json: JsonObject, filter: Filter.Group<Any?>) {
-        json[STATE]!!.jsonArray.forEachIndexed { index, jsonElement ->
-            if (jsonElement !is JsonNull) {
-                @Suppress("UNCHECKED_CAST")
-                serializer.deserialize(filter.state[index] as Filter<Any?>, jsonElement.jsonObject)
-            }
-        }
+        serializer.deserializeFilters(filter.state, json[STATE]!!.jsonArray)
     }
 
     override fun mappings() = listOf(
@@ -186,13 +192,15 @@ class SortSerializer(override val serializer: FilterSerializer) : Serializer<Fil
     }
 
     override fun deserialize(json: JsonObject, filter: Filter.Sort) {
-        // Deserialize state
-        filter.state = (json[STATE] as? JsonObject)?.let {
-            Filter.Sort.Selection(
-                it[STATE_INDEX]!!.jsonPrimitive.int,
-                it[STATE_ASCENDING]!!.jsonPrimitive.boolean,
-            )
+        val savedState = json[STATE]
+        if (savedState == JsonNull) {
+            filter.state = null
+            return
         }
+        val selection = savedState as? JsonObject ?: return
+        val index = selection[STATE_INDEX]!!.jsonPrimitive.int
+        val restoredIndex = (json[VALUES] as? JsonArray).restoreOptionIndex(index, filter.values) ?: return
+        filter.state = Filter.Sort.Selection(restoredIndex, selection[STATE_ASCENDING]!!.jsonPrimitive.boolean)
     }
 
     override fun mappings() = listOf(
@@ -235,4 +243,11 @@ class AutoCompleteSerializer(override val serializer: FilterSerializer) : Serial
         const val NAME = "name"
         const val STATE = "state"
     }
+}
+
+private fun JsonArray?.restoreOptionIndex(savedIndex: Int, currentOptions: Array<out Any?>): Int? {
+    if (this == null) return savedIndex.takeIf { it in currentOptions.indices }
+    val label = (getOrNull(savedIndex) as? JsonPrimitive)?.content ?: return null
+    if (savedIndex in currentOptions.indices && currentOptions[savedIndex].toString() == label) return savedIndex
+    return currentOptions.indexOfFirst { it.toString() == label }.takeIf { it >= 0 }
 }

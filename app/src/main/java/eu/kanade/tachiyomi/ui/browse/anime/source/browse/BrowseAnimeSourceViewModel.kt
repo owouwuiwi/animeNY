@@ -44,6 +44,7 @@ import eu.kanade.tachiyomi.util.removeCovers
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -58,14 +59,13 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import tachiyomi.core.common.preference.CheckboxState
 import tachiyomi.core.common.preference.mapAsCheckboxState
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.launchNonCancellable
-import tachiyomi.core.common.util.lang.withUIContext
+import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
 import tachiyomi.domain.category.anime.interactor.SetAnimeCategories
 import tachiyomi.domain.category.model.Category
@@ -120,7 +120,12 @@ class BrowseAnimeSourceViewModel(
 ) : ViewModel() {
 
     val state: StateFlow<BrowseAnimeSourceViewModel.State>
-        field = MutableStateFlow<BrowseAnimeSourceViewModel.State>(State(Listing.valueOf(listingQuery)))
+        field = MutableStateFlow<BrowseAnimeSourceViewModel.State>(
+            State(
+                listing = Listing.valueOf(listingQuery),
+                listingReady = savedSearch == null && filtersJson == null,
+            ),
+        )
 
     @AssistedFactory
     @ManualViewModelAssistedFactoryKey
@@ -142,6 +147,7 @@ class BrowseAnimeSourceViewModel(
     val startExpanded by uiPreferences.expandFilters.asState(viewModelScope)
 
     private val filterSerializer = FilterSerializer()
+    private var selectSavedSearchJob: Job? = null
 
     // SY <--
     init {
@@ -154,54 +160,19 @@ class BrowseAnimeSourceViewModel(
                 source = sourceManager.getOrStub(sourceId)
             }
             val source = source
-            if (source !is AnimeCatalogueSource) return@launch
+            if (source !is AnimeCatalogueSource) {
+                state.update { it.copy(listingReady = true) }
+                return@launch
+            }
             // KMK <--
 
-            viewModelScope.launchIO {
-                state.update {
-                    var query: String? = null
-                    var listing = it.listing
-
-                    if (listing is Listing.Search) {
-                        query = listing.query
-                        listing = Listing.Search(query, source.getFilterList())
-                    }
-
-                    it.copy(
-                        listing = listing,
-                        filters = source.getFilterList(),
-                        toolbarQuery = query,
-                    )
-                }
-            }.join()
+            prepareInitialListing(source)
 
             if (!getIncognitoState.await(source.id)) {
                 sourcePreferences.lastUsedSource.set(source.id)
             }
 
             // SY -->
-            val savedSearchId = savedSearch
-            val jsonFilters = filtersJson
-            val filters = state.value.filters
-            if (savedSearchId != null) {
-                val savedSearch = runBlocking { getExhSavedSearch.awaitOne(savedSearchId) { filters } }
-                if (savedSearch != null) {
-                    search(
-                        query = savedSearch.query,
-                        filters = savedSearch.filterList,
-                        // KMK -->
-                        savedSearchId = savedSearchId,
-                        // KMK <--
-                    )
-                }
-            } else if (jsonFilters != null) {
-                runCatching {
-                    val filtersJson = Json.decodeFromString<JsonArray>(jsonFilters)
-                    filterSerializer.deserialize(filters, filtersJson)
-                    search(filters = filters)
-                }
-            }
-
             getExhSavedSearch.subscribe(source.id, source::getFilterList)
                 .map { it.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, EXHSavedSearch::name)) }
                 .onEach { savedSearches ->
@@ -212,11 +183,38 @@ class BrowseAnimeSourceViewModel(
         }
     }
 
+    private suspend fun prepareInitialListing(source: AnimeCatalogueSource) {
+        val stored = savedSearch?.let { getExhSavedSearch.awaitOne(it, source::getFilterList) }
+        if (stored != null && selectSavedSearch(stored)) return
+
+        val filters = withIOContext { source.getFilterList() }
+        val requestedFilters = filtersJson?.let { json ->
+            runCatching { Json.decodeFromString<JsonArray>(json) }.getOrNull()
+        }
+        if (requestedFilters != null) filterSerializer.deserialize(filters, requestedFilters)
+
+        state.update {
+            val query = (it.listing as? Listing.Search)?.query
+            val initialListing = if (it.listing is Listing.Search || requestedFilters != null) {
+                Listing.Search(query, filters)
+            } else {
+                it.listing
+            }
+            it.copy(
+                listing = initialListing,
+                filters = filters,
+                toolbarQuery = query,
+                listingReady = true,
+            )
+        }
+    }
+
     /**
      * Flow of Pager flow tied to [State.listing]
      */
     private val hideInLibraryItems = sourcePreferences.hideInAnimeLibraryItems.get()
-    val animePagerFlowFlow = state.map { it.listing }
+    val animePagerFlowFlow = state.map { state -> state.takeIf { it.listingReady }?.listing }
+        .filterNotNull()
         .distinctUntilChanged()
         .map { listing ->
             Pager(PagingConfig(pageSize = 25)) {
@@ -268,6 +266,7 @@ class BrowseAnimeSourceViewModel(
     }
 
     fun setListing(listing: Listing) {
+        selectSavedSearchJob?.cancel()
         state.update { it.copy(listing = listing, toolbarQuery = null) }
     }
 
@@ -283,34 +282,24 @@ class BrowseAnimeSourceViewModel(
     fun search(
         query: String? = null,
         filters: FilterList? = null,
-        // KMK -->
-        savedSearchId: Long? = null,
-        // KMK <--
     ) {
         // KMK -->
         val source = source
         // KMK <--
         if (source !is AnimeCatalogueSource) return
-        // SY -->
-        if (filters != null && filters !== state.value.filters) {
-            // KMK -->
-            setFilters(filters)
-            // KMK <--
-        }
-        // SY <--
-        val input = state.value.listing as? Listing.Search
-            ?: Listing.Search(query = null, filters = source.getFilterList())
-
+        selectSavedSearchJob?.cancel()
         state.update {
+            val input = it.listing as? Listing.Search
+                ?: Listing.Search(query = null, filters = source.getFilterList())
+            val searchQuery = query ?: input.query
             it.copy(
                 listing = input.copy(
-                    query = query ?: input.query,
+                    query = searchQuery,
                     filters = filters ?: input.filters,
-                    // KMK -->
-                    savedSearchId = savedSearchId,
-                    // KMK <--
+                    savedSearchId = null,
                 ),
-                toolbarQuery = query ?: input.query,
+                filters = filters ?: it.filters,
+                toolbarQuery = searchQuery,
             )
         }
     }
@@ -320,6 +309,7 @@ class BrowseAnimeSourceViewModel(
         val source = source
         // KMK <--
         if (source !is AnimeCatalogueSource) return
+        selectSavedSearchJob?.cancel()
         val defaultFilters = source.getFilterList()
         var genreExists = false
 
@@ -521,6 +511,7 @@ class BrowseAnimeSourceViewModel(
         val savedSearches: ImmutableList<EXHSavedSearch> = persistentListOf(),
         val filterable: Boolean = true,
         // SY <--
+        val listingReady: Boolean = true,
     ) {
         val isUserQuery get() = listing is Listing.Search && !listing.query.isNullOrEmpty()
     }
@@ -549,52 +540,31 @@ class BrowseAnimeSourceViewModel(
 
     /** Open a saved search */
     fun onSavedSearch(
-        // KMK -->
         loadedSearch: EXHSavedSearch,
-        // KMK <--
         onToast: (StringResource) -> Unit,
     ) {
-        // KMK -->
-        resetFilters()
-        // KMK <--
-        viewModelScope.launchIO {
-            // KMK -->
-            val source = source
-            // KMK <--
-            if (source !is AnimeCatalogueSource) return@launchIO
-
-            // KMK -->
-            val search = getExhSavedSearch.awaitOne(loadedSearch.id, source::getFilterList) ?: loadedSearch
-            // KMK <--
-
-            if (search.filterList == null && state.value.filters.isNotEmpty()) {
-                withUIContext {
-                    onToast(TLMR.strings.save_search_invalid)
-                }
-                return@launchIO
-            }
-
-            val allDefault = search.filterList != null && search.filterList == source.getFilterList()
-            setDialog(null)
-
-            val filters = search.filterList
-                ?.takeUnless { allDefault }
-                ?: source.getFilterList()
-
-            state.update {
-                it.copy(
-                    listing = Listing.Search(
-                        query = search.query,
-                        filters = filters,
-                        // KMK -->
-                        savedSearchId = search.id,
-                        // KMK <--
-                    ),
-                    filters = filters,
-                    toolbarQuery = search.query,
-                )
+        val source = source as? AnimeCatalogueSource ?: return
+        selectSavedSearchJob?.cancel()
+        selectSavedSearchJob = viewModelScope.launch {
+            val search = getExhSavedSearch.awaitOne(loadedSearch.id, source::getFilterList)
+            if (search == null || !selectSavedSearch(search)) {
+                onToast(TLMR.strings.save_search_invalid)
             }
         }
+    }
+
+    private fun selectSavedSearch(search: EXHSavedSearch): Boolean {
+        val filters = search.filterList ?: return false
+        state.update {
+            it.copy(
+                listing = Listing.Search(search.query, filters, search.id),
+                filters = filters,
+                toolbarQuery = search.query,
+                listingReady = true,
+                dialog = null,
+            )
+        }
+        return true
     }
 
     /** Show dialog to delete saved search */
