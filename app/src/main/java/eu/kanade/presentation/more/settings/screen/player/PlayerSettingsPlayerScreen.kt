@@ -15,6 +15,7 @@ import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.screen.SearchableSettings
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.player.PlayerOrientation
+import eu.kanade.tachiyomi.ui.player.cast.GOOGLE_CAST_AVAILABLE
 import eu.kanade.tachiyomi.ui.player.controls.OptionalPlayerControl
 import eu.kanade.tachiyomi.ui.player.externalVideoPlayers
 import eu.kanade.tachiyomi.ui.player.loader.HosterCache
@@ -51,7 +52,6 @@ object PlayerSettingsPlayerScreen : Screen(), SearchableSettings {
         val playerPreferences = remember { Injekt.get<PlayerPreferences>() }
         val basePreferences = remember { Injekt.get<BasePreferences>() }
         val deviceSupportsPip = basePreferences.deviceHasPip
-        val localHttpServerHolder = remember { Injekt.get<LocalHttpServerHolder>() }
 
         return listOfNotNull(
             Preference.PreferenceItem.ListPreference(
@@ -71,7 +71,7 @@ object PlayerSettingsPlayerScreen : Screen(), SearchableSettings {
                 preference = playerPreferences.preserveWatchingPosition(),
                 title = stringResource(AYMR.strings.pref_preserve_watching_position),
             ),
-            getCastGroup(playerPreferences = playerPreferences),
+            if (GOOGLE_CAST_AVAILABLE) getCastGroup(playerPreferences) else null,
             Preference.PreferenceItem.ListPreference(
                 preference = playerPreferences.defaultPlayerOrientationType(),
                 entries = PlayerOrientation.entries.associateWith {
@@ -88,7 +88,7 @@ object PlayerSettingsPlayerScreen : Screen(), SearchableSettings {
                 playerPreferences = playerPreferences,
                 basePreferences = basePreferences,
             ),
-            geCastServerGroup(localHttpServerHolder),
+            if (GOOGLE_CAST_AVAILABLE) getCastServerGroup() else null,
         )
     }
 
@@ -431,9 +431,8 @@ object PlayerSettingsPlayerScreen : Screen(), SearchableSettings {
     }
 
     @Composable
-    private fun geCastServerGroup(
-        localHttpServerHolder: LocalHttpServerHolder,
-    ): Preference.PreferenceGroup {
+    private fun getCastServerGroup(): Preference.PreferenceGroup {
+        val localHttpServerHolder = remember { Injekt.get<LocalHttpServerHolder>() }
         return Preference.PreferenceGroup(
             title = stringResource(TLMR.strings.pref_category_castserver),
             preferenceItems = persistentListOf(

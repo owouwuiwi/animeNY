@@ -79,6 +79,7 @@ import eu.kanade.tachiyomi.databinding.PlayerLayoutBinding
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.source.anime.isNsfw
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
+import eu.kanade.tachiyomi.ui.player.cast.createPlayerCastController
 import eu.kanade.tachiyomi.ui.player.controls.PlayerControls
 import eu.kanade.tachiyomi.ui.player.network.NetworkStreamRequest
 import eu.kanade.tachiyomi.ui.player.settings.AdvancedPlayerPreferences
@@ -152,7 +153,7 @@ class PlayerActivity : BaseActivity() {
     @Inject private lateinit var subtitlePreferences: SubtitlePreferences
 
     @Inject private lateinit var preferenceStore: PreferenceStore
-    val castManager: CastManager by lazy { CastManager(this, preferenceStore) }
+    private val castController by lazy { createPlayerCastController(this, preferenceStore) }
 
     @Inject private lateinit var storageManager: StorageManager
 
@@ -407,15 +408,12 @@ class PlayerActivity : BaseActivity() {
 
             // <-- AM (DISCORD)
         }
-        // Cast -->
-        castManager
-        // <-- Cast
+        castController
 
         binding.controls.setContent {
             TachiyomiTheme {
                 PlayerControls(
                     viewModel = viewModel,
-                    castManager = castManager, // Pass the castManager instance
                     onBackPress = {
                         if (isPipSupportedAndEnabled && mpv.getPropertyBoolean("pause") == false &&
                             playerPreferences.pipOnExit().get()
@@ -472,7 +470,7 @@ class PlayerActivity : BaseActivity() {
         if (!isChangingConfigurations) {
             Thread { runCatching { mpv.close() } }.start()
         }
-        castManager.cleanup()
+        castController.onDestroy()
         viewModel.stopHttpServer()
 
         // AM (DISCORD) -->
@@ -482,8 +480,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onPause() {
-        // Mantener sesión Cast activa
-        castManager.maintainCastSessionBackground()
+        castController.onPause()
         viewModel.saveCurrentEpisodeWatchingProgress()
 
         updateDiscordRPC(exitingPlayer = false)
@@ -573,13 +570,7 @@ class PlayerActivity : BaseActivity() {
         }
         updateDiscordRPC(exitingPlayer = false)
 
-        castManager.apply {
-            registerSessionListener()
-            if (castState.value == CastManager.CastState.CONNECTED) {
-                updateCastState(CastManager.CastState.CONNECTED)
-            }
-            viewModel.isCasting.value = castState.value == CastManager.CastState.CONNECTED
-        }
+        viewModel.isCasting.value = castController.onPlayerReady()
     }
 
     private fun executeMPVCommand(commands: Array<String>) {
@@ -696,10 +687,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     override fun onResume() {
-        castManager.apply {
-            reconnect()
-            registerSessionListener()
-        }
+        castController.onResume()
 
         updateDiscordRPC(exitingPlayer = false)
 
@@ -1048,18 +1036,7 @@ class PlayerActivity : BaseActivity() {
                     }
 
                     override fun onPause() {
-                        // Cast -->
-                        castManager.apply {
-                            if (!isInPictureInPictureMode) {
-                                unregisterSessionListener()
-                            }
-
-                            // Si está transmitiendo, mantener sesión activa
-                            if (castState.value == CastManager.CastState.CONNECTED) {
-                                maintainCastSessionBackground()
-                            }
-                        }
-                        //
+                        castController.onMediaSessionPaused(inPictureInPicture = isInPictureInPictureMode)
                         when (playAction) {
                             SingleActionGesture.None -> {}
 

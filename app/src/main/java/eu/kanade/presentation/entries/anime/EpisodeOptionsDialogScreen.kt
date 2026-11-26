@@ -1,9 +1,6 @@
 package eu.kanade.presentation.entries.anime
 
 import android.content.ClipData
-import android.content.Context
-import android.net.Uri
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.slideInHorizontally
@@ -54,19 +51,14 @@ import cafe.adriel.voyager.core.model.ScreenModel
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import cafe.adriel.voyager.core.screen.Screen
-import com.google.android.gms.cast.MediaInfo
-import com.google.android.gms.cast.MediaLoadRequestData
-import com.google.android.gms.cast.MediaMetadata
-import com.google.android.gms.cast.MediaQueueItem
-import com.google.android.gms.cast.MediaStatus
-import com.google.android.gms.cast.framework.CastContext
-import com.google.android.gms.common.images.WebImage
 import eu.kanade.presentation.components.TabbedDialogPaddings
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.model.Hoster
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.ui.main.MainActivity
+import eu.kanade.tachiyomi.ui.player.cast.GOOGLE_CAST_AVAILABLE
+import eu.kanade.tachiyomi.ui.player.cast.sendEpisodeToCast
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.HosterState
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.QualitySheetHosterContent
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.QualitySheetVideoContent
@@ -578,11 +570,10 @@ private fun VideoList(
                             )
                         }
                     },
-                    // start tail cast
                     onCastClicked = {
                         scope.launch {
                             if (playerPreferences.enableCast().get()) {
-                                sendChaptersToCast(
+                                sendEpisodeToCast(
                                     context,
                                     anime.title,
                                     episode.name,
@@ -595,7 +586,6 @@ private fun VideoList(
                             }
                         }
                     },
-                    // end tail cast
                 )
             }
         }
@@ -693,14 +683,16 @@ private fun QualityOptions(
             },
 
         )
-        ClickableRow(
-            text = stringResource(TLMR.strings.action_cast), // Texto para la nueva opción
-            icon = Icons.Outlined.Cast, // Icono para la nueva opción
-            onClick = {
-                onCastClicked()
-                closeMenu()
-            },
-        )
+        if (GOOGLE_CAST_AVAILABLE) {
+            ClickableRow(
+                text = stringResource(TLMR.strings.action_cast),
+                icon = Icons.Outlined.Cast,
+                onClick = {
+                    onCastClicked()
+                    closeMenu()
+                },
+            )
+        }
     }
 }
 
@@ -747,58 +739,3 @@ private fun ClickableRow(
         }
     }
 }
-
-// Start tail cast
-
-private fun sendChaptersToCast(
-    context: Context,
-    title: String,
-    episode: String,
-    lastSecondSeen: Long,
-    image: String,
-    videoUrl: String,
-) {
-    val castSession = CastContext.getSharedInstance(context).sessionManager.currentCastSession
-    val remoteMediaClient = castSession?.remoteMediaClient
-    if (castSession == null || !castSession.isConnected) {
-        Toast.makeText(context, "Cast is not connected", Toast.LENGTH_SHORT).show()
-        return
-    }
-    if (remoteMediaClient != null) {
-        val mediaMetadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
-            putString(MediaMetadata.KEY_TITLE, title)
-            putString(MediaMetadata.KEY_SUBTITLE, episode)
-            addImage(WebImage(Uri.parse(image)))
-        }
-        val contentType = when {
-            videoUrl.contains(".m3u8") -> "application/x-mpegURL"
-            videoUrl.contains(".mpd") -> "application/dash+xml"
-            else -> "video/mp4"
-        }
-        val mediaInfo = MediaInfo.Builder(videoUrl)
-            .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-            .setContentType(contentType)
-            .setMetadata(mediaMetadata)
-            .build()
-        val mediaQueueItem = MediaQueueItem.Builder(mediaInfo)
-            .setAutoplay(true)
-            .setStartTime(lastSecondSeen.toDouble() / 1000)
-            .build()
-        val mediaStatus = remoteMediaClient.mediaStatus
-        if (mediaStatus != null && mediaStatus.playerState == MediaStatus.PLAYER_STATE_PLAYING) {
-            // Si hay un video reproduciéndose, agregar el nuevo video a la cola
-            remoteMediaClient.queueAppendItem(mediaQueueItem, null)
-        } else {
-            // Si no hay un video reproduciéndose, cargar el video directamente
-            val mediaLoadRequestData = MediaLoadRequestData.Builder()
-                .setMediaInfo(mediaInfo)
-                .setCurrentTime(lastSecondSeen)
-                .build()
-            remoteMediaClient.load(mediaLoadRequestData)
-        }
-    } else {
-        Toast.makeText(context, "remoteMediaClient is null", Toast.LENGTH_SHORT).show()
-    }
-}
-
-// End tail cast0

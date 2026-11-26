@@ -1,6 +1,5 @@
 package eu.kanade.tachiyomi.ui.home
 
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -59,8 +58,7 @@ import eu.kanade.tachiyomi.ui.history.HistoriesTab
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryTab
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import eu.kanade.tachiyomi.ui.more.MoreTab
-import eu.kanade.tachiyomi.ui.player.CastManager
-import eu.kanade.tachiyomi.ui.player.cast.CastMiniController
+import eu.kanade.tachiyomi.ui.player.cast.rememberCastMiniControls
 import eu.kanade.tachiyomi.ui.updates.UpdatesTab
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
@@ -96,14 +94,7 @@ object HomeScreen : Screen() {
             uiPreferences.bottomBarLabels.asState(scope)
         }
         // SY <--
-        val activity = context as? ComponentActivity
-        val preferences = context.appGraph.preferenceStore
-        val castManager = remember { CastManager(activity!!, preferences) }
-
-        LaunchedEffect(Unit) {
-            castManager.startDeviceDiscovery()
-            castManager.reconnect()
-        }
+        val castMiniControls = rememberCastMiniControls()
 
         val showHomeTab by uiPreferences.showHomeTab.collectAsState()
         val startScreenPref by uiPreferences.startScreen.collectAsState()
@@ -130,20 +121,11 @@ object HomeScreen : Screen() {
                         bottomBar = {
                             if (!isTabletUi()) {
                                 Column {
-                                    val isConnected =
-                                        castManager.castState.collectAsState().value == CastManager.CastState.CONNECTED
-                                    AnimatedVisibility(
-                                        visible = isConnected,
-                                        enter = expandVertically(),
-                                        exit = shrinkVertically(),
-                                    ) {
-                                        CastMiniController(
-                                            castManager = castManager,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                                        )
-                                    }
+                                    castMiniControls(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    )
 
                                     val bottomNavVisible by produceState(initialValue = true) {
                                         showBottomNavEvent.receiveAsFlow().collectLatest { value = it }

@@ -3,6 +3,7 @@ package mihon.gradle
 import org.gradle.api.Project
 
 interface BuildConfig {
+    val isFoss: Boolean
     val enableUpdater: Boolean
     val includeDependencyInfo: Boolean
 }
@@ -22,8 +23,10 @@ val Project.Config: BuildConfig get() = object : BuildConfig {
         }
         ?: Distribution.LOCAL
 
+    override val isFoss: Boolean = distribution == Distribution.FOSS
+
     override val enableUpdater: Boolean = project.flag("enable-updater")
-        ?: (distribution != Distribution.LOCAL)
+        ?: (distribution == Distribution.CI || distribution == Distribution.GITHUB)
 
     override val includeDependencyInfo: Boolean = project.flag("include-dependency-info") ?: false
 }

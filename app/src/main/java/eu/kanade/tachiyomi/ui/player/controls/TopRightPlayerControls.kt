@@ -31,11 +31,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.mediarouter.app.MediaRouteButton
-import com.google.android.gms.cast.framework.CastButtonFactory
-import eu.kanade.tachiyomi.ui.player.CastManager
-import eu.kanade.tachiyomi.ui.player.cast.CustomCastThemeFactory
+import eu.kanade.tachiyomi.ui.player.cast.CastRouteButton
+import eu.kanade.tachiyomi.ui.player.cast.GOOGLE_CAST_AVAILABLE
 import eu.kanade.tachiyomi.ui.player.controls.components.AutoPlaySwitch
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
 import tachiyomi.presentation.core.components.material.padding
@@ -64,8 +61,6 @@ fun TopRightPlayerControls(
     onMoreLongClick: () -> Unit,
 
     // cast
-    castState: CastManager.CastState,
-    onCastClick: () -> Unit,
     isCastEnabled: () -> Boolean,
 
     modifier: Modifier = Modifier,
@@ -84,14 +79,8 @@ fun TopRightPlayerControls(
                     .size(width = 48.dp, height = 24.dp),
             )
         }
-        if (isCastEnabled()) {
-            AndroidView(
-                factory = { ctx ->
-                    MediaRouteButton(ctx).apply {
-                        CastButtonFactory.setUpMediaRouteButton(ctx, this)
-                        dialogFactory = CustomCastThemeFactory()
-                    }
-                },
+        if (GOOGLE_CAST_AVAILABLE && isCastEnabled()) {
+            CastRouteButton(
                 modifier = Modifier
                     .padding(vertical = MaterialTheme.padding.medium, horizontal = MaterialTheme.padding.mediumSmall),
             )

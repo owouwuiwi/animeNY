@@ -21,6 +21,7 @@ plugins {
 }
 
 val keystorePropertiesFile = layout.settingsDirectory.file("keystore.properties").asFile
+val isFoss = Config.isFoss
 
 android {
     namespace = "eu.kanade.tachiyomi"
@@ -97,6 +98,13 @@ android {
     }
 
     sourceSets {
+        getByName("main").kotlin.srcDir(if (isFoss) "src/foss/kotlin" else "src/standard/kotlin")
+        if (!isFoss) {
+            getByName("main").res.srcDir("src/standard/res")
+            buildTypes.names.forEach { buildType ->
+                getByName(buildType).manifest.srcFile("src/standard/AndroidManifest.xml")
+            }
+        }
         getByName("nightly").res.directories.add("src/debug/res")
         getByName("benchmark").res.directories.add("src/debug/res")
     }
@@ -355,8 +363,9 @@ dependencies {
     implementation(aniyomilibs.truetypeparser)
     // torrserver
     implementation(libs.torrentserver)
-    // Cast
-    implementation(libs.bundles.cast)
+    if (!isFoss) {
+        implementation(libs.bundles.cast)
+    }
     // nanohttpd server
     implementation(libs.nanohttpd)
     // Discord Partner SDK
