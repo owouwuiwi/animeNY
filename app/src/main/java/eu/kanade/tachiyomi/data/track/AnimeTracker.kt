@@ -51,6 +51,11 @@ interface AnimeTracker {
 
     suspend fun update(track: AnimeTrack, didWatchEpisode: Boolean = false): AnimeTrack
 
+    /** Some trackers distinguish an explicit progress edit from a playback update. */
+    suspend fun updateEditedEpisodeProgress(track: AnimeTrack, previousProgress: Double): AnimeTrack {
+        return update(track)
+    }
+
     suspend fun bind(track: AnimeTrack, hasSeenEpisodes: Boolean = false): AnimeTrack
 
     suspend fun searchAnime(query: String): List<AnimeTrackSearch>
@@ -78,6 +83,7 @@ interface AnimeTracker {
     }
 
     suspend fun setRemoteLastEpisodeSeen(track: AnimeTrack, episodeNumber: Int) {
+        val previousProgress = track.last_episode_seen
         if (track.last_episode_seen == 0.0 &&
             track.last_episode_seen < episodeNumber &&
             track.status != getRewatchingStatus()
@@ -89,7 +95,7 @@ interface AnimeTracker {
             track.status = getCompletionStatus()
             track.finished_watching_date = System.currentTimeMillis()
         }
-        updateRemote(track)
+        updateRemote(track) { updateEditedEpisodeProgress(track, previousProgress) }
     }
 
     suspend fun setRemoteScore(track: AnimeTrack, scoreString: String) {
@@ -127,9 +133,12 @@ interface AnimeTracker {
         return null
     }
 
-    private suspend fun updateRemote(track: AnimeTrack): Unit = withIOContext {
+    private suspend fun updateRemote(
+        track: AnimeTrack,
+        sendUpdate: suspend () -> AnimeTrack = { update(track) },
+    ): Unit = withIOContext {
         try {
-            update(track)
+            sendUpdate()
             track.toDomainTrack(idRequired = false)?.let {
                 upsertTrack.await(it)
             }

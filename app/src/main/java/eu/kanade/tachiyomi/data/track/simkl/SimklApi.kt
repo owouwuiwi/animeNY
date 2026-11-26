@@ -87,42 +87,21 @@ class SimklApi(private val client: OkHttpClient, interceptor: SimklInterceptor) 
         }
     }
 
-    private suspend fun updateProgress(track: AnimeTrack) {
-        // first remove
-        authClient.newCall(
-            POST("$API_URL/sync/history/remove", body = buildProgressObject(track, false)),
-        ).awaitSuccess()
-        // then add again
-        authClient.newCall(
-            POST("$API_URL/sync/history", body = buildProgressObject(track, true)),
-        ).awaitSuccess()
+    private suspend fun updateProgress(track: AnimeTrack, previousEditedProgress: Double?) {
+        val progress = SimklEpisodeHistoryChange.fromProgress(track.last_episode_seen, previousEditedProgress)
+        if (!progress.unwatched.isEmpty()) {
+            val body = simklEpisodeHistoryPayload(track.remote_id, progress.unwatched).toString().toRequestBody(jsonMime)
+            authClient.newCall(POST("$API_URL/sync/history/remove", body = body)).awaitSuccess().close()
+        }
+        if (!progress.watched.isEmpty()) {
+            // SIMKL ignores already watched episodes unless rewatch recording is requested.
+            // Adding the prefix without removing it preserves the original timestamps.
+            val body = simklEpisodeHistoryPayload(track.remote_id, progress.watched).toString().toRequestBody(jsonMime)
+            authClient.newCall(POST("$API_URL/sync/history", body = body)).awaitSuccess().close()
+        }
     }
 
-    private fun buildProgressObject(track: AnimeTrack, add: Boolean = true) = buildJsonObject {
-        putJsonArray("shows") {
-            addJsonObject {
-                putJsonObject("ids") {
-                    put("simkl", track.remote_id)
-                }
-                putJsonArray("seasons") {
-                    addJsonObject {
-                        put("number", 1)
-                        if (add) {
-                            putJsonArray("episodes") {
-                                for (epNum in 1..track.last_episode_seen.toInt()) {
-                                    addJsonObject {
-                                        put("number", epNum)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }.toString().toRequestBody(jsonMime)
-
-    suspend fun updateLibAnime(track: AnimeTrack): AnimeTrack {
+    suspend fun updateLibAnime(track: AnimeTrack, previousEditedProgress: Double? = null): AnimeTrack {
         return withIOContext {
             // determine media type
             val type = track.tracking_url
@@ -131,7 +110,7 @@ class SimklApi(private val client: OkHttpClient, interceptor: SimklInterceptor) 
             val mediaType = if (type == "movies") "movies" else "shows"
             // update progress only for shows
             if (type != "movies") {
-                updateProgress(track)
+                updateProgress(track, previousEditedProgress)
             }
             // add to correct list
             addToList(track, mediaType)

@@ -66,6 +66,10 @@ class Simkl(id: Long) : BaseTracker(id, "Simkl"), AnimeTracker {
         return api.updateLibAnime(track)
     }
 
+    override suspend fun updateEditedEpisodeProgress(track: AnimeTrack, previousProgress: Double): AnimeTrack {
+        return api.updateLibAnime(track, previousProgress)
+    }
+
     override suspend fun bind(track: AnimeTrack, hasSeenEpisodes: Boolean): AnimeTrack {
         val remoteTrack = api.findLibAnime(track)
         return if (remoteTrack != null) {
