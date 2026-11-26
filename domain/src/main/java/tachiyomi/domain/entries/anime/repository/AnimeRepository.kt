@@ -41,6 +41,8 @@ interface AnimeRepository {
 
     suspend fun setAnimeCategories(animeId: Long, categoryIds: List<Long>)
 
+    suspend fun addToLibrary(animeIds: Set<Long>, categoryIds: List<Long>, dateAdded: Long): Set<Long>
+
     suspend fun insertAnime(anime: Anime): Long?
 
     suspend fun updateAnime(update: AnimeUpdate): Boolean

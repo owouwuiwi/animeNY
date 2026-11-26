@@ -28,6 +28,7 @@ fun BrowseAnimeSourceList(
     contentPadding: PaddingValues,
     onAnimeClick: (Anime) -> Unit,
     onAnimeLongClick: (Anime) -> Unit,
+    selectedIds: Set<Long> = emptySet(),
 ) {
     val sourceListState = rememberLazyListState()
     BoxWithConstraints {
@@ -50,6 +51,7 @@ fun BrowseAnimeSourceList(
                     anime = anime,
                     onClick = { onAnimeClick(anime) },
                     onLongClick = { onAnimeLongClick(anime) },
+                    isSelected = anime.id in selectedIds,
                     entries = entries,
                     containerHeight = containerHeightPx - topBarHeight,
                 )

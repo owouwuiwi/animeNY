@@ -44,6 +44,7 @@ import eu.kanade.tachiyomi.util.removeCovers
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,11 +62,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import logcat.LogPriority
 import tachiyomi.core.common.preference.CheckboxState
 import tachiyomi.core.common.preference.mapAsCheckboxState
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.launchNonCancellable
 import tachiyomi.core.common.util.lang.withIOContext
+import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
 import tachiyomi.domain.category.anime.interactor.SetAnimeCategories
 import tachiyomi.domain.category.model.Category
@@ -413,6 +416,85 @@ class BrowseAnimeSourceViewModel(
         }
     }
 
+    fun startBulkSelection() {
+        state.update { it.copy(bulkSelection = emptySet()) }
+    }
+
+    fun clearBulkSelection() {
+        state.update { if (it.isAddingInBulk) it else it.copy(bulkSelection = null) }
+    }
+
+    fun toggleBulkSelection(anime: Anime) {
+        state.update { state ->
+            val selected = state.bulkSelection ?: return@update state
+            if (state.isAddingInBulk || anime.favorite) return@update state
+            state.copy(bulkSelection = if (anime.id in selected) selected - anime.id else selected + anime.id)
+        }
+    }
+
+    fun selectLoadedAnime(anime: List<Anime>) {
+        state.update { state ->
+            val selected = state.bulkSelection ?: return@update state
+            if (state.isAddingInBulk) return@update state
+            state.copy(bulkSelection = selected + anime.filterNot { it.favorite }.map { it.id })
+        }
+    }
+
+    fun prepareBulkAdd(onError: (Throwable) -> Unit) {
+        if (state.value.bulkSelection.isNullOrEmpty() || state.value.isAddingInBulk) return
+        viewModelScope.launch {
+            try {
+                val categories = getCategories()
+                val defaultId = libraryPreferences.defaultAnimeCategory.get().toLong()
+                if (state.value.bulkSelection.isNullOrEmpty()) return@launch
+                when {
+                    categories.any { it.id == defaultId } -> addSelectedToLibrary(listOf(defaultId), onError)
+                    defaultId == 0L || categories.isEmpty() -> addSelectedToLibrary(emptyList(), onError)
+                    else -> setDialog(Dialog.BulkAddCategories(categories.mapAsCheckboxState { false }.toImmutableList()))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onError(e)
+            }
+        }
+    }
+
+    fun addSelectedToLibrary(categoryIds: List<Long>, onError: (Throwable) -> Unit) {
+        val snapshot = state.value
+        val selected = snapshot.bulkSelection.orEmpty()
+        if (selected.isEmpty() || snapshot.isAddingInBulk) return
+        state.update { it.copy(isAddingInBulk = true, dialog = null) }
+        viewModelScope.launch {
+            var added = false
+            try {
+                val entries = selected.mapNotNull { getAnime.await(it) }.filterNot { it.favorite }
+                entries.forEach { setAnimeDefaultEpisodeFlags.await(it) }
+                val updated = updateAnime.addToLibrary(
+                    animeIds = entries.mapTo(mutableSetOf()) { it.id },
+                    categoryIds = categoryIds,
+                    dateAdded = Instant.now().toEpochMilli(),
+                )
+                added = true
+                entries.filter { it.id in updated }.forEach { anime ->
+                    try {
+                        addTracks.bindEnhancedTrackers(anime, source)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logcat(LogPriority.WARN, e)
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onError(e)
+            } finally {
+                state.update { it.copy(isAddingInBulk = false, bulkSelection = if (added) null else it.bulkSelection) }
+            }
+        }
+    }
+
     /**
      * Get user categories.
      *
@@ -498,6 +580,7 @@ class BrowseAnimeSourceViewModel(
         // SY -->
         data class DeleteSavedSearch(val idToDelete: Long, val name: String) : Dialog
         data class CreateSavedSearch(val currentSavedSearches: ImmutableList<String>) : Dialog
+        data class BulkAddCategories(val initialSelection: ImmutableList<CheckboxState.State<Category>>) : Dialog
         // SY <--
     }
 
@@ -512,6 +595,8 @@ class BrowseAnimeSourceViewModel(
         val filterable: Boolean = true,
         // SY <--
         val listingReady: Boolean = true,
+        val bulkSelection: Set<Long>? = null,
+        val isAddingInBulk: Boolean = false,
     ) {
         val isUserQuery get() = listing is Listing.Search && !listing.query.isNullOrEmpty()
     }

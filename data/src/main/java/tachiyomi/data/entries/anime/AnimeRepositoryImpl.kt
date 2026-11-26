@@ -1,10 +1,13 @@
 package tachiyomi.data.entries.anime
 
 import aniyomi.domain.anime.SeasonAnime
+import app.cash.sqldelight.async.coroutines.awaitAsOneOrNull
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atStartOfDayIn
@@ -19,6 +22,7 @@ import tachiyomi.domain.entries.anime.model.AnimeUpdate
 import tachiyomi.domain.entries.anime.repository.AnimeRepository
 import tachiyomi.domain.library.anime.LibraryAnime
 import tachiyomi.domain.source.anime.model.DeletableAnime
+import tachiyomi.mi.data.AnimeDatabase
 import kotlin.time.Clock
 
 @Inject
@@ -122,11 +126,31 @@ class AnimeRepositoryImpl(
 
     override suspend fun setAnimeCategories(animeId: Long, categoryIds: List<Long>) {
         handler.await(inTransaction = true) {
-            animes_categoriesQueries.deleteAnimeCategoryByAnimeId(animeId)
-            categoryIds.map { categoryId ->
-                animes_categoriesQueries.insert(animeId, categoryId)
-            }
+            assignCategories(animeId, categoryIds)
         }
+    }
+
+    override suspend fun addToLibrary(
+        animeIds: Set<Long>,
+        categoryIds: List<Long>,
+        dateAdded: Long,
+    ): Set<Long> {
+        return handler.await(inTransaction = true) {
+            val added = mutableSetOf<Long>()
+            animeIds.forEach { animeId ->
+                currentCoroutineContext().ensureActive()
+                if (animesQueries.addFavorite(dateAdded, animeId).awaitAsOneOrNull() != null) {
+                    assignCategories(animeId, categoryIds)
+                    added.add(animeId)
+                }
+            }
+            added
+        }
+    }
+
+    private suspend fun AnimeDatabase.assignCategories(animeId: Long, categoryIds: List<Long>) {
+        animes_categoriesQueries.deleteAnimeCategoryByAnimeId(animeId)
+        categoryIds.forEach { animes_categoriesQueries.insert(animeId, it) }
     }
 
     override suspend fun insertAnime(anime: Anime): Long? {

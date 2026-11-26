@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.ui.browse.anime.source.browse
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -46,9 +47,11 @@ import eu.kanade.presentation.browse.anime.BrowseAnimeSourceContent
 import eu.kanade.presentation.browse.anime.MissingSourceScreen
 import eu.kanade.presentation.browse.anime.components.BrowseAnimeSourceToolbar
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
+import eu.kanade.presentation.components.BulkSelectionToolbar
 import eu.kanade.presentation.entries.anime.DuplicateAnimeDialog
 import eu.kanade.presentation.util.AssistContentScreen
 import eu.kanade.presentation.util.Screen
+import eu.kanade.presentation.util.formattedMessage
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.core.common.Constants
 import eu.kanade.tachiyomi.ui.browse.anime.extension.details.AnimeSourcePreferencesScreen
@@ -64,6 +67,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import mihon.presentation.core.util.collectAsLazyPagingItems
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.domain.source.anime.model.StubAnimeSource
@@ -134,6 +138,16 @@ data class BrowseAnimeSourceScreen(
         val haptic = LocalHapticFeedback.current
         val uriHandler = LocalUriHandler.current
         val snackbarHostState = remember { SnackbarHostState() }
+        val animeList = viewModel.animePagerFlowFlow.collectAsLazyPagingItems()
+        val bulkSelection = state.bulkSelection
+        val onBulkError: (Throwable) -> Unit = { error ->
+            scope.launch { snackbarHostState.showSnackbar(with(context) { error.formattedMessage }) }
+        }
+
+        BackHandler(enabled = bulkSelection != null) {
+            viewModel.clearBulkSelection()
+        }
+        LaunchedEffect(state.listing) { viewModel.clearBulkSelection() }
 
         val onHelpClick = { uriHandler.openUri(LocalAnimeSource.HELP_URL) }
         val onWebViewClick = f@{
@@ -159,6 +173,18 @@ data class BrowseAnimeSourceScreen(
                         .background(MaterialTheme.colorScheme.surface)
                         .onSizeChanged { topBarHeight = it.height },
                 ) {
+                    if (bulkSelection != null) {
+                        BulkSelectionToolbar(
+                            selectedCount = bulkSelection.size,
+                            isRunning = state.isAddingInBulk,
+                            onClickClearSelection = viewModel::clearBulkSelection,
+                            onChangeCategoryClick = { viewModel.prepareBulkAdd(onBulkError) },
+                            onSelectAll = {
+                                viewModel.selectLoadedAnime(animeList.itemSnapshotList.items.map { it.value })
+                            },
+                        )
+                        return@Column
+                    }
                     BrowseAnimeSourceToolbar(
                         searchQuery = state.toolbarQuery,
                         onSearchQueryChange = viewModel::setToolbarQuery,
@@ -170,6 +196,7 @@ data class BrowseAnimeSourceScreen(
                         onHelpClick = onHelpClick,
                         onSettingsClick = { navigator.push(AnimeSourcePreferencesScreen(sourceId)) },
                         onSearch = viewModel::search,
+                        onBulkSelectClick = viewModel::startBulkSelection,
                     )
 
                     Row(
@@ -271,7 +298,7 @@ data class BrowseAnimeSourceScreen(
         ) { paddingValues ->
             BrowseAnimeSourceContent(
                 source = viewModel.source,
-                animeList = viewModel.animePagerFlowFlow.collectAsLazyPagingItems(),
+                animeList = animeList,
                 columns = viewModel.getColumnsPreference(LocalConfiguration.current.orientation),
                 entries = viewModel.getColumnsPreferenceForCurrentOrientation(LocalConfiguration.current.orientation),
                 topBarHeight = topBarHeight,
@@ -281,8 +308,20 @@ data class BrowseAnimeSourceScreen(
                 onWebViewClick = onWebViewClick,
                 onHelpClick = { uriHandler.openUri(Constants.URL_HELP) },
                 onLocalAnimeSourceHelpClick = onHelpClick,
-                onAnimeClick = { navigator.push((AnimeScreen(it.id, true))) },
+                selectedIds = bulkSelection.orEmpty(),
+                onAnimeClick = {
+                    if (bulkSelection != null) {
+                        viewModel.toggleBulkSelection(it)
+                    } else {
+                        navigator.push(AnimeScreen(it.id, true))
+                    }
+                },
                 onAnimeLongClick = { anime ->
+                    if (bulkSelection != null) {
+                        viewModel.toggleBulkSelection(anime)
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        return@BrowseAnimeSourceContent
+                    }
                     scope.launchIO {
                         val duplicateAnime = viewModel.getDuplicateAnimelibAnime(anime)
                         when {
@@ -373,6 +412,15 @@ data class BrowseAnimeSourceScreen(
                         viewModel.changeAnimeFavorite(dialog.anime)
                         viewModel.moveAnimeToCategories(dialog.anime, include)
                     },
+                )
+            }
+
+            is BrowseAnimeSourceViewModel.Dialog.BulkAddCategories -> {
+                ChangeCategoryDialog(
+                    initialSelection = dialog.initialSelection,
+                    onDismissRequest = onDismissRequest,
+                    onEditCategories = { navigator.push(CategoriesTab) },
+                    onConfirm = { include, _ -> viewModel.addSelectedToLibrary(include, onBulkError) },
                 )
             }
 

@@ -104,6 +104,12 @@ SELECT coalesce(max(last_update), 0)
 FROM animes
 WHERE source = :sourceId AND url IN :urls;
 
+addFavorite:
+UPDATE animes
+SET favorite = 1, date_added = :dateAdded
+WHERE _id = :animeId AND favorite = 0
+RETURNING _id;
+
 getFavorites:
 SELECT
     _id, source, url, artist, author, description, genre, title, status, thumbnail_url, favorite,

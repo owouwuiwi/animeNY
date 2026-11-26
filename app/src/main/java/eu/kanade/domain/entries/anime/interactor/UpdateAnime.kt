@@ -32,6 +32,10 @@ class UpdateAnime(
         return animeRepository.updateAllAnime(animeUpdates)
     }
 
+    suspend fun addToLibrary(animeIds: Set<Long>, categoryIds: List<Long>, dateAdded: Long): Set<Long> {
+        return animeRepository.addToLibrary(animeIds, categoryIds, dateAdded)
+    }
+
     suspend fun awaitUpdateFromSource(
         localAnime: Anime,
         remoteAnime: SAnime,

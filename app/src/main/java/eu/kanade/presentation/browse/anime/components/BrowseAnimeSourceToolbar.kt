@@ -21,6 +21,7 @@ import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
 import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.source.local.entries.anime.LocalAnimeSource
 
@@ -37,6 +38,7 @@ fun BrowseAnimeSourceToolbar(
     onSettingsClick: () -> Unit,
     onSearch: (String) -> Unit,
     scrollBehavior: TopAppBarScrollBehavior? = null,
+    onBulkSelectClick: (() -> Unit)? = null,
 ) {
     // Avoid capturing unstable source in actions lambda
     val title = source?.name
@@ -87,6 +89,14 @@ fun BrowseAnimeSourceToolbar(
                                 AppBar.OverflowAction(
                                     title = stringResource(MR.strings.action_settings),
                                     onClick = onSettingsClick,
+                                ),
+                            )
+                        }
+                        if (onBulkSelectClick != null) {
+                            add(
+                                AppBar.OverflowAction(
+                                    title = stringResource(TLMR.strings.action_bulk_select),
+                                    onClick = onBulkSelectClick,
                                 ),
                             )
                         }

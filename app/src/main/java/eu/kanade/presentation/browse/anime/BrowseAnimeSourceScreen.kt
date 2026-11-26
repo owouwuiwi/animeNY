@@ -51,6 +51,7 @@ fun BrowseAnimeSourceContent(
     onLocalAnimeSourceHelpClick: () -> Unit,
     onAnimeClick: (Anime) -> Unit,
     onAnimeLongClick: (Anime) -> Unit,
+    selectedIds: Set<Long> = emptySet(),
 ) {
     val context = LocalContext.current
 
@@ -126,6 +127,7 @@ fun BrowseAnimeSourceContent(
                 contentPadding = contentPadding,
                 onAnimeClick = onAnimeClick,
                 onAnimeLongClick = onAnimeLongClick,
+                selectedIds = selectedIds,
             )
         }
 
@@ -137,6 +139,7 @@ fun BrowseAnimeSourceContent(
                 contentPadding = contentPadding,
                 onAnimeClick = onAnimeClick,
                 onAnimeLongClick = onAnimeLongClick,
+                selectedIds = selectedIds,
             )
         }
 
@@ -149,6 +152,7 @@ fun BrowseAnimeSourceContent(
                 contentPadding = contentPadding,
                 onAnimeClick = onAnimeClick,
                 onAnimeLongClick = onAnimeLongClick,
+                selectedIds = selectedIds,
             )
         }
 
@@ -159,6 +163,7 @@ fun BrowseAnimeSourceContent(
                 contentPadding = contentPadding,
                 onAnimeClick = onAnimeClick,
                 onAnimeLongClick = onAnimeLongClick,
+                selectedIds = selectedIds,
             )
         }
     }
