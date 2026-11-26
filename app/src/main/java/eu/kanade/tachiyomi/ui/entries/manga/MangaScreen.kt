@@ -156,13 +156,7 @@ class MangaScreen(
 
         var showScanlatorsDialog by remember { mutableStateOf(false) }
 
-        val onDismissRequest = {
-            viewModel.dismissDialog()
-            if (viewModel.autoOpenTrack && viewModel.isFromChangeCategory) {
-                viewModel.isFromChangeCategory = false
-                viewModel.showTrackDialog()
-            }
-        }
+        val onDismissRequest = viewModel::dismissDialog
         when (val dialog = successState.dialog) {
             null -> {}
 

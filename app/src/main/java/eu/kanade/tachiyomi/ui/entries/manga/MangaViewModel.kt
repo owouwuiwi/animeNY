@@ -208,11 +208,6 @@ class MangaViewModel(
     // another thread, so they can write to it before the rest of the constructor has run.
     private val downloadProgress = mutableStateMapOf<Long, Int>()
 
-    internal var isFromChangeCategory: Boolean = false
-
-    internal val autoOpenTrack: Boolean
-        get() = successState?.trackingAvailable == true && trackPreferences.trackOnAddingToLibrary.get()
-
     /**
      * Helper function to update the UI state only if it's currently in success state
      */
@@ -577,33 +572,11 @@ class MangaViewModel(
                 val categories = getCategories()
                 val defaultCategoryId = libraryPreferences.defaultCategory.get().toLong()
                 val defaultCategory = categories.find { it.id == defaultCategoryId }
-                when {
-                    // Default category set
-                    defaultCategory != null -> {
-                        val result = updateManga.awaitUpdateFavorite(manga.id, true)
-                        if (!result) return@launchIO
-                        moveMangaToCategory(defaultCategory)
-                    }
-
-                    // Automatic 'Default' or no categories
-                    defaultCategoryId == 0L || categories.isEmpty() -> {
-                        val result = updateManga.awaitUpdateFavorite(manga.id, true)
-                        if (!result) return@launchIO
-                        moveMangaToCategory(null)
-                    }
-
-                    // Choose a category
-                    else -> {
-                        isFromChangeCategory = true
-                        showChangeCategoryDialog()
-                    }
+                if (defaultCategory == null && defaultCategoryId != 0L && categories.isNotEmpty()) {
+                    showChangeCategoryDialog()
+                    return@launchIO
                 }
-
-                // Finally match with enhanced tracking when available
-                addTracks.bindEnhancedTrackers(manga, state.source)
-                if (autoOpenTrack) {
-                    showTrackDialog()
-                }
+                addMangaToLibrary(manga, state.source, listOfNotNull(defaultCategory?.id))
             }
         }
     }
@@ -682,37 +655,23 @@ class MangaViewModel(
     }
 
     fun moveMangaToCategoriesAndAddToLibrary(manga: Manga, categories: List<Long>) {
-        moveMangaToCategory(categories)
-        if (manga.favorite) return
-
+        val source = successState?.source ?: return
         viewModelScope.launchIO {
-            updateManga.awaitUpdateFavorite(manga.id, true)
+            if (manga.favorite) {
+                setMangaCategories.await(manga.id, categories)
+            } else {
+                addMangaToLibrary(manga, source, categories)
+            }
         }
     }
 
-    /**
-     * Move the given manga to categories.
-     *
-     * @param categories the selected categories.
-     */
-    private fun moveMangaToCategories(categories: List<Category>) {
-        val categoryIds = categories.map { it.id }
-        moveMangaToCategory(categoryIds)
-    }
-
-    private fun moveMangaToCategory(categoryIds: List<Long>) {
-        viewModelScope.launchIO {
-            setMangaCategories.await(mangaId, categoryIds)
+    private suspend fun addMangaToLibrary(manga: Manga, source: MangaSource, categories: List<Long>) {
+        if (!updateManga.awaitUpdateFavorite(manga.id, true)) return
+        setMangaCategories.await(manga.id, categories)
+        addTracks.bindEnhancedTrackers(manga, source)
+        if (successState?.hasLoggedInTrackers == true && trackPreferences.trackOnAddingToLibrary.get()) {
+            showTrackDialog()
         }
-    }
-
-    /**
-     * Move the given manga to the category.
-     *
-     * @param category the selected category, or null for default category.
-     */
-    private fun moveMangaToCategory(category: Category?) {
-        moveMangaToCategories(listOfNotNull(category))
     }
 
     // Manga info - end
