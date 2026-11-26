@@ -42,6 +42,7 @@ import tachiyomi.presentation.core.components.material.padding
 
 @Composable
 fun TopRightPlayerControls(
+    hiddenControls: Set<OptionalPlayerControl>,
     // auto-play
     autoPlayEnabled: Boolean,
     onToggleAutoPlay: (Boolean) -> Unit,
@@ -74,13 +75,15 @@ fun TopRightPlayerControls(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Absolute.SpaceEvenly,
     ) {
-        AutoPlaySwitch(
-            isChecked = autoPlayEnabled,
-            onToggleAutoPlay = onToggleAutoPlay,
-            modifier = Modifier
-                .padding(vertical = MaterialTheme.padding.medium, horizontal = MaterialTheme.padding.mediumSmall)
-                .size(width = 48.dp, height = 24.dp),
-        )
+        if (OptionalPlayerControl.AutoPlay !in hiddenControls) {
+            AutoPlaySwitch(
+                isChecked = autoPlayEnabled,
+                onToggleAutoPlay = onToggleAutoPlay,
+                modifier = Modifier
+                    .padding(vertical = MaterialTheme.padding.medium, horizontal = MaterialTheme.padding.mediumSmall)
+                    .size(width = 48.dp, height = 24.dp),
+            )
+        }
         if (isCastEnabled()) {
             AndroidView(
                 factory = { ctx ->
@@ -93,19 +96,23 @@ fun TopRightPlayerControls(
                     .padding(vertical = MaterialTheme.padding.medium, horizontal = MaterialTheme.padding.mediumSmall),
             )
         }
-        ControlsButton(
-            icon = Icons.Default.Subtitles,
-            onClick = onSubtitlesClick,
-            onLongClick = onSubtitlesLongClick,
-            horizontalSpacing = MaterialTheme.padding.mediumSmall,
-        )
-        ControlsButton(
-            icon = Icons.Default.Audiotrack,
-            onClick = onAudioClick,
-            onLongClick = onAudioLongClick,
-            horizontalSpacing = MaterialTheme.padding.mediumSmall,
-        )
-        if (isEpisodeOnline == true) {
+        if (OptionalPlayerControl.Subtitles !in hiddenControls) {
+            ControlsButton(
+                icon = Icons.Default.Subtitles,
+                onClick = onSubtitlesClick,
+                onLongClick = onSubtitlesLongClick,
+                horizontalSpacing = MaterialTheme.padding.mediumSmall,
+            )
+        }
+        if (OptionalPlayerControl.Audio !in hiddenControls) {
+            ControlsButton(
+                icon = Icons.Default.Audiotrack,
+                onClick = onAudioClick,
+                onLongClick = onAudioLongClick,
+                horizontalSpacing = MaterialTheme.padding.mediumSmall,
+            )
+        }
+        if (isEpisodeOnline == true && OptionalPlayerControl.Quality !in hiddenControls) {
             ControlsButton(
                 icon = Icons.Default.HighQuality,
                 onClick = onQualityClick,
@@ -113,11 +120,13 @@ fun TopRightPlayerControls(
                 horizontalSpacing = MaterialTheme.padding.mediumSmall,
             )
         }
-        ControlsButton(
-            icon = Icons.Default.MoreVert,
-            onClick = onMoreClick,
-            onLongClick = onMoreLongClick,
-            horizontalSpacing = MaterialTheme.padding.mediumSmall,
-        )
+        if (OptionalPlayerControl.More !in hiddenControls) {
+            ControlsButton(
+                icon = Icons.Default.MoreVert,
+                onClick = onMoreClick,
+                onLongClick = onMoreLongClick,
+                horizontalSpacing = MaterialTheme.padding.mediumSmall,
+            )
+        }
     }
 }

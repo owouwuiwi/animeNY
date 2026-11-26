@@ -453,6 +453,10 @@
     <string name="pref_top_align_cover_summary">Align the cover image to the top instead of center</string>
 
     <!-- Audio language -->
+    <string name="pref_hidden_player_controls">Hidden player buttons</string>
+    <string name="player_control_autoplay">Autoplay</string>
+    <string name="player_control_quality">Video quality</string>
+    <string name="player_control_aspect_ratio">Aspect ratio</string>
     <string name="pref_remember_series_stream">Remember stream for each series</string>
     <string name="pref_remember_series_stream_summary">Try the last manually selected provider and quality when opening another episode.</string>
     <string name="prepare_anime_download_folder">Create download folder</string>

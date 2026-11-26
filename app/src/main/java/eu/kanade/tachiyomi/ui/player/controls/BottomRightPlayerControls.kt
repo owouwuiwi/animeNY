@@ -17,11 +17,13 @@
 
 package eu.kanade.tachiyomi.ui.player.controls
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import eu.kanade.tachiyomi.ui.player.controls.components.ControlsButton
 import eu.kanade.tachiyomi.ui.player.controls.components.FilledControlsButton
@@ -32,6 +34,7 @@ import tachiyomi.domain.custombuttons.model.CustomButton
 
 @Composable
 fun BottomRightPlayerControls(
+    hiddenControls: Set<OptionalPlayerControl>,
     mpv: MPV,
     customButton: CustomButton?,
     customButtonTitle: String,
@@ -42,31 +45,36 @@ fun BottomRightPlayerControls(
     onPipClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier) {
-        if (skipIntroButton != null) {
-            FilledControlsButton(
-                text = skipIntroButton,
-                onClick = onPressSkipIntroButton,
-                onLongClick = {},
-            )
-        } else if (customButton != null) {
-            FilledControlsButton(
-                text = customButtonTitle,
-                onClick = { customButton.execute(mpv) },
-                onLongClick = { customButton.executeLongPress(mpv) },
-            )
+    Row(modifier, verticalAlignment = Alignment.Bottom) {
+        Column(horizontalAlignment = Alignment.End) {
+            if (skipIntroButton != null) {
+                FilledControlsButton(
+                    text = skipIntroButton,
+                    onClick = onPressSkipIntroButton,
+                    onLongClick = {},
+                )
+            }
+            if (customButton != null) {
+                FilledControlsButton(
+                    text = customButtonTitle,
+                    onClick = { customButton.execute(mpv) },
+                    onLongClick = { customButton.executeLongPress(mpv) },
+                )
+            }
         }
 
-        if (isPipAvailable) {
+        if (isPipAvailable && OptionalPlayerControl.PictureInPicture !in hiddenControls) {
             ControlsButton(
                 Icons.Default.PictureInPictureAlt,
                 onClick = onPipClick,
             )
         }
 
-        ControlsButton(
-            Icons.Default.AspectRatio,
-            onClick = onAspectClick,
-        )
+        if (OptionalPlayerControl.AspectRatio !in hiddenControls) {
+            ControlsButton(
+                Icons.Default.AspectRatio,
+                onClick = onAspectClick,
+            )
+        }
     }
 }

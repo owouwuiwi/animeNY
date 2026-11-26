@@ -15,6 +15,7 @@ import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.screen.SearchableSettings
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.player.PlayerOrientation
+import eu.kanade.tachiyomi.ui.player.controls.OptionalPlayerControl
 import eu.kanade.tachiyomi.ui.player.externalVideoPlayers
 import eu.kanade.tachiyomi.ui.player.loader.HosterCache
 import eu.kanade.tachiyomi.ui.player.loader.HosterPriority
@@ -102,6 +103,11 @@ object PlayerSettingsPlayerScreen : Screen(), SearchableSettings {
         return Preference.PreferenceGroup(
             title = stringResource(AYMR.strings.pref_category_controls),
             preferenceItems = persistentListOf(
+                Preference.PreferenceItem.MultiSelectListPreference(
+                    preference = playerPreferences.hiddenPlayerControls(),
+                    title = stringResource(TLMR.strings.pref_hidden_player_controls),
+                    entries = OptionalPlayerControl.entries.associate { it.name to stringResource(it.titleRes) },
+                ),
                 Preference.PreferenceItem.SwitchPreference(
                     preference = allowGestures,
                     title = stringResource(AYMR.strings.pref_controls_allow_gestures_in_panels),

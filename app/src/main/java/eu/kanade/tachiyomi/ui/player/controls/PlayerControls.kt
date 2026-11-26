@@ -130,6 +130,10 @@ fun PlayerControls(
     val currentChapter by viewModel.currentChapter.collectAsState()
     val indexedChapters by viewModel.chapters.collectAsState()
     val currentBrightness by viewModel.currentBrightness.collectAsState()
+    val hiddenControlNames by playerPreferences.hiddenPlayerControls().collectAsState()
+    val hiddenControls = remember(hiddenControlNames) {
+        OptionalPlayerControl.entries.filter { it.name in hiddenControlNames }.toSet()
+    }
 
     val playerTimeToDisappear by playerPreferences.playerTimeToDisappear().collectAsState()
     var resetControls by remember { mutableStateOf(true) }
@@ -483,6 +487,7 @@ fun PlayerControls(
                     },
                 ) {
                     TopRightPlayerControls(
+                        hiddenControls = hiddenControls,
                         autoPlayEnabled = autoPlayEnabled,
                         onToggleAutoPlay = { viewModel.setAutoPlay(it) },
                         onSubtitlesClick = { viewModel.showSheet(Sheets.SubtitleTracks) },
@@ -522,6 +527,7 @@ fun PlayerControls(
                 ) {
                     val activity = LocalContext.current as PlayerActivity
                     BottomRightPlayerControls(
+                        hiddenControls = hiddenControls,
                         mpv = viewModel.mpv,
                         customButton = customButton,
                         customButtonTitle = customButtonTitle,
@@ -568,6 +574,7 @@ fun PlayerControls(
                     },
                 ) {
                     BottomLeftPlayerControls(
+                        hiddenControls = hiddenControls,
                         playbackSpeed,
                         currentChapter = currentChapter?.toSegment(),
                         onLockControls = viewModel::lockControls,

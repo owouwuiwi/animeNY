@@ -26,6 +26,7 @@ class PlayerPreferences(
     // Controls
 
     fun allowGestures() = preferenceStore.getBoolean("pref_allow_gestures_in_panels", false)
+    fun hiddenPlayerControls() = preferenceStore.getStringSet("pref_hidden_player_controls", emptySet())
     fun showLoadingCircle() = preferenceStore.getBoolean("pref_show_loading", true)
     fun showCurrentChapter() = preferenceStore.getBoolean("pref_show_current_chapter", true)
     fun rememberPlayerBrightness() = preferenceStore.getBoolean("pref_remember_brightness", false)

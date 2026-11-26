@@ -46,6 +46,7 @@ import uy.kohesive.injekt.api.get
 
 @Composable
 fun BottomLeftPlayerControls(
+    hiddenControls: Set<OptionalPlayerControl>,
     playbackSpeed: Float,
     currentChapter: Segment?,
     onLockControls: () -> Unit,
@@ -64,26 +65,30 @@ fun BottomLeftPlayerControls(
             Icons.Default.LockOpen,
             onClick = onLockControls,
         )
-        ControlsButton(
-            icon = Icons.Default.ScreenRotation,
-            onClick = onCycleRotation,
-        )
-        var speedMenuExpanded by remember { mutableStateOf(false) }
-        Box {
+        if (OptionalPlayerControl.Rotation !in hiddenControls) {
             ControlsButton(
-                text = stringResource(AYMR.strings.player_speed, playbackSpeed),
-                onClick = { speedMenuExpanded = true },
-                onLongClick = { onOpenSheet(Sheets.PlaybackSpeed) },
+                icon = Icons.Default.ScreenRotation,
+                onClick = onCycleRotation,
             )
-            PlaybackSpeedDropdown(
-                expanded = speedMenuExpanded,
-                speed = playbackSpeed,
-                onSpeedChange = {
-                    onPlaybackSpeedChange(it)
-                    playerPreferences.playerSpeed().set(it)
-                },
-                onDismissRequest = { speedMenuExpanded = false },
-            )
+        }
+        if (OptionalPlayerControl.PlaybackSpeed !in hiddenControls) {
+            var speedMenuExpanded by remember { mutableStateOf(false) }
+            Box {
+                ControlsButton(
+                    text = stringResource(AYMR.strings.player_speed, playbackSpeed),
+                    onClick = { speedMenuExpanded = true },
+                    onLongClick = { onOpenSheet(Sheets.PlaybackSpeed) },
+                )
+                PlaybackSpeedDropdown(
+                    expanded = speedMenuExpanded,
+                    speed = playbackSpeed,
+                    onSpeedChange = {
+                        onPlaybackSpeedChange(it)
+                        playerPreferences.playerSpeed().set(it)
+                    },
+                    onDismissRequest = { speedMenuExpanded = false },
+                )
+            }
         }
         AnimatedVisibility(
             currentChapter != null && playerPreferences.showCurrentChapter().get(),
