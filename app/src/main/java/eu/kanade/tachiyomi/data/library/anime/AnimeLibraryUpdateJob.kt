@@ -251,7 +251,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                 }
 
                 AnimeLibraryGroup.BY_TAG -> {
-                    val groupId = groupExtra.toLongOrNull()
+                    val groupId = groupExtra?.toLongOrNull()
                     val uniqueEntries = libraryAnime.distinctBy { it.anime.id }
                     groupLibraryEntriesByTag(uniqueEntries) { it.anime.genre }
                         .firstOrNull { it.id == groupId }

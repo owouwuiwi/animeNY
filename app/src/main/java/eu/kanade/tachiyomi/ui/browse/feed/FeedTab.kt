@@ -50,8 +50,10 @@ fun feedTab(
 ): TabContent {
     val navigator = LocalNavigator.currentOrThrow
     val state by screenModel.state.collectAsState()
-    val groupBySource by screenModel.sourcePreferences.feedGroupBySource.collectAsState()
-    val sortOrder by screenModel.sourcePreferences.feedSortOrder.collectAsState()
+    val groupBySource by screenModel.sourcePreferences.feedGroupBySource.changes()
+        .collectAsState(screenModel.sourcePreferences.feedGroupBySource.get())
+    val sortOrder by screenModel.sourcePreferences.feedSortOrder.changes()
+        .collectAsState(screenModel.sourcePreferences.feedSortOrder.get())
     var showFeedDisplayOptions by rememberSaveable { mutableStateOf(false) }
 
     // KMK -->

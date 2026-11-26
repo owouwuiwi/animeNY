@@ -264,7 +264,7 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                 }
 
                 MangaLibraryGroup.BY_TAG -> {
-                    val groupId = groupExtra.toLongOrNull()
+                    val groupId = groupExtra?.toLongOrNull()
                     val uniqueEntries = libraryManga.distinctBy { it.manga.id }
                     groupLibraryEntriesByTag(uniqueEntries) { it.manga.genre }
                         .firstOrNull { it.id == groupId }
