@@ -39,6 +39,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -159,6 +160,18 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         }
     }
 
+    private suspend fun excludedSourceIds(): Set<Long> {
+        val selectedPackages = libraryPreferences.animeUpdateExtensionsExclude.get()
+        if (selectedPackages.isEmpty()) return emptySet()
+
+        return graph.animeExtensionManager.loadedExtensionsFlow.first()
+            .asSequence()
+            .filter { it.pkgName in selectedPackages }
+            .flatMap { it.sources }
+            .map { it.id }
+            .toSet()
+    }
+
     override suspend fun getForegroundInfo(): ForegroundInfo {
         return ForegroundInfo(
             Notifications.ID_LIBRARY_PROGRESS,
@@ -184,17 +197,19 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         val groupAnimeLibraryUpdateType = libraryPreferences.groupAnimeLibraryUpdateType.get()
         // SY <--
 
+        val isGlobalUpdate = categoryId == -1L && (
+            group == AnimeLibraryGroup.BY_DEFAULT ||
+                groupExtra == null ||
+                groupAnimeLibraryUpdateType == AnimeGroupLibraryMode.GLOBAL ||
+                (
+                    groupAnimeLibraryUpdateType == AnimeGroupLibraryMode.ALL_BUT_UNGROUPED &&
+                        group == AnimeLibraryGroup.UNGROUPED
+                    )
+            )
+        val excludedSources = if (isGlobalUpdate) excludedSourceIds() else emptySet()
         val listToUpdate = if (categoryId != -1L) {
             libraryAnime.filter { it.category == categoryId }
-        } else if (
-            group == AnimeLibraryGroup.BY_DEFAULT ||
-            groupExtra == null ||
-            groupAnimeLibraryUpdateType == AnimeGroupLibraryMode.GLOBAL ||
-            (
-                groupAnimeLibraryUpdateType == AnimeGroupLibraryMode.ALL_BUT_UNGROUPED &&
-                    group == AnimeLibraryGroup.UNGROUPED
-                )
-        ) {
+        } else if (isGlobalUpdate) {
             val categoriesToUpdate = libraryPreferences.animeUpdateCategories.get().map { it.toLong() }
             val includedAnime = if (categoriesToUpdate.isNotEmpty()) {
                 libraryAnime.filter { it.category in categoriesToUpdate }
@@ -210,7 +225,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             }
 
             includedAnime
-                .filterNot { it.anime.id in excludedAnimeIds }
+                .filterNot { it.anime.id in excludedAnimeIds || it.anime.source in excludedSources }
         } else {
             when (group) {
                 AnimeLibraryGroup.BY_TRACK_STATUS -> {
@@ -282,6 +297,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         val (_, fetchWindowUpperBound) = animeFetchInterval.getWindow(ZonedDateTime.now())
 
         animeToUpdate = lastToUpdateWithSeasons
+            .filterNot { it.anime.source in excludedSources }
             // SY -->
             .distinctBy { it.anime.id }
             // SY <--

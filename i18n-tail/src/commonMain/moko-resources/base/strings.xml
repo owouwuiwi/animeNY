@@ -422,6 +422,8 @@
 
     <string name="pref_tracking_sync_enhanced">Sync progress from enhanced trackers</string>
     <string name="migration_copy_tags">Tags</string>
+    <string name="library_update_skip_anime_extensions">Anime extensions to skip in global updates</string>
+    <string name="library_update_skip_manga_extensions">Manga extensions to skip in global updates</string>
     <string name="pref_import_tracker_progress">Import progress from other trackers</string>
     <string name="pref_import_tracker_progress_summary">Mark earlier episodes and chapters as completed when linking or refreshing a tracker. Existing progress is kept.</string>
     <string name="pref_smart_sync_tracker">Smart sync seasons</string>

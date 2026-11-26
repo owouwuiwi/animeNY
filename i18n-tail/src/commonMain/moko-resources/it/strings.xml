@@ -345,6 +345,8 @@
   <string name="action_set_date_title">Imposta data di caricamento</string>
   <string name="pref_tracking_sync_enhanced">Sincronizza i progressi dai tracker potenziati</string>
   <string name="migration_copy_tags">Tag</string>
+  <string name="library_update_skip_anime_extensions">Estensioni anime da saltare negli aggiornamenti globali</string>
+  <string name="library_update_skip_manga_extensions">Estensioni manga da saltare negli aggiornamenti globali</string>
   <string name="pref_import_tracker_progress">Importa i progressi dagli altri tracker</string>
   <string name="pref_import_tracker_progress_summary">Segna come completati gli episodi e i capitoli precedenti quando colleghi o aggiorni un tracker. I progressi esistenti vengono conservati.</string>
   <string name="pref_smart_sync_tracker">Stagione di sincronizzazione intelligente</string>

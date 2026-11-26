@@ -164,6 +164,10 @@ object SettingsLibraryScreen : SearchableSettings {
 
         val autoUpdateIntervalPref = libraryPreferences.autoUpdateInterval
         val autoUpdateInterval by autoUpdateIntervalPref.collectAsState()
+        val animeExtensions by context.appGraph.animeExtensionManager.loadedExtensionsFlow
+            .collectAsState(initial = emptyList())
+        val mangaExtensions by context.appGraph.mangaExtensionManager.loadedExtensionsFlow
+            .collectAsState(initial = emptyList())
 
         val animeAutoUpdateCategoriesPref = libraryPreferences.animeUpdateCategories
         val animeAutoUpdateCategoriesExcludePref =
@@ -275,6 +279,18 @@ object SettingsLibraryScreen : SearchableSettings {
                         excluded = excludedManga,
                     ),
                     onClick = { showMangaCategoriesDialog = true },
+                ),
+                Preference.PreferenceItem.MultiSelectListPreference(
+                    preference = libraryPreferences.animeUpdateExtensionsExclude,
+                    title = stringResource(TLMR.strings.library_update_skip_anime_extensions),
+                    entries = animeExtensions.sortedBy { it.name.lowercase() }.associate { it.pkgName to it.name },
+                    enabled = animeExtensions.isNotEmpty(),
+                ),
+                Preference.PreferenceItem.MultiSelectListPreference(
+                    preference = libraryPreferences.mangaUpdateExtensionsExclude,
+                    title = stringResource(TLMR.strings.library_update_skip_manga_extensions),
+                    entries = mangaExtensions.sortedBy { it.name.lowercase() }.associate { it.pkgName to it.name },
+                    enabled = mangaExtensions.isNotEmpty(),
                 ),
                 // SY -->
                 Preference.PreferenceItem.ListPreference(

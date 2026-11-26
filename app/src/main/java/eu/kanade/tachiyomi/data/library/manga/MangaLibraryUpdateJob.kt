@@ -44,6 +44,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -172,6 +173,18 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         }
     }
 
+    private suspend fun excludedSourceIds(): Set<Long> {
+        val selectedPackages = libraryPreferences.mangaUpdateExtensionsExclude.get()
+        if (selectedPackages.isEmpty()) return emptySet()
+
+        return graph.mangaExtensionManager.loadedExtensionsFlow.first()
+            .asSequence()
+            .filter { it.pkgName in selectedPackages }
+            .flatMap { it.sources }
+            .map { it.id }
+            .toSet()
+    }
+
     override suspend fun getForegroundInfo(): ForegroundInfo {
         return ForegroundInfo(
             Notifications.ID_LIBRARY_PROGRESS,
@@ -197,17 +210,19 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
         val groupMangaLibraryUpdateType = libraryPreferences.groupMangaLibraryUpdateType.get()
         // SY <--
 
+        val isGlobalUpdate = categoryId == -1L && (
+            group == MangaLibraryGroup.BY_DEFAULT ||
+                groupExtra == null ||
+                groupMangaLibraryUpdateType == MangaGroupLibraryMode.GLOBAL ||
+                (
+                    groupMangaLibraryUpdateType == MangaGroupLibraryMode.ALL_BUT_UNGROUPED &&
+                        group == MangaLibraryGroup.UNGROUPED
+                    )
+            )
+        val excludedSources = if (isGlobalUpdate) excludedSourceIds() else emptySet()
         val listToUpdate = if (categoryId != -1L) {
             libraryManga.filter { it.category == categoryId }
-        } else if (
-            group == MangaLibraryGroup.BY_DEFAULT ||
-            groupExtra == null ||
-            groupMangaLibraryUpdateType == MangaGroupLibraryMode.GLOBAL ||
-            (
-                groupMangaLibraryUpdateType == MangaGroupLibraryMode.ALL_BUT_UNGROUPED &&
-                    group == MangaLibraryGroup.UNGROUPED
-                )
-        ) {
+        } else if (isGlobalUpdate) {
             val categoriesToUpdate = libraryPreferences.updateCategories.get().map { it.toLong() }
             val includedManga = if (categoriesToUpdate.isNotEmpty()) {
                 libraryManga.filter { it.category in categoriesToUpdate }
@@ -223,7 +238,7 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             }
 
             includedManga
-                .filterNot { it.manga.id in excludedMangaIds }
+                .filterNot { it.manga.id in excludedMangaIds || it.manga.source in excludedSources }
         } else {
             when (group) {
                 MangaLibraryGroup.BY_TRACK_STATUS -> {
