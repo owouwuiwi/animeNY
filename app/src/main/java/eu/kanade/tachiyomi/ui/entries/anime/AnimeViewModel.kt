@@ -137,6 +137,7 @@ import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.items.episode.model.EpisodeUpdate
 import tachiyomi.domain.items.episode.model.NoEpisodesException
 import tachiyomi.domain.items.episode.service.calculateEpisodeGap
+import tachiyomi.domain.items.episode.service.episodeTrackingNumbers
 import tachiyomi.domain.items.episode.service.getEpisodeSort
 import tachiyomi.domain.items.season.interactor.SetAnimeDefaultSeasonFlags
 import tachiyomi.domain.items.season.service.getSeasonSortComparator
@@ -1180,7 +1181,13 @@ class AnimeViewModel(
             refreshTrackers()
 
             val tracks = getTracks.await(animeId)
-            val maxEpisodeNumber = episodes.maxOf { it.episodeNumber }
+            val anime = successState?.anime ?: return@launchIO
+            val maxEpisodeNumber = if (anime.usesSeasonalEpisodeNumbers) {
+                val progress = episodeTrackingNumbers(anime, getEpisodesByAnimeId.await(anime.id))
+                episodes.mapNotNull { progress[it.id] }.maxOrNull() ?: return@launchIO
+            } else {
+                episodes.maxOf { it.episodeNumber }
+            }
             val shouldPromptTrackingUpdate = tracks.any { track -> maxEpisodeNumber > track.lastEpisodeSeen }
 
             if (!shouldPromptTrackingUpdate) return@launchIO
@@ -1463,6 +1470,13 @@ class AnimeViewModel(
 
         viewModelScope.launchNonCancellable {
             setAnimeEpisodeFlags.awaitSetSortingModeOrFlipOrder(anime, sort)
+        }
+    }
+
+    fun setSeasonalEpisodeNumbers(enabled: Boolean) {
+        val anime = successState?.anime ?: return
+        viewModelScope.launchNonCancellable {
+            setAnimeEpisodeFlags.awaitUseSeasonalEpisodeNumbers(anime, enabled)
         }
     }
 

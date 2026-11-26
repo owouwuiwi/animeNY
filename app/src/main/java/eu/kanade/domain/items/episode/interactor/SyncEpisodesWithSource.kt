@@ -21,11 +21,11 @@ import tachiyomi.domain.items.episode.model.NoEpisodesException
 import tachiyomi.domain.items.episode.model.toEpisodeUpdate
 import tachiyomi.domain.items.episode.repository.EpisodeRepository
 import tachiyomi.domain.items.episode.service.EpisodeRecognition
+import tachiyomi.domain.items.episode.service.seasonalEpisodeNumber
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.source.local.entries.anime.isLocal
 import java.lang.Long.max
 import java.time.ZonedDateTime
-import java.util.TreeSet
 
 @Inject
 class SyncEpisodesWithSource(
@@ -163,24 +163,25 @@ class SyncEpisodesWithSource(
 
         val changedOrDuplicateReadUrls = mutableSetOf<String>()
 
-        val deletedEpisodeNumbers = TreeSet<Double>()
-        val deletedSeenEpisodeNumbers = TreeSet<Double>()
-        val deletedBookmarkedEpisodeNumbers = TreeSet<Double>()
+        val deletedEpisodeNumbers = mutableSetOf<String>()
+        val deletedSeenEpisodeNumbers = mutableSetOf<String>()
+        val deletedBookmarkedEpisodeNumbers = mutableSetOf<String>()
 
         val readEpisodeNumbers = dbEpisodes
             .asSequence()
             .filter { it.seen && it.isRecognizedNumber }
-            .map { it.episodeNumber }
+            .map { it.sourceNumberKey(anime) }
             .toSet()
 
         removedEpisodes.forEach { episode ->
-            if (episode.seen) deletedSeenEpisodeNumbers.add(episode.episodeNumber)
-            if (episode.bookmark) deletedBookmarkedEpisodeNumbers.add(episode.episodeNumber)
-            deletedEpisodeNumbers.add(episode.episodeNumber)
+            val number = episode.sourceNumberKey(anime)
+            if (episode.seen) deletedSeenEpisodeNumbers.add(number)
+            if (episode.bookmark) deletedBookmarkedEpisodeNumbers.add(number)
+            deletedEpisodeNumbers.add(number)
         }
 
         val deletedEpisodeNumberDateFetchMap = removedEpisodes.sortedByDescending { it.dateFetch }
-            .associate { it.episodeNumber to it.dateFetch }
+            .associate { it.sourceNumberKey(anime) to it.dateFetch }
 
         val markDuplicateAsRead = libraryPreferences.markDuplicateSeenEpisodeAsSeen.get()
             .contains(LibraryPreferences.MARK_DUPLICATE_EPISODE_SEEN_NEW)
@@ -190,21 +191,22 @@ class SyncEpisodesWithSource(
         var itemCount = newEpisodes.size
         var updatedToAdd = newEpisodes.map { toAddItem ->
             var episode = toAddItem.copy(dateFetch = nowMillis + itemCount--)
+            val number = episode.sourceNumberKey(anime)
 
-            if (episode.episodeNumber in readEpisodeNumbers && markDuplicateAsRead) {
+            if (number in readEpisodeNumbers && markDuplicateAsRead) {
                 changedOrDuplicateReadUrls.add(episode.url)
                 episode = episode.copy(seen = true)
             }
 
-            if (!episode.isRecognizedNumber || episode.episodeNumber !in deletedEpisodeNumbers) return@map episode
+            if (!episode.isRecognizedNumber || number !in deletedEpisodeNumbers) return@map episode
 
             episode = episode.copy(
-                seen = episode.episodeNumber in deletedSeenEpisodeNumbers,
-                bookmark = episode.episodeNumber in deletedBookmarkedEpisodeNumbers,
+                seen = number in deletedSeenEpisodeNumbers,
+                bookmark = number in deletedBookmarkedEpisodeNumbers,
             )
 
             // Try to to use the fetch date of the original entry to not pollute 'Updates' tab
-            deletedEpisodeNumberDateFetchMap[episode.episodeNumber]?.let {
+            deletedEpisodeNumberDateFetchMap[number]?.let {
                 episode = episode.copy(dateFetch = it)
             }
 
@@ -243,3 +245,6 @@ class SyncEpisodesWithSource(
         return updatedToAdd.filterNot { it.url in changedOrDuplicateReadUrls }
     }
 }
+
+private fun Episode.sourceNumberKey(anime: Anime): String =
+    anime.seasonalEpisodeNumber(name)?.let { "S${it.season}E${it.episode}" } ?: episodeNumber.toString()

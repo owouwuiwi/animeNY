@@ -85,6 +85,7 @@ import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.items.episode.model.Episode
+import tachiyomi.domain.items.episode.service.seasonalEpisodeNumber
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.i18n.stringResource
@@ -431,6 +432,7 @@ class AnimeScreen(
                 onBookmarkedFilterChanged = viewModel::setBookmarkedFilter,
                 onFillermarkedFilterChanged = viewModel::setFillermarkedFilter,
                 onSortModeChanged = viewModel::setSorting,
+                onSeasonalNumberingChanged = viewModel::setSeasonalEpisodeNumbers,
                 onDisplayModeChanged = viewModel::setDisplayMode,
                 onShowPreviewsEnabled = viewModel::showEpisodePreviews,
                 onShowSummariesEnabled = viewModel::showEpisodeSummaries,
@@ -565,7 +567,8 @@ class AnimeScreen(
                 val episodeTitle = if (dialog.anime.displayMode == Anime.EPISODE_DISPLAY_NUMBER) {
                     stringResource(
                         AYMR.strings.display_mode_episode,
-                        formatEpisodeNumber(dialog.episode.episodeNumber),
+                        dialog.anime.seasonalEpisodeNumber(dialog.episode.name)?.toString()
+                            ?: formatEpisodeNumber(dialog.episode.episodeNumber),
                     )
                 } else {
                     dialog.episode.name

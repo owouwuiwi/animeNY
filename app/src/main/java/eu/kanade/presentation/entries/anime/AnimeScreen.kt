@@ -104,6 +104,7 @@ import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.items.episode.service.missingEntriesCount
+import tachiyomi.domain.items.episode.service.seasonalEpisodeNumber
 import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.source.anime.model.StubAnimeSource
@@ -1409,7 +1410,8 @@ private fun LazyGridScope.sharedEpisodeItems(
                     title = if (anime.displayMode == Anime.EPISODE_DISPLAY_NUMBER) {
                         stringResource(
                             AYMR.strings.display_mode_episode,
-                            formatEpisodeNumber(episodeItem.episode.episodeNumber),
+                            anime.seasonalEpisodeNumber(episodeItem.episode.name)?.toString()
+                                ?: formatEpisodeNumber(episodeItem.episode.episodeNumber),
                         )
                     } else {
                         episodeItem.episode.name

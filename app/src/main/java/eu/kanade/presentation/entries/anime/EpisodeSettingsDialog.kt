@@ -28,6 +28,7 @@ import tachiyomi.core.common.preference.TriState
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.components.CheckboxItem
 import tachiyomi.presentation.core.components.LabeledCheckbox
 import tachiyomi.presentation.core.components.RadioItem
@@ -44,6 +45,7 @@ fun EpisodeSettingsDialog(
     onBookmarkedFilterChanged: (TriState) -> Unit,
     onFillermarkedFilterChanged: (TriState) -> Unit,
     onSortModeChanged: (Long) -> Unit,
+    onSeasonalNumberingChanged: (Boolean) -> Unit,
     onDisplayModeChanged: (Long) -> Unit,
     onShowPreviewsEnabled: (Long) -> Unit,
     onShowSummariesEnabled: (Long) -> Unit,
@@ -103,6 +105,13 @@ fun EpisodeSettingsDialog(
                         sortDescending = anime?.sortDescending() ?: false,
                         onItemSelected = onSortModeChanged,
                     )
+                    if (anime != null) {
+                        CheckboxItem(
+                            label = stringResource(TLMR.strings.seasonal_episode_numbering),
+                            checked = anime.usesSeasonalEpisodeNumbers,
+                            onClick = { onSeasonalNumberingChanged(!anime.usesSeasonalEpisodeNumbers) },
+                        )
+                    }
                 }
 
                 2 -> {

@@ -51,6 +51,8 @@ import tachiyomi.domain.items.episode.interactor.GetEpisodesByAnimeId
 import tachiyomi.domain.items.episode.interactor.UpdateEpisode
 import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.items.episode.model.EpisodeUpdate
+import tachiyomi.domain.items.episode.service.episodeTrackingNumbers
+import tachiyomi.domain.items.episode.service.getEpisodeSort
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import tachiyomi.domain.track.anime.interactor.GetAnimeTracks
 import tachiyomi.domain.track.anime.interactor.InsertAnimeTrack
@@ -543,7 +545,12 @@ class ExternalIntents {
                 ),
             )
             if (trackPreferences.autoUpdateTrack.get() && currEp.seen) {
-                updateTrackEpisodeSeen(currEp.episodeNumber, anime)
+                val number = if (anime.usesSeasonalEpisodeNumbers) {
+                    episodeTrackingNumbers(anime, getEpisodesByAnimeId.await(anime.id))[currEp.id]
+                } else {
+                    currEp.episodeNumber
+                }
+                if (number != null) updateTrackEpisodeSeen(number, anime)
             }
             if (seen) {
                 deleteEpisodeIfNeeded(currentEpisode, anime)
@@ -560,15 +567,8 @@ class ExternalIntents {
      */
     private suspend fun deleteEpisodeIfNeeded(episode: Episode, anime: Anime) {
         // Determine which episode should be deleted and enqueue
-        val sortFunction: (Episode, Episode) -> Int = when (anime.sorting) {
-            Anime.EPISODE_SORTING_SOURCE -> { c1, c2 -> c2.sourceOrder.compareTo(c1.sourceOrder) }
-            Anime.EPISODE_SORTING_NUMBER -> { c1, c2 -> c1.episodeNumber.compareTo(c2.episodeNumber) }
-            Anime.EPISODE_SORTING_UPLOAD_DATE -> { c1, c2 -> c1.dateUpload.compareTo(c2.dateUpload) }
-            else -> throw NotImplementedError("Unknown sorting method")
-        }
-
         val episodes = getEpisodesByAnimeId.await(anime.id)
-            .sortedWith { e1, e2 -> sortFunction(e1, e2) }
+            .sortedWith(getEpisodeSort(anime, sortDescending = false))
 
         val currentEpisodePosition = episodes.indexOf(episode)
         val removeAfterSeenSlots = downloadPreferences.removeAfterReadSlots.get()

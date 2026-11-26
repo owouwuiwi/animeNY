@@ -156,6 +156,7 @@ import tachiyomi.domain.history.anime.model.AnimeHistoryUpdate
 import tachiyomi.domain.items.episode.interactor.GetEpisodesByAnimeId
 import tachiyomi.domain.items.episode.interactor.UpdateEpisode
 import tachiyomi.domain.items.episode.model.EpisodeUpdate
+import tachiyomi.domain.items.episode.service.episodeTrackingNumbers
 import tachiyomi.domain.items.episode.service.getEpisodeSort
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
@@ -2506,7 +2507,13 @@ class PlayerViewModel(
         val anime = currentAnime.value ?: return
 
         viewModelScope.launchNonCancellable {
-            trackEpisode.await(context, anime.id, episode.episode_number.toDouble())
+            val number = if (anime.usesSeasonalEpisodeNumbers) {
+                episodeTrackingNumbers(anime, getEpisodesByAnimeId.await(anime.id))[episode.id]
+                    ?: return@launchNonCancellable
+            } else {
+                episode.episode_number.toDouble()
+            }
+            trackEpisode.await(context, anime.id, number)
         }
     }
 

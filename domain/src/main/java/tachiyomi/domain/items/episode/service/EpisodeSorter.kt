@@ -8,6 +8,11 @@ fun getEpisodeSort(anime: Anime, sortDescending: Boolean = anime.sortDescending(
     Episode,
     Episode,
 ) -> Int {
+    val byNumber = if (anime.usesSeasonalEpisodeNumbers) {
+        compareBy<Episode> { SeasonalEpisodeNumber.parse(it.name) }.thenBy(Episode::episodeNumber)
+    } else {
+        compareBy(Episode::episodeNumber)
+    }
     return when (anime.sorting) {
         Anime.EPISODE_SORTING_SOURCE -> when (sortDescending) {
             true -> { e1, e2 -> e1.sourceOrder.compareTo(e2.sourceOrder) }
@@ -15,8 +20,8 @@ fun getEpisodeSort(anime: Anime, sortDescending: Boolean = anime.sortDescending(
         }
 
         Anime.EPISODE_SORTING_NUMBER -> when (sortDescending) {
-            true -> { e1, e2 -> e2.episodeNumber.compareTo(e1.episodeNumber) }
-            false -> { e1, e2 -> e1.episodeNumber.compareTo(e2.episodeNumber) }
+            true -> { e1, e2 -> byNumber.compare(e2, e1) }
+            false -> { e1, e2 -> byNumber.compare(e1, e2) }
         }
 
         Anime.EPISODE_SORTING_UPLOAD_DATE -> when (sortDescending) {

@@ -96,6 +96,9 @@ data class Anime(
     val displayMode: Long
         get() = episodeFlags and EPISODE_DISPLAY_MASK
 
+    val usesSeasonalEpisodeNumbers: Boolean
+        get() = episodeFlags and EPISODE_SEASONAL_NUMBERING_MASK != 0L
+
     val unseenFilterRaw: Long
         get() = episodeFlags and EPISODE_UNSEEN_MASK
 
@@ -287,6 +290,7 @@ data class Anime(
         const val EPISODE_SHOW_SUMMARIES = 0x00000000L
         const val EPISODE_SHOW_NOT_SUMMARIES = 0x00001000L
         const val EPISODE_SUMMARIES_MASK = 0x00001000L
+        const val EPISODE_SEASONAL_NUMBERING_MASK = 0x00002000L
 
         const val EPISODE_DISPLAY_NAME = 0x00000000L
         const val EPISODE_DISPLAY_NUMBER = 0x00100000L

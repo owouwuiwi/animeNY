@@ -98,6 +98,18 @@ class SetAnimeEpisodeFlags(
         )
     }
 
+    suspend fun awaitUseSeasonalEpisodeNumbers(anime: Anime, useSeasonal: Boolean): Boolean {
+        return animeRepository.updateAnime(
+            AnimeUpdate(
+                id = anime.id,
+                episodeFlags = anime.episodeFlags.setFlag(
+                    if (useSeasonal) Anime.EPISODE_SEASONAL_NUMBERING_MASK else 0L,
+                    Anime.EPISODE_SEASONAL_NUMBERING_MASK,
+                ),
+            ),
+        )
+    }
+
     suspend fun awaitSetAllFlags(
         animeId: Long,
         unseenFilter: Long,
@@ -110,10 +122,12 @@ class SetAnimeEpisodeFlags(
         showPreviews: Long,
         showSummaries: Long,
     ): Boolean {
+        // The numbering format depends on each title's source and is not part of the default.
+        val seasonalNumbering = animeRepository.getAnimeById(animeId).episodeFlags and Anime.EPISODE_SEASONAL_NUMBERING_MASK
         return animeRepository.updateAnime(
             AnimeUpdate(
                 id = animeId,
-                episodeFlags = 0L.setFlag(unseenFilter, Anime.EPISODE_UNSEEN_MASK)
+                episodeFlags = seasonalNumbering.setFlag(unseenFilter, Anime.EPISODE_UNSEEN_MASK)
                     .setFlag(downloadedFilter, Anime.EPISODE_DOWNLOADED_MASK)
                     .setFlag(bookmarkedFilter, Anime.EPISODE_BOOKMARKED_MASK)
                     .setFlag(fillermarkedFilter, Anime.EPISODE_FILLERMARKED_MASK)
