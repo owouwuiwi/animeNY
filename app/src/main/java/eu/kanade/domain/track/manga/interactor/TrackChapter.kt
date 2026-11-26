@@ -24,6 +24,7 @@ class TrackChapter(
 ) {
 
     suspend fun await(context: Context, mangaId: Long, chapterNumber: Double, setupJobOnFailure: Boolean = true) {
+        if (!chapterNumber.isFinite()) return
         withNonCancellableContext {
             val tracks = getTracks.await(mangaId)
             if (tracks.isEmpty()) return@withNonCancellableContext
@@ -31,19 +32,20 @@ class TrackChapter(
             tracks.mapNotNull { track ->
                 val service = trackerManager.get(track.trackerId)
                 if (service == null || !service.isLoggedIn || chapterNumber <= track.lastChapterRead) {
-                    if (service == null || !service.isLoggedIn || chapterNumber <= track.lastChapterRead) {
-                        return@mapNotNull null
-                    }
+                    return@mapNotNull null
                 }
 
                 async {
                     runCatching {
                         try {
-                            val updatedTrack = service.mangaService.refresh(track.toDbTrack())
-                                .toDomainTrack(idRequired = true)!!
-                                .copy(lastChapterRead = chapterNumber)
-                            service.mangaService.update(updatedTrack.toDbTrack(), true)
-                            insertTrack.await(updatedTrack)
+                            val remoteTrack = service.mangaService.refresh(track.toDbTrack())
+                            val savedTrack = if (chapterNumber > remoteTrack.last_chapter_read) {
+                                remoteTrack.last_chapter_read = chapterNumber
+                                service.mangaService.update(remoteTrack, didReadChapter = true)
+                            } else {
+                                remoteTrack
+                            }
+                            insertTrack.await(checkNotNull(savedTrack.toDomainTrack()))
                             delayedTrackingStore.removeMangaItem(track.id)
                         } catch (e: Exception) {
                             delayedTrackingStore.addManga(track.id, chapterNumber)
