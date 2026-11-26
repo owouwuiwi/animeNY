@@ -16,8 +16,9 @@ class PagerPageTrackerTest {
         val activity = mockk<ReaderActivity>(relaxed = true)
         val chapter = ReaderChapter(mockk<Chapter>(relaxed = true))
         val page = ReaderPage(0).apply { this.chapter = chapter }
-        chapter.state = ReaderChapter.State.Loaded(listOf(page))
-        var paired = false
+        val otherPage = ReaderPage(1).apply { this.chapter = chapter }
+        chapter.state = ReaderChapter.State.Loaded(listOf(page, otherPage))
+        var paired: ReaderPage? = null
         val tracker = PagerPageTracker(
             activity = activity,
             itemAt = { page to paired },
@@ -28,14 +29,14 @@ class PagerPageTrackerTest {
         )
 
         tracker.onPageChange(0)
-        paired = true
+        paired = otherPage
         tracker.onPageChange(0)
         tracker.onPageChange(0)
-        paired = false
+        paired = null
         tracker.onPageChange(0)
 
-        verify(exactly = 2) { activity.onPageSelected(page, false) }
-        verify(exactly = 1) { activity.onPageSelected(page, true) }
+        verify(exactly = 2) { activity.onPageSelected(page, null) }
+        verify(exactly = 1) { activity.onPageSelected(page, otherPage) }
     }
 
     @Test
