@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
+import tachiyomi.core.common.storage.displayablePath
 import tachiyomi.core.common.storage.extension
 import tachiyomi.core.common.storage.nameWithoutExtension
 import tachiyomi.core.common.util.lang.launchIO
@@ -75,6 +76,10 @@ class AnimeDownloadManager(
     fun downloaderStart() = downloader.start()
     fun downloaderStop(reason: String? = null) = downloader.stop(reason)
     fun pauseActiveDownloads() = downloader.pause()
+
+    fun prepareDownloadFolder(anime: Anime, source: AnimeSource): String {
+        return provider.getAnimeDir(anime.title, source).displayablePath
+    }
 
     val isDownloaderRunning
         get() = AnimeDownloadJob.isRunningFlow(context)

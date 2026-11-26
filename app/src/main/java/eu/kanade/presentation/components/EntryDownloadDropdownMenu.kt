@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import eu.kanade.presentation.entries.DownloadAction
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.i18n.pluralStringResource
 import tachiyomi.presentation.core.i18n.stringResource
 
@@ -17,6 +18,7 @@ fun EntryDownloadDropdownMenu(
     onDownloadClicked: (DownloadAction) -> Unit,
     isManga: Boolean,
     modifier: Modifier = Modifier,
+    onPrepareDownloadFolder: (() -> Unit)? = null,
 ) {
     val downloadAmount = if (isManga) MR.plurals.download_amount else AYMR.plurals.download_amount_anime
     val downloadUnviewed = if (isManga) MR.strings.download_unread else AYMR.strings.download_unseen
@@ -42,6 +44,15 @@ fun EntryDownloadDropdownMenu(
                 onClick = {
                     onDownloadClicked(downloadAction)
                     onDismissRequest()
+                },
+            )
+        }
+        if (onPrepareDownloadFolder != null) {
+            DropdownMenuItem(
+                text = { Text(text = stringResource(TLMR.strings.prepare_anime_download_folder)) },
+                onClick = {
+                    onDismissRequest()
+                    onPrepareDownloadFolder()
                 },
             )
         }

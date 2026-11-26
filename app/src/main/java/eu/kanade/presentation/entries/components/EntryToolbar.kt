@@ -65,6 +65,7 @@ fun EntryToolbar(
     backgroundAlphaProvider: () -> Float,
     isManga: Boolean,
     modifier: Modifier = Modifier,
+    onPrepareDownloadFolder: (() -> Unit)? = null,
 ) {
     val navigator = LocalNavigator.current
     fun onHomeClicked() = navigator?.popUntil { screen ->
@@ -112,6 +113,7 @@ fun EntryToolbar(
                     onDismissRequest = onDismissRequest,
                     onDownloadClicked = onClickDownload,
                     isManga = isManga,
+                    onPrepareDownloadFolder = onPrepareDownloadFolder,
                 )
             }
 

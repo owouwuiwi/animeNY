@@ -180,6 +180,7 @@ class AnimeScreen(
     ) {
         // KMK <--
         val isAnimeHttpSource = remember { successState.source is AnimeHttpSource }
+        val canDownloadEpisodes = !successState.source.isLocalOrStub() && successState.anime.fetchType == FetchType.Episodes
 
         LaunchedEffect(successState.anime, viewModel.source) {
             if (isAnimeHttpSource) {
@@ -267,9 +268,8 @@ class AnimeScreen(
                     viewModel.source,
                 )
             }.takeIf { isAnimeHttpSource },
-            onDownloadActionClicked = viewModel::runDownloadAction.takeIf {
-                !successState.source.isLocalOrStub() && successState.anime.fetchType == FetchType.Episodes
-            },
+            onDownloadActionClicked = viewModel::runDownloadAction.takeIf { canDownloadEpisodes },
+            onPrepareDownloadFolder = viewModel::prepareDownloadFolder.takeIf { canDownloadEpisodes },
             onEditCategoryClicked = viewModel::showChangeCategoryDialog.takeIf { successState.anime.favorite },
             // SY -->
             onEditInfoClicked = viewModel::showEditAnimeInfoDialog,

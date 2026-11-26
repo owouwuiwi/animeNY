@@ -80,6 +80,7 @@ import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.util.AniChartApi
 import eu.kanade.tachiyomi.util.episode.getNextUnseen
 import eu.kanade.tachiyomi.util.removeCovers
+import eu.kanade.tachiyomi.util.system.copyToClipboard
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -149,6 +150,7 @@ import tachiyomi.domain.storage.service.StoragePreferences
 import tachiyomi.domain.track.anime.interactor.GetAnimeTracks
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.source.local.entries.anime.LocalAnimeSource
 import tachiyomi.source.local.entries.anime.isLocal
 import java.util.Calendar
@@ -1141,6 +1143,27 @@ class AnimeViewModel(
         }
         if (episodesToDownload.isNotEmpty()) {
             startDownload(episodesToDownload, false)
+        }
+    }
+
+    fun prepareDownloadFolder() {
+        val state = successState ?: return
+        viewModelScope.launchIO {
+            val path = try {
+                downloadManager.prepareDownloadFolder(state.anime, state.source)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                snackbarHostState.showSnackbar(e.message ?: context.stringResource(MR.strings.unknown_error))
+                return@launchIO
+            }
+            val result = snackbarHostState.showSnackbar(
+                message = context.stringResource(TLMR.strings.anime_download_folder_ready, path),
+                actionLabel = context.stringResource(MR.strings.action_copy_to_clipboard),
+                duration = SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                withUIContext { context.copyToClipboard(state.anime.title, path) }
+            }
         }
     }
 
