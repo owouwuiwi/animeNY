@@ -6,15 +6,16 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.browse.InLibraryBadge
+import eu.kanade.presentation.components.stableLazyKeys
 import eu.kanade.presentation.library.components.AnimeComfortableGridItem
 import eu.kanade.presentation.library.components.CommonAnimeItemDefaults
 import tachiyomi.domain.entries.anime.model.Anime
@@ -36,12 +37,13 @@ fun GlobalSearchCardRow(
         return
     }
 
+    val itemKeys = remember(titles) { titles.stableLazyKeys { it.id.toString() } }
     LazyRow(
         contentPadding = PaddingValues(MaterialTheme.padding.small),
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.extraSmall),
     ) {
-        items(titles) {
-            val title by getAnime(it)
+        items(count = titles.size, key = itemKeys::get) { index ->
+            val title by getAnime(titles[index])
             AnimeItem(
                 title = title.title,
                 cover = title.asAnimeCover(),

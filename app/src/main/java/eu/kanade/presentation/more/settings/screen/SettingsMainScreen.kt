@@ -109,7 +109,8 @@ object SettingsMainScreen : Screen() {
                 val state = rememberLazyListState()
                 val indexSelected = if (twoPane) {
                     items.indexOfFirst { it.screen::class == navigator.items.first()::class }
-                        .also {
+                        .takeIf { it >= 0 }
+                        ?.also {
                             LaunchedEffect(Unit) {
                                 state.animateScrollToItem(it)
                                 if (it > 0) {
@@ -128,7 +129,7 @@ object SettingsMainScreen : Screen() {
                 ) {
                     itemsIndexed(
                         items = items,
-                        key = { _, item -> item.hashCode() },
+                        key = { _, item -> item.screen.key },
                     ) { index, item ->
                         val selected = indexSelected == index
                         var modifier: Modifier = Modifier

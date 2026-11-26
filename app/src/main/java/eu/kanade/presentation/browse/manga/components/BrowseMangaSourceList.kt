@@ -13,6 +13,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import eu.kanade.presentation.browse.BrowseSourceLoadingItem
 import eu.kanade.presentation.browse.InLibraryBadge
+import eu.kanade.presentation.components.rememberStablePagingKeys
 import eu.kanade.presentation.library.components.CommonEntryItemDefaults
 import eu.kanade.presentation.library.components.EntryListItem
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +30,7 @@ fun BrowseMangaSourceList(
     onMangaClick: (Manga) -> Unit,
     onMangaLongClick: (Manga) -> Unit,
 ) {
+    val itemKeys = mangaList.rememberStablePagingKeys { it.value.id.toString() }
     val sourceListState = rememberLazyListState()
     BoxWithConstraints {
         val density = LocalDensity.current
@@ -44,7 +46,7 @@ fun BrowseMangaSourceList(
                 }
             }
 
-            items(count = mangaList.itemCount) { index ->
+            items(count = mangaList.itemCount, key = itemKeys) { index ->
                 val manga by mangaList[index]?.collectAsState() ?: return@items
                 BrowseMangaSourceListItem(
                     manga = manga,

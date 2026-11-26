@@ -13,6 +13,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import eu.kanade.presentation.browse.BrowseSourceLoadingItem
 import eu.kanade.presentation.browse.InLibraryBadge
+import eu.kanade.presentation.components.rememberStablePagingKeys
 import eu.kanade.presentation.library.components.CommonEntryItemDefaults
 import eu.kanade.presentation.library.components.EntryComfortableGridItem
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +30,7 @@ fun BrowseAnimeSourceComfortableGrid(
     onAnimeLongClick: (Anime) -> Unit,
     selectedIds: Set<Long> = emptySet(),
 ) {
+    val itemKeys = animeList.rememberStablePagingKeys { it.value.id.toString() }
     LazyVerticalGrid(
         columns = columns,
         contentPadding = contentPadding + PaddingValues(8.dp),
@@ -41,7 +43,7 @@ fun BrowseAnimeSourceComfortableGrid(
             }
         }
 
-        items(count = animeList.itemCount) { index ->
+        items(count = animeList.itemCount, key = itemKeys) { index ->
             val anime by animeList[index]?.collectAsState() ?: return@items
             BrowseAnimeSourceComfortableGridItem(
                 anime = anime,
