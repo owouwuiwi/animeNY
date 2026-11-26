@@ -57,6 +57,7 @@ import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.core.common.util.lang.launchUI
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
@@ -147,7 +148,7 @@ fun AnimeImagesDialog(
                                 var expanded by remember { mutableStateOf(false) }
                                 IconButton(
                                     onClick = {
-                                        if ((isCover && isCustomCover) || (!isCover && isCustomBackground)) {
+                                        if (isCover || isCustomBackground) {
                                             expanded = true
                                         } else {
                                             onEditClick(EditCoverAction.EDIT)
@@ -171,13 +172,24 @@ fun AnimeImagesDialog(
                                             expanded = false
                                         },
                                     )
-                                    DropdownMenuItem(
-                                        text = { Text(text = stringResource(MR.strings.action_delete)) },
-                                        onClick = {
-                                            onEditClick(EditCoverAction.DELETE)
-                                            expanded = false
-                                        },
-                                    )
+                                    if (isCover) {
+                                        DropdownMenuItem(
+                                            text = { Text(text = stringResource(TLMR.strings.cover_from_url)) },
+                                            onClick = {
+                                                onEditClick(EditCoverAction.FROM_URL)
+                                                expanded = false
+                                            },
+                                        )
+                                    }
+                                    if ((isCover && isCustomCover) || (!isCover && isCustomBackground)) {
+                                        DropdownMenuItem(
+                                            text = { Text(text = stringResource(MR.strings.action_delete)) },
+                                            onClick = {
+                                                onEditClick(EditCoverAction.DELETE)
+                                                expanded = false
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }

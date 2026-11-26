@@ -36,6 +36,7 @@ import eu.kanade.presentation.entries.components.SetIntervalDialog
 import eu.kanade.presentation.entries.manga.ChapterSettingsDialog
 import eu.kanade.presentation.entries.manga.DuplicateMangaDialog
 import eu.kanade.presentation.entries.manga.MangaScreen
+import eu.kanade.presentation.entries.components.CoverUrlDialog
 import eu.kanade.presentation.entries.manga.components.MangaCoverDialog
 import eu.kanade.presentation.entries.manga.components.ScanlatorFilterDialog
 import eu.kanade.presentation.theme.CoverBasedTheme
@@ -261,6 +262,7 @@ class MangaScreen(
             }
 
             MangaViewModel.Dialog.FullCover -> {
+                var showCoverUrl by rememberSaveable { mutableStateOf(false) }
                 val sm = assistedMetroViewModel<MangaCoverViewModel, MangaCoverViewModel.Factory> {
                     create(mangaId = successState.manga.id)
                 }
@@ -281,11 +283,18 @@ class MangaScreen(
                         onEditClick = {
                             when (it) {
                                 EditCoverAction.EDIT -> getContent.launch("image/*")
+                                EditCoverAction.FROM_URL -> showCoverUrl = true
                                 EditCoverAction.DELETE -> sm.deleteCustomCover(context)
                             }
                         },
                         onDismissRequest = onDismissRequest,
                     )
+                    if (showCoverUrl) {
+                        CoverUrlDialog(
+                            onApply = { sm.editCoverFromUrl(context, it) },
+                            onDismiss = { showCoverUrl = false },
+                        )
+                    }
                 } else {
                     LoadingScreen(Modifier.systemBarsPadding())
                 }

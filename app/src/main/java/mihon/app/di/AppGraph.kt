@@ -100,6 +100,7 @@ import eu.kanade.tachiyomi.extension.anime.util.AnimeExtensionInstallActivity
 import eu.kanade.tachiyomi.extension.manga.MangaExtensionManager
 import eu.kanade.tachiyomi.extension.manga.util.MangaExtensionInstallActivity
 import eu.kanade.tachiyomi.network.JavaScriptEngine
+import eu.kanade.tachiyomi.data.coil.RemoteCoverLoader
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.ui.base.delegate.SecureActivityDelegateImpl
@@ -336,6 +337,7 @@ interface AppGraph : ViewModelGraph {
     val protoBuf: ProtoBuf
     val xml: XML
     val networkHelper: NetworkHelper
+    val remoteCoverLoader: RemoteCoverLoader
     val javaScriptEngine: JavaScriptEngine
     val coroutineScope: CoroutineScope
 

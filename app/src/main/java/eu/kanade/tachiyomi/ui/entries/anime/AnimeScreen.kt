@@ -40,6 +40,7 @@ import eu.kanade.presentation.entries.anime.AnimeScreen
 import eu.kanade.presentation.entries.anime.DuplicateAnimeDialog
 import eu.kanade.presentation.entries.anime.EpisodeOptionsDialogScreen
 import eu.kanade.presentation.entries.anime.components.EditEpisodeTitleDialog
+import eu.kanade.presentation.entries.components.CoverUrlDialog
 import eu.kanade.presentation.entries.anime.EpisodeSettingsDialog
 import eu.kanade.presentation.entries.anime.SeasonSettingsDialog
 import eu.kanade.presentation.entries.anime.components.AnimeImagesDialog
@@ -78,6 +79,7 @@ import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import mihon.app.di.appGraph
 import logcat.LogPriority
 import mihon.feature.migration.config.AnimeMigrationConfigScreen
 import tachiyomi.core.common.i18n.stringResource
@@ -486,7 +488,10 @@ class AnimeScreen(
             }
 
             AnimeViewModel.Dialog.FullImages -> {
-                val sm = rememberScreenModel { AnimeImageScreenModel(successState.anime.id) }
+                var showCoverUrl by rememberSaveable { mutableStateOf(false) }
+                val sm = rememberScreenModel {
+                    AnimeImageScreenModel(successState.anime.id, context.appGraph.remoteCoverLoader)
+                }
                 val anime by sm.state.collectAsStateWithLifecycle()
                 if (anime != null) {
                     val getContent = rememberLauncherForActivityResult(
@@ -506,11 +511,18 @@ class AnimeScreen(
                         onEditClick = {
                             when (it) {
                                 EditCoverAction.EDIT -> getContent.launch("image/*")
+                                EditCoverAction.FROM_URL -> showCoverUrl = true
                                 EditCoverAction.DELETE -> sm.deleteCustomImage(context)
                             }
                         },
                         onDismissRequest = onDismissRequest,
                     )
+                    if (showCoverUrl) {
+                        CoverUrlDialog(
+                            onApply = { sm.editImageFromUrl(context, it) },
+                            onDismiss = { showCoverUrl = false },
+                        )
+                    }
                 } else {
                     LoadingScreen(Modifier.systemBarsPadding())
                 }

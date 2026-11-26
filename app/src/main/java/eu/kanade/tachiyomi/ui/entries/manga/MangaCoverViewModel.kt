@@ -18,6 +18,7 @@ import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactory
 import dev.zacsweers.metrox.viewmodel.ManualViewModelAssistedFactoryKey
 import eu.kanade.domain.entries.manga.interactor.UpdateManga
 import eu.kanade.tachiyomi.data.cache.MangaCoverCache
+import eu.kanade.tachiyomi.data.coil.RemoteCoverLoader
 import eu.kanade.tachiyomi.data.saver.Image
 import eu.kanade.tachiyomi.data.saver.ImageSaver
 import eu.kanade.tachiyomi.data.saver.Location
@@ -25,6 +26,8 @@ import eu.kanade.tachiyomi.util.editCover
 import eu.kanade.tachiyomi.util.system.getBitmapOrNull
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.WhileSubscribed
@@ -40,6 +43,7 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.entries.manga.interactor.GetManga
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.i18n.MR
+import tachiyomi.source.local.entries.manga.isLocal
 import tachiyomi.source.local.image.manga.LocalMangaCoverManager
 import kotlin.time.Duration.Companion.seconds
 
@@ -51,6 +55,7 @@ class MangaCoverViewModel(
     private val coverCache: MangaCoverCache,
     private val updateManga: UpdateManga,
     private val coverManager: LocalMangaCoverManager,
+    private val remoteCoverLoader: RemoteCoverLoader,
 ) : ViewModel() {
 
     val snackbarHostState: SnackbarHostState = SnackbarHostState()
@@ -159,6 +164,17 @@ class MangaCoverViewModel(
                 notifyFailedCoverUpdate(context, e)
             }
         }
+    }
+
+    suspend fun editCoverFromUrl(context: Context, url: String) = withIOContext {
+        val manga = checkNotNull(state.value)
+        check(manga.favorite || manga.isLocal())
+        val image = remoteCoverLoader.load(url)
+        currentCoroutineContext().ensureActive()
+        image.inputStream().use {
+            manga.editCover(coverManager, it, updateManga, coverCache)
+        }
+        notifyCoverUpdated(context)
     }
 
     private fun notifyCoverUpdated(context: Context) {

@@ -13,6 +13,7 @@ import coil3.size.Size
 import eu.kanade.domain.entries.anime.interactor.UpdateAnime
 import eu.kanade.tachiyomi.data.cache.AnimeBackgroundCache
 import eu.kanade.tachiyomi.data.cache.AnimeCoverCache
+import eu.kanade.tachiyomi.data.coil.RemoteCoverLoader
 import eu.kanade.tachiyomi.data.saver.Image
 import eu.kanade.tachiyomi.data.saver.ImageSaver
 import eu.kanade.tachiyomi.data.saver.Location
@@ -38,6 +39,7 @@ import tachiyomi.domain.entries.anime.interactor.GetAnime
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.source.local.entries.anime.isLocal
 import tachiyomi.source.local.image.anime.LocalAnimeBackgroundManager
 import tachiyomi.source.local.image.anime.LocalAnimeCoverManager
 import uy.kohesive.injekt.Injekt
@@ -46,6 +48,7 @@ import kotlin.time.Duration.Companion.seconds
 
 class AnimeImageScreenModel(
     private val animeId: Long,
+    private val remoteCoverLoader: RemoteCoverLoader,
     private val getAnime: GetAnime = Injekt.get(),
     private val imageSaver: ImageSaver = Injekt.get(),
     private val coverCache: AnimeCoverCache = Injekt.get(),
@@ -181,6 +184,15 @@ class AnimeImageScreenModel(
                 notifyFailedImageUpdate(context, e)
             }
         }
+    }
+
+    suspend fun editImageFromUrl(context: Context, url: String) = withIOContext {
+        val anime = checkNotNull(state.value)
+        check(anime.favorite || anime.isLocal())
+        remoteCoverLoader.load(url).inputStream().use {
+            anime.editCover(coverManager, it, updateAnime, coverCache)
+        }
+        notifyImageUpdated(context)
     }
 
     private fun notifyImageUpdated(context: Context) {

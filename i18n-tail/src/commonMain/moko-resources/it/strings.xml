@@ -358,4 +358,6 @@
     <string name="feed_order_last_local_update">Ultimo aggiornamento locale</string>
     <string name="edit_episode_title">Modifica titolo episodio</string>
     <string name="backup_limit_to_categories">Includi solo le categorie selezionate</string>
+    <string name="cover_from_url">Copertina da URL</string>
+    <string name="cover_url_hint">URL immagine o pagina del tracker</string>
 </resources>

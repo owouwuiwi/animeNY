@@ -485,4 +485,6 @@
     <string name="feed_order_last_local_update">Latest local update</string>
     <string name="edit_episode_title">Edit episode title</string>
     <string name="backup_limit_to_categories">Include only selected categories</string>
+    <string name="cover_from_url">Cover from URL</string>
+    <string name="cover_url_hint">Image or tracking page URL</string>
 </resources>

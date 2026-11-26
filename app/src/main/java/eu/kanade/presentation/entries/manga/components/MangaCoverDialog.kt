@@ -61,6 +61,7 @@ import mihon.icons.materialsymbols.rounded.Save
 import mihon.icons.materialsymbols.rounded.Share
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.clickableNoIndication
@@ -123,13 +124,7 @@ fun MangaCoverDialog(
                             Box {
                                 var expanded by remember { mutableStateOf(false) }
                                 IconButton(
-                                    onClick = {
-                                        if (isCustomCover) {
-                                            expanded = true
-                                        } else {
-                                            onEditClick(EditCoverAction.EDIT)
-                                        }
-                                    },
+                                    onClick = { expanded = true },
                                 ) {
                                     Icon(
                                         imageVector = MaterialSymbols.Rounded.Edit,
@@ -151,12 +146,21 @@ fun MangaCoverDialog(
                                         },
                                     )
                                     DropdownMenuItem(
-                                        text = { Text(text = stringResource(MR.strings.action_delete)) },
+                                        text = { Text(text = stringResource(TLMR.strings.cover_from_url)) },
                                         onClick = {
-                                            onEditClick(EditCoverAction.DELETE)
+                                            onEditClick(EditCoverAction.FROM_URL)
                                             expanded = false
                                         },
                                     )
+                                    if (isCustomCover) {
+                                        DropdownMenuItem(
+                                            text = { Text(text = stringResource(MR.strings.action_delete)) },
+                                            onClick = {
+                                                onEditClick(EditCoverAction.DELETE)
+                                                expanded = false
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }
