@@ -13,4 +13,5 @@ data class MangaHistoryWithRelations(
     val readAt: Date?,
     val readDuration: Long,
     val coverData: MangaCover,
+    val unreadCount: Long = 0L,
 )

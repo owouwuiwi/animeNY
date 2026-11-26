@@ -1,6 +1,7 @@
 package eu.kanade.presentation.history.manga.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -23,6 +24,7 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.entries.components.DotSeparatorText
 import eu.kanade.presentation.entries.components.ItemCover
+import eu.kanade.presentation.library.components.UnviewedBadge
 import eu.kanade.presentation.theme.TachiyomiPreviewTheme
 import eu.kanade.presentation.util.formatChapterNumber
 import eu.kanade.tachiyomi.util.lang.toTimestampString
@@ -59,11 +61,14 @@ fun MangaHistoryItem(
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ItemCover.Book(
-            modifier = Modifier.fillMaxHeight(),
-            data = history.coverData,
-            onClick = onClickCover,
-        )
+        Box(contentAlignment = Alignment.TopEnd) {
+            ItemCover.Book(
+                modifier = Modifier.fillMaxHeight(),
+                data = history.coverData,
+                onClick = onClickCover,
+            )
+            UnviewedBadge(count = history.unreadCount)
+        }
         Column(
             modifier = Modifier
                 .weight(1f)

@@ -39,7 +39,18 @@ coverLastModified,
 chapterNumber,
 lastPageRead,
 readAt,
-readDuration
+readDuration,
+(
+    SELECT count(*)
+    FROM chapter AS unread
+    WHERE unread.manga_id = historyView.mangaId
+    AND unread.user_read = 0
+    AND NOT EXISTS (
+        SELECT 1 FROM excluded_scanlator
+        WHERE excluded_scanlator.manga_id = unread.manga_id
+        AND excluded_scanlator.scanlator = unread.remote_scanlator
+    )
+) AS unreadCount
 FROM historyView
 WHERE historyView.readAt > 0
 AND maxReadAtChapterId = historyView.chapterId
@@ -59,7 +70,18 @@ manga.state_cover_last_modified AS coverLastModified,
 chapter.remote_chapter_number AS chapterNumber,
 chapter.user_last_page_read AS lastPageRead,
 history.read_at AS readAt,
-history.read_duration AS readDuration
+history.read_duration AS readDuration,
+(
+    SELECT count(*)
+    FROM chapter AS unread
+    WHERE unread.manga_id = manga.id
+    AND unread.user_read = 0
+    AND NOT EXISTS (
+        SELECT 1 FROM excluded_scanlator
+        WHERE excluded_scanlator.manga_id = unread.manga_id
+        AND excluded_scanlator.scanlator = unread.remote_scanlator
+    )
+) AS unreadCount
 FROM history
 JOIN manga
 ON manga.id = history.manga_id
