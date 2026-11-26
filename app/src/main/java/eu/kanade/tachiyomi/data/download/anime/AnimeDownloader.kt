@@ -434,7 +434,7 @@ class AnimeDownloader(
         }
         val height = preferences.preferredAnimeDownloadHeight.get()
         val preferVideo: ((Hoster, Video) -> Boolean)? = if (height > 0) {
-            { _, video -> videoQualityHeight(video.videoTitle) == height }
+            { _, video -> video.resolution == height || videoQualityHeight(video.videoTitle) == height }
         } else {
             null
         }

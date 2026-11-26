@@ -91,6 +91,7 @@ import eu.kanade.tachiyomi.ui.player.controls.components.sheets.getChangedAt
 import eu.kanade.tachiyomi.ui.player.loader.EpisodeLoader
 import eu.kanade.tachiyomi.ui.player.loader.HosterLoader
 import eu.kanade.tachiyomi.ui.player.loader.HosterPriority
+import eu.kanade.tachiyomi.ui.player.loader.PreferredSeriesStream
 import eu.kanade.tachiyomi.ui.player.network.NetworkStreamRequest
 import eu.kanade.tachiyomi.ui.player.network.NetworkStreamSource
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
@@ -1666,6 +1667,19 @@ class PlayerViewModel(
         autoPlay: Boolean = true,
     ) {
         val requestedVideo = (hosterIndex to videoIndex).takeIf { hosterIndex != -1 }
+        val rememberedStream = if (autoPlay && requestedVideo == null && playerPreferences.rememberSeriesStream().get()) {
+            currentAnime.value?.id?.takeIf { it > 0 }?.let { id ->
+                PreferredSeriesStream.decode(playerPreferences.preferredSeriesStream(id).get())
+            }
+        } else {
+            null
+        }
+        val preferred = rememberedStream?.let { stream ->
+            val disabled = HosterPriority("", playerPreferences.disabledHosters().get())
+            hosterList.indexOfFirst { stream.matchesHoster(it) && !disabled.isDisabled(it.hosterName) }
+                .takeIf { it >= 0 }
+                ?.let { it to stream }
+        }
 
         _hosterList.update { _ -> hosterList }
         _hosterExpandedList.update { _ ->
@@ -1679,7 +1693,7 @@ class PlayerViewModel(
             cachedHosterIndices.addAll(
                 hosterList.indices.filter { EpisodeLoader.hasCachedVideos(hosterList[it], source) },
             )
-            val requestedHosterIdx = requestedVideo?.first
+            val requestedHosterIdx = (requestedVideo?.first ?: preferred?.first)
                 ?.takeIf { _hosterState.value.getOrNull(it) is HosterState.Idle }
             pendingHosterIndices.clear()
             pendingHosterIndices.addAll(
@@ -1700,15 +1714,15 @@ class PlayerViewModel(
                     List(EXTRACTION_PERMITS) {
                         async {
                             for (hosterIdx in pendingHosters) {
-                                if (autoPlay && hasEnoughCandidates()) continue
+                                if (autoPlay && hosterIdx != requestedHosterIdx && hasEnoughCandidates()) continue
                                 loadPendingHoster(source, hosterIdx)
                                 // Before taking the next hoster, so it sees whether playback started.
-                                if (autoPlay) startPlaybackIfReady(source, requestedVideo)
+                                if (autoPlay) startPlaybackIfReady(source, requestedVideo, preferred)
                             }
                         }
                     }.awaitAll()
                     // Covers hosters that were already loaded and lists where nothing is playable.
-                    if (autoPlay) startPlaybackIfReady(source, requestedVideo)
+                    if (autoPlay) startPlaybackIfReady(source, requestedVideo, preferred)
                 }
             } catch (e: CancellationException) {
                 _hosterState.update { _ ->
@@ -1779,12 +1793,26 @@ class PlayerViewModel(
     // error they get one fresh extraction before moving on to the next hoster.
     private val cachedHosterIndices = ConcurrentHashMap.newKeySet<Int>()
 
-    private suspend fun startPlaybackIfReady(source: AnimeSource, requestedVideo: Pair<Int, Int>?) {
+    private suspend fun startPlaybackIfReady(
+        source: AnimeSource,
+        requestedVideo: Pair<Int, Int>?,
+        preferred: Pair<Int, PreferredSeriesStream>?,
+    ) {
         videoSelectionMutex.withLock {
             if (_selectedHosterVideoIndex.value.first != -1) return
             if (requestedVideo != null && isHosterUnsettled(requestedVideo.first)) return
+            if (preferred != null && isHosterUnsettled(preferred.first)) return
+
+            val preferredVideo = preferred?.let { (index, stream) ->
+                val state = _hosterState.value.getOrNull(index) as? HosterState.Ready
+                state?.let {
+                    val playable = it.videoList.withIndex().filter { (i, _) -> isPlayable(index to i) }
+                    stream.selectVideo(playable)?.let { position -> index to position }
+                }
+            }
 
             val next = requestedVideo?.takeIf { isPlayable(it) }
+                ?: preferredVideo
                 ?: HosterLoader.selectNextInOrder(_hosterState.value)
                 ?: return
             playInOrder(source, next)
@@ -2017,12 +2045,21 @@ class PlayerViewModel(
 
     fun onVideoClicked(hosterIndex: Int, videoIndex: Int) {
         val hosterState = _hosterState.value.getOrNull(hosterIndex) as? HosterState.Ready ?: return
-        if (videoIndex !in hosterState.videoList.indices) return
+        val video = hosterState.videoList.getOrNull(videoIndex) ?: return
+        val seriesId = currentAnime.value?.id
+        val episodeId = currentEpisode.value?.id
 
         // Failed videos stay clickable so they can be retried.
         viewModelScope.launchIO {
             val success = loadVideo(currentSource.value, hosterIndex, videoIndex)
             if (success) {
+                if (seriesId != null && seriesId > 0 && currentEpisode.value?.id == episodeId &&
+                    isEpisodeOnline.value && playerPreferences.rememberSeriesStream().get()
+                ) {
+                    PreferredSeriesStream.from(hosterState.name, video)?.let {
+                        playerPreferences.preferredSeriesStream(seriesId).set(it.encode())
+                    }
+                }
                 if (sheetShown.value == Sheets.QualityTracks) {
                     dismissSheet()
                 }

@@ -43,6 +43,8 @@ class PlayerPreferences(
     fun showEmptyHosters() = preferenceStore.getBoolean("pref_show_empty_hosters", false)
     fun hosterPriority() = preferenceStore.getString("pref_hoster_priority", "")
     fun disabledHosters() = preferenceStore.getString("pref_disabled_hosters", "")
+    fun rememberSeriesStream() = preferenceStore.getBoolean("pref_remember_series_stream", false)
+    fun preferredSeriesStream(animeId: Long) = preferenceStore.getString("pref_series_stream_$animeId", "")
     fun hosterCacheMinutes() = preferenceStore.getInt("pref_hoster_cache_minutes", 120)
     fun hosterListCacheMinutes() = preferenceStore.getInt("pref_hoster_list_cache_minutes", 1440)
 

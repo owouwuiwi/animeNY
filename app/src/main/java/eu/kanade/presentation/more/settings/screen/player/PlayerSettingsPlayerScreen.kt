@@ -174,6 +174,11 @@ object PlayerSettingsPlayerScreen : Screen(), SearchableSettings {
                     title = stringResource(AYMR.strings.pref_hosters_switch_on_error),
                     subtitle = stringResource(AYMR.strings.pref_hosters_switch_on_error_summary),
                 ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = playerPreferences.rememberSeriesStream(),
+                    title = stringResource(TLMR.strings.pref_remember_series_stream),
+                    subtitle = stringResource(TLMR.strings.pref_remember_series_stream_summary),
+                ),
                 Preference.PreferenceItem.TextPreference(
                     title = stringResource(AYMR.strings.pref_hosters_priority),
                     subtitle = hosterPrioritySummary(savedHosters, disabledHosters),
