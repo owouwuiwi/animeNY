@@ -80,6 +80,7 @@ import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.SubtitlePreferences
+import eu.kanade.tachiyomi.ui.player.utils.brightnessToGestureSpace
 import `is`.xyz.mpv.MPV
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
@@ -251,8 +252,9 @@ fun PlayerControls(
                         bottom.linkTo(parent.bottom)
                     },
                 ) {
+                    val perceptualBrightness by gesturePreferences.perceptualBrightness().collectAsState()
                     BrightnessSlider(
-                        brightness = brightness,
+                        brightness = brightness.brightnessToGestureSpace(perceptualBrightness),
                         positiveRange = 0f..1f,
                         negativeRange = 0f..0.75f,
                     )

@@ -18,6 +18,7 @@ class GesturePreferences(
         true,
     )
     fun swapVolumeBrightness() = preferenceStore.getBoolean("pref_swap_volume_and_brightness", false)
+    fun perceptualBrightness() = preferenceStore.getBoolean("pref_perceptual_brightness_gesture", false)
 
     // Seeking
 

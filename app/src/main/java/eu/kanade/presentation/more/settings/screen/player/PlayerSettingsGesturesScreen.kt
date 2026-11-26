@@ -68,6 +68,11 @@ object PlayerSettingsGesturesScreen : Screen(), SearchableSettings {
                     preference = swapVol,
                     title = stringResource(AYMR.strings.pref_controls_swap_vol_brightness),
                 ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = gesturePreferences.perceptualBrightness(),
+                    title = stringResource(TLMR.strings.pref_perceptual_brightness),
+                    subtitle = stringResource(TLMR.strings.pref_perceptual_brightness_summary),
+                ),
             ),
         )
     }

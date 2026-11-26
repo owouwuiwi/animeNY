@@ -448,6 +448,8 @@
     <string name="pref_top_align_cover_summary">Align the cover image to the top instead of center</string>
 
     <!-- Audio language -->
+    <string name="pref_perceptual_brightness">Fine brightness control</string>
+    <string name="pref_perceptual_brightness_summary">Use a perceptual curve for finer adjustments at low brightness.</string>
     <string name="pref_player_audio_default_language">Default audio language</string>
     <string name="pref_player_audio_default_language_original">Original language</string>
     <string name="pref_player_audio_default_language_preferred">Preferred languages list</string>

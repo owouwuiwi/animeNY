@@ -64,6 +64,8 @@ import eu.kanade.tachiyomi.ui.player.controls.components.DoubleTapSeekTriangles
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
+import eu.kanade.tachiyomi.ui.player.utils.brightnessFromGestureSpace
+import eu.kanade.tachiyomi.ui.player.utils.brightnessToGestureSpace
 import `is`.xyz.mpv.MPV
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
@@ -104,6 +106,7 @@ fun GestureHandler(
 
     val gestureVolumeBrightness = gesturePreferences.gestureVolumeBrightness().get()
     val swapVolumeBrightness by gesturePreferences.swapVolumeBrightness().collectAsState()
+    val perceptualBrightness by gesturePreferences.perceptualBrightness().collectAsState()
     val seekGesture by gesturePreferences.gestureHorizontalSeek().collectAsState()
     val preciseSeeking by gesturePreferences.playerSmoothSeek().collectAsState()
     val showSeekbar by gesturePreferences.showSeekBar().collectAsState()
@@ -220,13 +223,13 @@ fun GestureHandler(
                     if (showSeekbar) viewModel.showSeekBar()
                 }
             }
-            .pointerInput(areControlsLocked) {
+            .pointerInput(areControlsLocked, perceptualBrightness) {
                 if (!gestureVolumeBrightness || areControlsLocked) return@pointerInput
                 var startingY = 0f
                 var mpvVolumeStartingY = 0f
                 var originalVolume = currentVolume
                 var originalMPVVolume = currentMPVVolume
-                var originalBrightness = currentBrightness
+                var originalBrightness = currentBrightness.brightnessToGestureSpace(perceptualBrightness)
                 val brightnessGestureSens = 0.001f
                 val volumeGestureSens = 0.001f * viewModel.maxVolume
                 val mpvVolumeGestureSens = 0.001f * volumeBoostingCap
@@ -249,7 +252,7 @@ fun GestureHandler(
                         mpvVolumeStartingY = 0f
                         originalVolume = currentVolume
                         originalMPVVolume = currentMPVVolume
-                        originalBrightness = currentBrightness
+                        originalBrightness = currentBrightness.brightnessToGestureSpace(perceptualBrightness)
                     },
                 ) { change, amount ->
                     val changeVolume: () -> Unit = {
@@ -293,7 +296,7 @@ fun GestureHandler(
                                 startingY,
                                 change.position.y,
                                 brightnessGestureSens,
-                            ),
+                            ).brightnessFromGestureSpace(perceptualBrightness),
                         )
                         viewModel.displayBrightnessSlider()
                     }
