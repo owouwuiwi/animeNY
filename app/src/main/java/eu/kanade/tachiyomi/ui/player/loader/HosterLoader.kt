@@ -116,12 +116,15 @@ class HosterLoader {
          *
          * @param isExcluded skips videos that already failed, e.g. in a previous download attempt.
          * It receives the video before it's resolved.
+         * @param preferVideo tries matching videos before other available streams when supplied.
          */
         suspend fun getBestHosterVideo(
             source: AnimeSource,
             hosterList: List<Hoster>,
+            preferVideo: ((Hoster, Video) -> Boolean)? = null,
             isExcluded: (Hoster, Video) -> Boolean = { _, _ -> false },
         ): Pair<Hoster, Video>? {
+            val fallback = mutableListOf<Pair<Hoster, Video>>()
             hosterList.forEach { hoster ->
                 val hosterState = EpisodeLoader.loadHosterVideos(source, hoster)
                     .markExcluded { isExcluded(hoster, it) }
@@ -131,11 +134,19 @@ class HosterLoader {
                     .filter { hosterState.videoState[it] == Video.State.QUEUE }
                     .sortedByDescending { hosterState.videoList[it].preferred }
                 candidates.forEach { videoIdx ->
-                    val resolvedVideo = getResolvedVideo(source, hosterState.videoList[videoIdx])
-                    if (resolvedVideo?.videoUrl?.isNotEmpty() == true) return hoster to resolvedVideo
+                    val candidate = hosterState.videoList[videoIdx]
+                    if (preferVideo != null && !preferVideo(hoster, candidate)) {
+                        fallback.add(hoster to candidate)
+                    } else {
+                        val resolved = getResolvedVideo(source, candidate)
+                        if (resolved?.videoUrl?.isNotEmpty() == true) return hoster to resolved
+                    }
                 }
             }
-            return null
+            return fallback.firstNotNullOfOrNull { (hoster, candidate) ->
+                val resolved = getResolvedVideo(source, candidate)?.takeIf { it.videoUrl.isNotEmpty() }
+                resolved?.let { hoster to it }
+            }
         }
 
         private fun HosterState.markExcluded(isExcluded: (Video) -> Boolean): HosterState {

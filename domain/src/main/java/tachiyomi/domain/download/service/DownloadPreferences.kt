@@ -18,6 +18,10 @@ class DownloadPreferences(
     )
 
     val useExternalDownloader: Preference<Boolean> = preferenceStore.getBoolean("use_external_downloader", false)
+    val preferredAnimeDownloadHeight: Preference<Int> = preferenceStore.getInt(
+        "pref_preferred_anime_download_height",
+        0,
+    )
 
     val externalDownloaderSelection: Preference<String> = preferenceStore.getString(
         "external_downloader_selection",

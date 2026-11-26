@@ -34,6 +34,7 @@ import eu.kanade.tachiyomi.network.HttpException
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.player.loader.EpisodeLoader
 import eu.kanade.tachiyomi.ui.player.loader.HosterLoader
+import eu.kanade.tachiyomi.ui.player.loader.videoQualityHeight
 import eu.kanade.tachiyomi.util.storage.DiskUtil
 import eu.kanade.tachiyomi.util.storage.renameToOrCopy
 import eu.kanade.tachiyomi.util.storage.toFFmpegString
@@ -431,10 +432,15 @@ class AnimeDownloader(
         if (hosters.isEmpty()) {
             throw Exception(context.stringResource(AYMR.strings.video_list_empty_error))
         }
-        return HosterLoader.getBestHosterVideo(download.source, hosters) { hoster, video ->
-            (hoster.hosterName to video.videoTitle) in failedVideos
+        val height = preferences.preferredAnimeDownloadHeight.get()
+        val preferVideo: ((Hoster, Video) -> Boolean)? = if (height > 0) {
+            { _, video -> videoQualityHeight(video.videoTitle) == height }
+        } else {
+            null
         }
-            ?: throw Exception(context.stringResource(AYMR.strings.video_list_empty_error))
+        return HosterLoader.getBestHosterVideo(download.source, hosters, preferVideo) { hoster, video ->
+            (hoster.hosterName to video.videoTitle) in failedVideos
+        } ?: throw Exception(context.stringResource(AYMR.strings.video_list_empty_error))
     }
 
     /**
