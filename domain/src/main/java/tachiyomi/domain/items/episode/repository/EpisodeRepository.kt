@@ -10,6 +10,8 @@ interface EpisodeRepository {
 
     suspend fun updateEpisode(episodeUpdate: EpisodeUpdate)
 
+    suspend fun updateEpisodeCustomTitle(episodeId: Long, customTitle: String?)
+
     suspend fun updateAllEpisodes(episodeUpdates: List<EpisodeUpdate>)
 
     suspend fun removeEpisodesWithIds(episodeIds: List<Long>)

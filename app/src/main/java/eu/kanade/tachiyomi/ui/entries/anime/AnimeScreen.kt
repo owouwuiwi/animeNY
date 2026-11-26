@@ -39,6 +39,7 @@ import eu.kanade.presentation.entries.anime.AnimeAudioLanguageDialog
 import eu.kanade.presentation.entries.anime.AnimeScreen
 import eu.kanade.presentation.entries.anime.DuplicateAnimeDialog
 import eu.kanade.presentation.entries.anime.EpisodeOptionsDialogScreen
+import eu.kanade.presentation.entries.anime.components.EditEpisodeTitleDialog
 import eu.kanade.presentation.entries.anime.EpisodeSettingsDialog
 import eu.kanade.presentation.entries.anime.SeasonSettingsDialog
 import eu.kanade.presentation.entries.anime.components.AnimeImagesDialog
@@ -298,6 +299,7 @@ class AnimeScreen(
             onMarkPreviousAsSeenClicked = viewModel::markPreviousEpisodeSeen,
             onMultiDeleteClicked = viewModel::showDeleteEpisodeDialog,
             onSetDateClicked = viewModel::showSetEpisodeDateDialog,
+            onEditEpisodeTitleClicked = viewModel::showEditEpisodeTitleDialog,
             onEpisodeSwipe = viewModel::episodeSwipe,
             onEpisodeSelected = viewModel::toggleSelection,
             onAllEpisodeSelected = viewModel::toggleAllSelection,
@@ -398,6 +400,14 @@ class AnimeScreen(
                     initialDateMillis = dialog.episodes.firstOrNull()?.let {
                         it.dateUploadOverride.takeIf { d -> d > 0 } ?: it.dateUpload
                     } ?: 0,
+                )
+            }
+
+            is AnimeViewModel.Dialog.EditEpisodeTitle -> {
+                EditEpisodeTitleDialog(
+                    episode = dialog.episode,
+                    onSave = { viewModel.setEpisodeTitle(dialog.episode, it) },
+                    onDismiss = onDismissRequest,
                 )
             }
 

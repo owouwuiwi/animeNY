@@ -23,6 +23,7 @@ CREATE TABLE episodes(
     fillermark INTEGER AS Boolean NOT NULL,
     memo BLOB AS JsonObject NOT NULL DEFAULT '{}',
     date_upload_override INTEGER NOT NULL DEFAULT 0,
+    custom_title TEXT,
     FOREIGN KEY(anime_id) REFERENCES animes (_id)
     ON DELETE CASCADE
 );
@@ -59,7 +60,7 @@ getEpisodeById:
 SELECT
     _id, anime_id, url, name, scanlator, seen, bookmark, last_second_seen, total_seconds,
     episode_number, source_order, date_fetch, date_upload, last_modified_at, version, is_syncing,
-    summary, preview_url, fillermark, memo, date_upload_override
+    summary, preview_url, fillermark, memo, date_upload_override, custom_title
 FROM episodes
 WHERE _id = :id;
 
@@ -67,7 +68,7 @@ getEpisodesByAnimeId:
 SELECT
     _id, anime_id, url, name, scanlator, seen, bookmark, last_second_seen, total_seconds,
     episode_number, source_order, date_fetch, date_upload, last_modified_at, version, is_syncing,
-    summary, preview_url, fillermark, memo, date_upload_override
+    summary, preview_url, fillermark, memo, date_upload_override, custom_title
 FROM episodes
 WHERE anime_id = :animeId;
 
@@ -75,7 +76,7 @@ getEpisodesByAnimeIds:
 SELECT
     _id, anime_id, url, name, scanlator, seen, bookmark, last_second_seen, total_seconds,
     episode_number, source_order, date_fetch, date_upload, last_modified_at, version, is_syncing,
-    summary, preview_url, fillermark, memo, date_upload_override
+    summary, preview_url, fillermark, memo, date_upload_override, custom_title
 FROM episodes
 WHERE anime_id IN :animeIds
 ORDER BY anime_id, url;
@@ -84,7 +85,7 @@ getBookmarkedEpisodesByAnimeId:
 SELECT
     _id, anime_id, url, name, scanlator, seen, bookmark, last_second_seen, total_seconds,
     episode_number, source_order, date_fetch, date_upload, last_modified_at, version, is_syncing,
-    summary, preview_url, fillermark, memo, date_upload_override
+    summary, preview_url, fillermark, memo, date_upload_override, custom_title
 FROM episodes
 WHERE bookmark
 AND anime_id = :animeId;
@@ -94,7 +95,7 @@ getEpisodeByUrl:
 SELECT
     _id, anime_id, url, name, scanlator, seen, bookmark, last_second_seen, total_seconds,
     episode_number, source_order, date_fetch, date_upload, last_modified_at, version, is_syncing,
-    summary, preview_url, fillermark, memo, date_upload_override
+    summary, preview_url, fillermark, memo, date_upload_override, custom_title
 FROM episodes
 WHERE url = :episodeUrl;
 
@@ -102,7 +103,7 @@ getEpisodeByUrlAndAnimeId:
 SELECT
     _id, anime_id, url, name, scanlator, seen, bookmark, last_second_seen, total_seconds,
     episode_number, source_order, date_fetch, date_upload, last_modified_at, version, is_syncing,
-    summary, preview_url, fillermark, memo, date_upload_override
+    summary, preview_url, fillermark, memo, date_upload_override, custom_title
 FROM episodes
 WHERE url = :episodeUrl
 AND anime_id = :animeId
@@ -118,13 +119,18 @@ SET is_syncing = 0
 WHERE is_syncing = 1;
 
 insert:
-INSERT INTO episodes(anime_id, url, name, scanlator, seen, bookmark, last_second_seen, total_seconds, episode_number, source_order, date_fetch, date_upload, last_modified_at, version, is_syncing, summary, preview_url, fillermark, memo, date_upload_override)
-VALUES (:animeId, :url, :name, :scanlator, :seen, :bookmark, :lastSecondSeen, :totalSeconds, :episodeNumber, :sourceOrder, :dateFetch, :dateUpload, 0, :version, 0, :summary, :previewUrl, :fillermark, :memo, :dateUploadOverride);
+INSERT INTO episodes(anime_id, url, name, scanlator, seen, bookmark, last_second_seen, total_seconds, episode_number, source_order, date_fetch, date_upload, last_modified_at, version, is_syncing, summary, preview_url, fillermark, memo, date_upload_override, custom_title)
+VALUES (:animeId, :url, :name, :scanlator, :seen, :bookmark, :lastSecondSeen, :totalSeconds, :episodeNumber, :sourceOrder, :dateFetch, :dateUpload, 0, :version, 0, :summary, :previewUrl, :fillermark, :memo, :dateUploadOverride, :customTitle);
 
 insertReturningId:
-INSERT INTO episodes(anime_id, url, name, scanlator, seen, bookmark, last_second_seen, total_seconds, episode_number, source_order, date_fetch, date_upload, last_modified_at, version, is_syncing, summary, preview_url, fillermark, memo, date_upload_override)
-VALUES (:animeId, :url, :name, :scanlator, :seen, :bookmark, :lastSecondSeen, :totalSeconds, :episodeNumber, :sourceOrder, :dateFetch, :dateUpload, 0, :version, 0, :summary, :previewUrl, :fillermark, :memo, :dateUploadOverride)
+INSERT INTO episodes(anime_id, url, name, scanlator, seen, bookmark, last_second_seen, total_seconds, episode_number, source_order, date_fetch, date_upload, last_modified_at, version, is_syncing, summary, preview_url, fillermark, memo, date_upload_override, custom_title)
+VALUES (:animeId, :url, :name, :scanlator, :seen, :bookmark, :lastSecondSeen, :totalSeconds, :episodeNumber, :sourceOrder, :dateFetch, :dateUpload, 0, :version, 0, :summary, :previewUrl, :fillermark, :memo, :dateUploadOverride, :customTitle)
 RETURNING _id;
+
+updateCustomTitle:
+UPDATE episodes
+SET custom_title = :customTitle
+WHERE _id = :episodeId;
 
 update:
 UPDATE episodes

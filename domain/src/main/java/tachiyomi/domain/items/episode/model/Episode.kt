@@ -24,7 +24,11 @@ data class Episode(
     val version: Long,
     val dateUploadOverride: Long,
     val memo: JsonObject,
+    val customTitle: String? = null,
 ) {
+    val displayTitle: String
+        get() = customTitle?.takeIf { it.isNotBlank() } ?: name
+
     val isRecognizedNumber: Boolean
         get() = episodeNumber >= 0f
 

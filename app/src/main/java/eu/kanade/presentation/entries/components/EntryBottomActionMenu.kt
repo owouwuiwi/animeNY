@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Input
 import androidx.compose.material.icons.automirrored.outlined.LabelOff
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.EditCalendar
 import androidx.compose.material.icons.outlined.NewLabel
 import androidx.compose.material3.DropdownMenu
@@ -92,6 +93,7 @@ fun EntryBottomActionMenu(
     onExternalClicked: (() -> Unit)? = null,
     onInternalClicked: (() -> Unit)? = null,
     onSetDateClicked: (() -> Unit)? = null,
+    onEditEpisodeTitleClicked: (() -> Unit)? = null,
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -110,7 +112,9 @@ fun EntryBottomActionMenu(
         ) {
             val haptic = LocalHapticFeedback.current
             val confirm = remember {
-                mutableStateListOf(false, false, false, false, false, false, false, false, false, false, false, false)
+                mutableStateListOf(
+                    false, false, false, false, false, false, false, false, false, false, false, false, false,
+                )
             }
             var resetJob by remember { mutableStateOf<Job?>(null) }
             val onLongClickItem: (Int) -> Unit = { toConfirmIndex ->
@@ -250,6 +254,15 @@ fun EntryBottomActionMenu(
                         toConfirm = confirm[11],
                         onLongClick = { onLongClickItem(11) },
                         onClick = onInternalClicked,
+                    )
+                }
+                if (onEditEpisodeTitleClicked != null) {
+                    Button(
+                        title = stringResource(TLMR.strings.edit_episode_title),
+                        icon = Icons.Outlined.Edit,
+                        toConfirm = confirm[12],
+                        onLongClick = { onLongClickItem(12) },
+                        onClick = onEditEpisodeTitleClicked,
                     )
                 }
             }

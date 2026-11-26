@@ -11,6 +11,13 @@ class UpdateEpisode(
     private val episodeRepository: EpisodeRepository,
 ) {
 
+    suspend fun awaitCustomTitle(episodeId: Long, customTitle: String?) {
+        episodeRepository.updateEpisodeCustomTitle(
+            episodeId,
+            customTitle?.trim()?.takeIf { it.isNotEmpty() },
+        )
+    }
+
     suspend fun await(episodeUpdate: EpisodeUpdate) {
         try {
             episodeRepository.updateEpisode(episodeUpdate)

@@ -1325,6 +1325,30 @@ class AnimeViewModel(
         updateSuccessState { it.copy(dialog = Dialog.SetEpisodeDate(episodes)) }
     }
 
+    fun showEditEpisodeTitleDialog(episode: Episode) {
+        updateSuccessState { it.copy(dialog = Dialog.EditEpisodeTitle(episode)) }
+    }
+
+    fun setEpisodeTitle(episode: Episode, title: String?) {
+        viewModelScope.launchIO {
+            try {
+                updateEpisode.awaitCustomTitle(episode.id, title)
+                updateSuccessState { state ->
+                    if ((state.dialog as? Dialog.EditEpisodeTitle)?.episode?.id == episode.id) {
+                        state.copy(dialog = null)
+                    } else {
+                        state
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logcat(LogPriority.ERROR, e)
+                snackbarHostState.showSnackbar(with(context) { e.formattedMessage })
+            }
+        }
+    }
+
     fun setEpisodeDateOverride(episodes: List<Episode>, dateOverride: Long) {
         viewModelScope.launchIO {
             episodes
@@ -1942,6 +1966,7 @@ class AnimeViewModel(
         // SY <--
 
         data class SetEpisodeDate(val episodes: List<Episode>) : Dialog
+        data class EditEpisodeTitle(val episode: Episode) : Dialog
         data object RemoveFromLibrary : Dialog
         data object ChangeAnimeSkipIntro : Dialog
         data class ChangeAnimeAudioLanguage(val originalLanguage: String?) : Dialog

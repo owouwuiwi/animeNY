@@ -192,6 +192,7 @@ class AnimeRestorer(
                         seen = kept.seen || other.seen,
                         bookmark = kept.bookmark || other.bookmark,
                         lastSecondSeen = kotlin.math.max(kept.lastSecondSeen, other.lastSecondSeen),
+                        customTitle = kept.customTitle ?: other.customTitle,
                     )
                 }
             }
@@ -222,10 +223,12 @@ class AnimeRestorer(
                 fillermark = episode.fillermark || dbEpisode.fillermark,
                 seen = episode.seen,
                 lastSecondSeen = episode.lastSecondSeen,
+                customTitle = dbEpisode.customTitle ?: episode.customTitle,
             )
         } else {
             episode.copyFrom(dbEpisode).copy(
                 id = dbEpisode.id,
+                customTitle = dbEpisode.customTitle ?: episode.customTitle,
                 bookmark = episode.bookmark || dbEpisode.bookmark,
                 fillermark = episode.fillermark || dbEpisode.fillermark,
             ).let {
@@ -267,6 +270,7 @@ class AnimeRestorer(
                     episode.fillermark,
                     episode.memo,
                     episode.dateUploadOverride,
+                    episode.customTitle,
                 )
             }
         }
@@ -297,6 +301,7 @@ class AnimeRestorer(
                     dateUploadOverride = episode.dateUploadOverride,
                     memo = episode.memo,
                 )
+                episode.customTitle?.let { episodesQueries.updateCustomTitle(it, episode.id) }
             }
         }
     }

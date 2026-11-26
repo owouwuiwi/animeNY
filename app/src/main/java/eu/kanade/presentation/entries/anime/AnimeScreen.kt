@@ -180,6 +180,7 @@ fun AnimeScreen(
     onMarkPreviousAsSeenClicked: (Episode) -> Unit,
     onMultiDeleteClicked: (List<Episode>) -> Unit,
     onSetDateClicked: (List<Episode>) -> Unit,
+    onEditEpisodeTitleClicked: ((Episode) -> Unit)? = null,
 
     // For episode swipe
     onEpisodeSwipe: (EpisodeList.Item, LibraryPreferences.EpisodeSwipeAction) -> Unit,
@@ -260,6 +261,7 @@ fun AnimeScreen(
             onMarkPreviousAsSeenClicked = onMarkPreviousAsSeenClicked,
             onMultiDeleteClicked = onMultiDeleteClicked,
             onSetDateClicked = onSetDateClicked,
+            onEditEpisodeTitleClicked = onEditEpisodeTitleClicked,
             onEpisodeSwipe = onEpisodeSwipe,
             onEpisodeSelected = onEpisodeSelected,
             onAllEpisodeSelected = onAllEpisodeSelected,
@@ -321,6 +323,7 @@ fun AnimeScreen(
             onMarkPreviousAsSeenClicked = onMarkPreviousAsSeenClicked,
             onMultiDeleteClicked = onMultiDeleteClicked,
             onSetDateClicked = onSetDateClicked,
+            onEditEpisodeTitleClicked = onEditEpisodeTitleClicked,
             onEpisodeSwipe = onEpisodeSwipe,
             onEpisodeSelected = onEpisodeSelected,
             onAllEpisodeSelected = onAllEpisodeSelected,
@@ -396,6 +399,7 @@ private fun AnimeScreenSmallImpl(
     onMarkPreviousAsSeenClicked: (Episode) -> Unit,
     onMultiDeleteClicked: (List<Episode>) -> Unit,
     onSetDateClicked: (List<Episode>) -> Unit,
+    onEditEpisodeTitleClicked: ((Episode) -> Unit)?,
 
     // For episode swipe
     onEpisodeSwipe: (EpisodeList.Item, LibraryPreferences.EpisodeSwipeAction) -> Unit,
@@ -532,6 +536,7 @@ private fun AnimeScreenSmallImpl(
                     onDownloadEpisode = onDownloadEpisode,
                     onMultiDeleteClicked = onMultiDeleteClicked,
                     onSetDateClicked = onSetDateClicked,
+                    onEditEpisodeTitleClicked = onEditEpisodeTitleClicked,
                     fillFraction = 1f,
                     alwaysUseExternalPlayer = alwaysUseExternalPlayer,
                 )
@@ -868,6 +873,7 @@ fun AnimeScreenLargeImpl(
     onMarkPreviousAsSeenClicked: (Episode) -> Unit,
     onMultiDeleteClicked: (List<Episode>) -> Unit,
     onSetDateClicked: (List<Episode>) -> Unit,
+    onEditEpisodeTitleClicked: ((Episode) -> Unit)?,
 
     // For swipe actions
     onEpisodeSwipe: (EpisodeList.Item, LibraryPreferences.EpisodeSwipeAction) -> Unit,
@@ -993,6 +999,7 @@ fun AnimeScreenLargeImpl(
                     onDownloadEpisode = onDownloadEpisode,
                     onMultiDeleteClicked = onMultiDeleteClicked,
                     onSetDateClicked = onSetDateClicked,
+                    onEditEpisodeTitleClicked = onEditEpisodeTitleClicked,
                     fillFraction = 0.5f,
                     alwaysUseExternalPlayer = alwaysUseExternalPlayer,
                     modifier = Modifier
@@ -1266,6 +1273,7 @@ private fun SharedAnimeBottomActionMenu(
     onDownloadEpisode: ((List<EpisodeList.Item>, EpisodeDownloadAction) -> Unit)?,
     onMultiDeleteClicked: (List<Episode>) -> Unit,
     onSetDateClicked: (List<Episode>) -> Unit,
+    onEditEpisodeTitleClicked: ((Episode) -> Unit)?,
     fillFraction: Float,
     alwaysUseExternalPlayer: Boolean,
     modifier: Modifier = Modifier,
@@ -1312,6 +1320,9 @@ private fun SharedAnimeBottomActionMenu(
         }.takeIf { alwaysUseExternalPlayer && selected.size == 1 },
         onSetDateClicked = {
             onSetDateClicked(selected.fastMap { it.episode })
+        },
+        onEditEpisodeTitleClicked = selected.singleOrNull()?.episode?.let { episode ->
+            onEditEpisodeTitleClicked?.let { edit -> { edit(episode) } }
         },
         isManga = false,
     )
@@ -1407,7 +1418,9 @@ private fun LazyGridScope.sharedEpisodeItems(
                 }
                 // <-- AM (FILE_SIZE)
                 AnimeEpisodeListItem(
-                    title = if (anime.displayMode == Anime.EPISODE_DISPLAY_NUMBER) {
+                    title = if (episodeItem.episode.customTitle != null) {
+                        episodeItem.episode.displayTitle
+                    } else if (anime.displayMode == Anime.EPISODE_DISPLAY_NUMBER) {
                         stringResource(
                             AYMR.strings.display_mode_episode,
                             anime.seasonalEpisodeNumber(episodeItem.episode.name)?.toString()

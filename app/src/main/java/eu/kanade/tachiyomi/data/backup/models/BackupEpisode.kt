@@ -36,6 +36,7 @@ class BackupEpisode(
     @ProtoNumber(503) var previewUrl: String? = null,
 
     @ProtoNumber(504) var dateUploadOverride: Long = 0,
+    @ProtoNumber(505) var customTitle: String? = null,
 ) {
     fun toEpisodeImpl(): Episode {
         return Episode.create().copy(
@@ -56,6 +57,7 @@ class BackupEpisode(
             lastModifiedAt = this@BackupEpisode.lastModifiedAt,
             version = this@BackupEpisode.version,
             dateUploadOverride = this@BackupEpisode.dateUploadOverride,
+            customTitle = this@BackupEpisode.customTitle,
             memo = MemoColumnAdapter.decode(this@BackupEpisode.memo),
         )
     }
@@ -80,6 +82,7 @@ fun Episode.toBackupEpisode(): BackupEpisode =
         lastModifiedAt = lastModifiedAt,
         version = version,
         dateUploadOverride = dateUploadOverride,
+        customTitle = customTitle,
         memo = MemoColumnAdapter.encode(memo),
     )
 
@@ -105,6 +108,7 @@ val backupEpisodeMapper = {
         fillermark: Boolean,
         memo: JsonObject,
         dateUploadOverride: Long,
+        customTitle: String?,
     ->
     BackupEpisode(
         url = url,
@@ -124,6 +128,7 @@ val backupEpisodeMapper = {
         lastModifiedAt = lastModifiedAt,
         version = version,
         dateUploadOverride = dateUploadOverride,
+        customTitle = customTitle,
         memo = MemoColumnAdapter.encode(memo),
     )
 }

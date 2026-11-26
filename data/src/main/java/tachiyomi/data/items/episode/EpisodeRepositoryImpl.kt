@@ -44,6 +44,7 @@ class EpisodeRepositoryImpl(
                         episode.fillermark,
                         episode.memo,
                         episode.dateUploadOverride,
+                        episode.customTitle,
                     ).awaitAsOne()
                     episode.copy(id = lastInsertId)
                 }
@@ -56,6 +57,10 @@ class EpisodeRepositoryImpl(
 
     override suspend fun updateEpisode(episodeUpdate: EpisodeUpdate) {
         partialUpdate(episodeUpdate)
+    }
+
+    override suspend fun updateEpisodeCustomTitle(episodeId: Long, customTitle: String?) {
+        handler.await { episodesQueries.updateCustomTitle(customTitle, episodeId) }
     }
 
     override suspend fun updateAllEpisodes(episodeUpdates: List<EpisodeUpdate>) {
@@ -165,6 +170,7 @@ class EpisodeRepositoryImpl(
         fillermark: Boolean,
         memo: JsonObject,
         dateUploadOverride: Long,
+        customTitle: String?,
     ): Episode = Episode(
         id = id,
         animeId = animeId,
@@ -185,6 +191,7 @@ class EpisodeRepositoryImpl(
         lastModifiedAt = lastModifiedAt,
         version = version,
         dateUploadOverride = dateUploadOverride,
+        customTitle = customTitle,
         memo = memo,
     )
 }
