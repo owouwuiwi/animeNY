@@ -98,6 +98,8 @@ class AnimeRepositoryImpl(
         return handler.subscribeToList {
             animesQueries.getUpcomingAnime(
                 startOfDay = epochMillis,
+                airingTimeMask = Anime.ANIME_AIRING_TIME_MASK,
+                airingTimeShift = Anime.ANIME_AIRING_TIME_SHIFT.toLong(),
                 statuses = statuses,
                 includedEmpty = includedCategories.isEmpty(),
                 includedCategories = includedCategories,

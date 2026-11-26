@@ -190,9 +190,11 @@ SELECT
     is_syncing, fetch_type, parent_id, season_flags, season_number, season_source_order,
     background_url, background_last_modified, `cast`, memo, notes, audio_language, original_language
 FROM animes
-WHERE next_update >= :startOfDay
-AND favorite = 1
-AND status IN :statuses
+WHERE favorite = 1
+AND (
+    (next_update >= :startOfDay AND status IN :statuses)
+    OR ((viewer & :airingTimeMask) >> :airingTimeShift) * 1000 >= :startOfDay
+)
 AND (
     -- includedEmpty being true expresses "don't care" state and bypasses the membership filter
     :includedEmpty

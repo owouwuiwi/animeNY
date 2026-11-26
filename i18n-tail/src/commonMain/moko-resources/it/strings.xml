@@ -360,4 +360,6 @@
     <string name="backup_limit_to_categories">Includi solo le categorie selezionate</string>
     <string name="cover_from_url">Copertina da URL</string>
     <string name="cover_url_hint">URL immagine o pagina del tracker</string>
+    <string name="upcoming_episode_time">Episodio %1$d · %2$s</string>
+    <string name="upcoming_estimated_time">Orario stimato %s</string>
 </resources>

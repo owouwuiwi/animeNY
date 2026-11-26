@@ -487,4 +487,6 @@
     <string name="backup_limit_to_categories">Include only selected categories</string>
     <string name="cover_from_url">Cover from URL</string>
     <string name="cover_url_hint">Image or tracking page URL</string>
+    <string name="upcoming_episode_time">Episode %1$d · %2$s</string>
+    <string name="upcoming_estimated_time">Estimated %s</string>
 </resources>

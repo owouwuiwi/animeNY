@@ -121,7 +121,7 @@ data class Anime(
         get() = (viewerFlags and ANIME_AIRING_EPISODE_MASK).removeHexZeros(zeros = 2).toInt()
 
     val nextEpisodeAiringAt: Long
-        get() = (viewerFlags and ANIME_AIRING_TIME_MASK).removeHexZeros(zeros = 6)
+        get() = (viewerFlags and ANIME_AIRING_TIME_MASK) ushr ANIME_AIRING_TIME_SHIFT
 
     val unseenFilter: TriState
         get() = when (unseenFilterRaw) {
@@ -352,6 +352,7 @@ data class Anime(
         const val ANIME_INTRO_MASK = 0x0000000000000FFL
         const val ANIME_AIRING_EPISODE_MASK = 0x000000000FFFF00L
         const val ANIME_AIRING_TIME_MASK = 0x0FFFFFFFF000000L
+        const val ANIME_AIRING_TIME_SHIFT = 24
         const val ANIME_INTRO_DISABLE_MASK = 0x100000000000000L
 
         /** [audioLanguage] value that follows the global "Default audio language" setting. */

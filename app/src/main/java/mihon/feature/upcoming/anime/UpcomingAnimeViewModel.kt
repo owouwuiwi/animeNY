@@ -1,7 +1,6 @@
 package mihon.feature.upcoming.anime
 
 import androidx.compose.runtime.Immutable
-import androidx.compose.ui.util.fastMap
 import androidx.compose.ui.util.fastMapIndexedNotNull
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,7 +9,6 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
-import eu.kanade.core.util.insertSeparatorsReversed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,6 +25,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.YearMonth
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.yearMonth
 import mihon.domain.upcoming.anime.interactor.GetUpcomingAnime
@@ -105,27 +104,26 @@ class UpcomingAnimeViewModel(
         )
 
     private fun List<Anime>.toUpcomingAnimeUIModels(): List<UpcomingAnimeUIModel> {
-        var animeCount = 0
-        return fastMap { UpcomingAnimeUIModel.Item(it) }
-            .insertSeparatorsReversed { before, after ->
-                if (after != null) animeCount++
+        val timezone = TimeZone.currentSystemDefault()
+        val startOfDay = Clock.System.now().toLocalDateTime(timezone).date.atStartOfDayIn(timezone)
+        val byDate = mapNotNull { anime ->
+            val schedule = upcomingAnimeTime(
+                startOfDay,
+                anime.nextEpisodeAiringAt,
+                anime.nextEpisodeToAir,
+                anime.expectedNextUpdate,
+            ) ?: return@mapNotNull null
+            UpcomingAnimeUIModel.Item(anime, schedule)
+        }
+            .sortedWith(compareBy({ it.schedule.time }, { it.anime.id }))
+            .groupBy { it.schedule.time.toLocalDateTime(timezone).date }
 
-                val beforeDate = before?.anime
-                    ?.expectedNextUpdate
-                    ?.toLocalDateTime(TimeZone.currentSystemDefault())
-                    ?.date
-                val afterDate = after?.anime
-                    ?.expectedNextUpdate
-                    ?.toLocalDateTime(TimeZone.currentSystemDefault())
-                    ?.date
-
-                if (beforeDate != afterDate && afterDate != null) {
-                    UpcomingAnimeUIModel.Header(afterDate, animeCount).also { animeCount = 0 }
-                } else {
-                    null
-                }
+        return buildList {
+            for ((date, items) in byDate) {
+                add(UpcomingAnimeUIModel.Header(date, items.size))
+                addAll(items)
             }
-            .toList()
+        }
     }
 
     private fun List<UpcomingAnimeUIModel>.toEvents(): Map<LocalDate, Int> {
