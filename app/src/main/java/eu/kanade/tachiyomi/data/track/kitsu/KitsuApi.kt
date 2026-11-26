@@ -434,10 +434,11 @@ class KitsuApi(
     }
 
     suspend fun getMangaMetadata(track: DomainMangaTrack): TrackMangaMetadata {
+        val libraryId = requireNotNull(track.libraryId?.takeIf { it > 0 }) { "Kitsu library entry ID is missing" }
         return graphQlClient
             .query(
                 KitsuGetLibraryEntryMetadataQuery(
-                    libraryId = track.remoteId.toString(),
+                    libraryId = libraryId.toString(),
                     staffCount = Optional.present(25),
                 ),
             )
@@ -470,10 +471,11 @@ class KitsuApi(
     }
 
     suspend fun getAnimeMetadata(track: DomainAnimeTrack): TrackAnimeMetadata {
+        val libraryId = requireNotNull(track.libraryId?.takeIf { it > 0 }) { "Kitsu library entry ID is missing" }
         return graphQlClient
             .query(
                 KitsuGetLibraryEntryMetadataQuery(
-                    libraryId = track.remoteId.toString(),
+                    libraryId = libraryId.toString(),
                     staffCount = Optional.present(25),
                 ),
             )

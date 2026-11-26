@@ -176,6 +176,9 @@ class Kitsu(id: Long) :
     }
 
     override suspend fun update(track: MangaTrack, didReadChapter: Boolean): MangaTrack {
+        if (track.library_id == null || track.library_id == 0L) {
+            track.library_id = api.findLibManga(track)?.library_id
+        }
         if (track.status != COMPLETED) {
             if (didReadChapter) {
                 if (track.last_chapter_read.toLong() == track.total_chapters && track.total_chapters > 0) {
@@ -194,6 +197,9 @@ class Kitsu(id: Long) :
     }
 
     override suspend fun update(track: AnimeTrack, didWatchEpisode: Boolean): AnimeTrack {
+        if (track.library_id == null || track.library_id == 0L) {
+            track.library_id = api.findLibAnime(track)?.library_id
+        }
         if (track.status != COMPLETED) {
             if (didWatchEpisode) {
                 if (track.last_episode_seen.toLong() == track.total_episodes && track.total_episodes > 0) {
@@ -223,6 +229,7 @@ class Kitsu(id: Long) :
         val remoteTrack = api.findLibManga(track)
         return if (remoteTrack != null) {
             track.copyPersonalFrom(remoteTrack, copyRemotePrivate = false)
+            track.library_id = remoteTrack.library_id
             track.remote_id = remoteTrack.remote_id
 
             if (track.status != COMPLETED) {
@@ -241,6 +248,7 @@ class Kitsu(id: Long) :
         val remoteTrack = api.findLibAnime(track)
         return if (remoteTrack != null) {
             track.copyPersonalFrom(remoteTrack, copyRemotePrivate = false)
+            track.library_id = remoteTrack.library_id
             track.remote_id = remoteTrack.remote_id
 
             if (track.status != COMPLETED) {
@@ -285,6 +293,7 @@ class Kitsu(id: Long) :
     override suspend fun refresh(track: MangaTrack): MangaTrack {
         val remoteTrack = api.findLibManga(track) ?: throw Exception("Could not find manga")
         track.copyPersonalFrom(remoteTrack)
+        track.library_id = remoteTrack.library_id
         track.total_chapters = remoteTrack.total_chapters
         return track
     }
@@ -292,6 +301,7 @@ class Kitsu(id: Long) :
     override suspend fun refresh(track: AnimeTrack): AnimeTrack {
         val remoteTrack = api.findLibAnime(track) ?: throw Exception("Could not find anime")
         track.copyPersonalFrom(remoteTrack)
+        track.library_id = remoteTrack.library_id
         track.total_episodes = remoteTrack.total_episodes
         return track
     }
