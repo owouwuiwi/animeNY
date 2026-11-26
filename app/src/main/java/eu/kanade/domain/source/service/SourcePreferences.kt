@@ -13,6 +13,7 @@ import tachiyomi.core.common.preference.getEnumSet
 import tachiyomi.core.common.preference.getLongArray
 import tachiyomi.core.common.preference.getObjectFromString
 import tachiyomi.domain.library.model.LibraryDisplayMode
+import tachiyomi.domain.source.anime.model.FeedSortOrder
 
 @Inject
 @SingleIn(AppScope::class)
@@ -102,6 +103,8 @@ class SourcePreferences(
 
     // KMK -->
     val hideInLibraryFeedItems = preferenceStore.getBoolean("feed_hide_in_library_items", false)
+    val feedGroupBySource = preferenceStore.getBoolean("feed_group_by_source", false)
+    val feedSortOrder = preferenceStore.getEnum("feed_sort_order", FeedSortOrder.MANUAL)
 
     val disabledRepos = preferenceStore.getStringSet("disabled_repos", emptySet())
     // KMK <--

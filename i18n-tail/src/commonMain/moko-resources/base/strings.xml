@@ -462,4 +462,9 @@
     <string name="audio_language_original">Original language</string>
     <string name="audio_language_original_detected">Original language (%s)</string>
     <string name="audio_language_dialog_message">Used for this show when picking the audio track. Picking an audio track in the player also changes it.</string>
+    <string name="feed_display_options">Feed display options</string>
+    <string name="feed_group_by_source">Group by source</string>
+    <string name="feed_order_manual">Manual order</string>
+    <string name="feed_order_source_name">Source name</string>
+    <string name="feed_order_last_local_update">Latest local update</string>
 </resources>

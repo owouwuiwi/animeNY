@@ -11,12 +11,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.browse.anime.components.AnimeSourceIcon
 import eu.kanade.presentation.browse.components.GlobalSearchCardRow
@@ -42,6 +47,7 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.source.anime.model.AnimeSource
 import tachiyomi.domain.source.anime.model.FeedSavedSearch
+import tachiyomi.domain.source.anime.model.FeedSortOrder
 import tachiyomi.domain.source.anime.model.SavedSearch
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.tail.TLMR
@@ -62,12 +68,17 @@ data class FeedItemUI(
     val title: String,
     val subtitle: String,
     val results: List<Anime>?,
-)
+    val lastLocalUpdate: Long = 0L,
+) {
+    val sourceLabel: String get() = source?.name ?: feed.source.toString()
+}
 
 @Composable
 fun FeedScreen(
     state: FeedScreenState,
     contentPadding: PaddingValues,
+    groupBySource: Boolean,
+    sortOrder: FeedSortOrder,
     onClickSavedSearch: (SavedSearch, AnimeCatalogueSource) -> Unit,
     onClickSource: (AnimeCatalogueSource) -> Unit,
     // KMK -->
@@ -104,43 +115,131 @@ fun FeedScreen(
                 },
                 enabled = !state.isLoadingItems,
             ) {
+                val feeds = state.items.orEmpty()
+                val displayedFeeds = remember(feeds, sortOrder) {
+                    when (sortOrder) {
+                        FeedSortOrder.MANUAL -> feeds
+                        FeedSortOrder.SOURCE_NAME -> feeds.sortedWith(
+                            compareBy(String.CASE_INSENSITIVE_ORDER) { it.sourceLabel },
+                        )
+
+                        FeedSortOrder.LAST_UPDATE -> feeds.sortedByDescending { it.lastLocalUpdate }
+                    }
+                }
+                val sections = remember(displayedFeeds, groupBySource) {
+                    if (groupBySource) {
+                        displayedFeeds.groupBy { it.feed.source }.values.toList()
+                    } else {
+                        listOf(displayedFeeds)
+                    }
+                }
                 ScrollbarLazyColumn(
                     contentPadding = contentPadding + topSmallPaddingValues,
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    // KMK -->
-                    val feeds = state.items.orEmpty()
-                    itemsIndexed(
-                        items = feeds,
-                        key = { _, it -> "feed-${it.feed.id}" },
-                    ) { index, item ->
-                        // KMK <--
-                        GlobalSearchResultItem(
-                            title = item.title,
-                            subtitle = item.subtitle,
-                            onClick = {
-                                if (item.savedSearch != null && item.source != null) {
-                                    onClickSavedSearch(item.savedSearch, item.source)
-                                } else if (item.source != null) {
-                                    onClickSource(item.source)
-                                }
-                            },
-                            modifier = Modifier.animateItem(),
-                        ) {
-                            FeedItem(
-                                item = item,
-                                getMangaState = { getAnimeState(it) },
-                                onClickManga = onClickManga,
-                                // KMK -->
-                                onLongClickManga = onLongClickManga,
-                                // KMK <--
-                            )
+                    sections.forEach { section ->
+                        val first = section.firstOrNull()
+                        if (groupBySource && first != null) {
+                            item(key = "source-${first.feed.source}") {
+                                Text(
+                                    text = first.sourceLabel,
+                                    modifier = Modifier.padding(
+                                        horizontal = MaterialTheme.padding.medium,
+                                        vertical = MaterialTheme.padding.small,
+                                    ).animateItem(),
+                                    style = MaterialTheme.typography.titleLarge,
+                                )
+                            }
+                        }
+                        items(
+                            items = section,
+                            key = { "feed-${it.feed.id}" },
+                        ) { item ->
+                            val title = if (groupBySource && item.savedSearch == null) {
+                                stringResource(
+                                    if (item.source?.supportsLatest == true) MR.strings.latest else MR.strings.popular,
+                                )
+                            } else {
+                                item.title
+                            }
+                            GlobalSearchResultItem(
+                                title = title,
+                                subtitle = item.subtitle,
+                                onClick = {
+                                    if (item.savedSearch != null && item.source != null) {
+                                        onClickSavedSearch(item.savedSearch, item.source)
+                                    } else if (item.source != null) {
+                                        onClickSource(item.source)
+                                    }
+                                },
+                                modifier = Modifier.animateItem(),
+                            ) {
+                                FeedItem(
+                                    item = item,
+                                    getMangaState = { getAnimeState(it) },
+                                    onClickManga = onClickManga,
+                                    onLongClickManga = onLongClickManga,
+                                )
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+internal fun FeedDisplayOptionsDialog(
+    groupBySource: Boolean,
+    sortOrder: FeedSortOrder,
+    onGroupBySourceChange: (Boolean) -> Unit,
+    onSortOrderChange: (FeedSortOrder) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(TLMR.strings.feed_display_options)) },
+        text = {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth().toggleable(
+                        value = groupBySource,
+                        role = Role.Switch,
+                        onValueChange = onGroupBySourceChange,
+                    ),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(TLMR.strings.feed_group_by_source), Modifier.weight(1f))
+                    Switch(checked = groupBySource, onCheckedChange = null)
+                }
+                Column(Modifier.selectableGroup()) {
+                    FeedSortOrder.entries.forEach { order ->
+                        val label = when (order) {
+                            FeedSortOrder.MANUAL -> TLMR.strings.feed_order_manual
+                            FeedSortOrder.SOURCE_NAME -> TLMR.strings.feed_order_source_name
+                            FeedSortOrder.LAST_UPDATE -> TLMR.strings.feed_order_last_local_update
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(48.dp).selectable(
+                                selected = sortOrder == order,
+                                role = Role.RadioButton,
+                                onClick = { onSortOrderChange(order) },
+                            ),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = sortOrder == order, onClick = null)
+                            Spacer(Modifier.width(MaterialTheme.padding.small))
+                            Text(stringResource(label))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(MR.strings.action_ok)) }
+        },
+    )
 }
 
 @Composable

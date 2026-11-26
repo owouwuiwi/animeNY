@@ -346,4 +346,9 @@
   <string name="pref_tracking_sync_enhanced">Sincronizza i progressi dai tracker potenziati</string>
   <string name="pref_smart_sync_tracker">Stagione di sincronizzazione intelligente</string>
   <string name="pref_smart_sync_tracker_summary">Salta gli elementi completati e ferma alla voce in corso</string>
+    <string name="feed_display_options">Visualizzazione del feed</string>
+    <string name="feed_group_by_source">Raggruppa per fonte</string>
+    <string name="feed_order_manual">Ordine manuale</string>
+    <string name="feed_order_source_name">Nome della fonte</string>
+    <string name="feed_order_last_local_update">Ultimo aggiornamento locale</string>
 </resources>

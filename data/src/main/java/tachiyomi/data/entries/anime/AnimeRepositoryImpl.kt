@@ -56,6 +56,11 @@ class AnimeRepositoryImpl(
         }
     }
 
+    override suspend fun latestUpdateForUrls(sourceId: Long, urls: Collection<String>): Long {
+        if (urls.isEmpty()) return 0L
+        return handler.awaitOne { animesQueries.latestUpdateForUrls(sourceId, urls) }
+    }
+
     override suspend fun getAnimeFavorites(): List<Anime> {
         return handler.awaitList { animesQueries.getFavorites(AnimeMapper::mapAnime) }
     }

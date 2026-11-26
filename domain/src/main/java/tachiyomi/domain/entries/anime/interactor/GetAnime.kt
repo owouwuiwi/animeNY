@@ -28,4 +28,7 @@ class GetAnime(
     fun subscribe(url: String, sourceId: Long): Flow<Anime?> {
         return animeRepository.getAnimeByUrlAndSourceIdAsFlow(url, sourceId)
     }
+
+    suspend fun latestUpdateForUrls(sourceId: Long, urls: Collection<String>): Long =
+        animeRepository.latestUpdateForUrls(sourceId, urls)
 }

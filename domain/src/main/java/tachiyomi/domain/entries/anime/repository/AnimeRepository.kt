@@ -17,6 +17,8 @@ interface AnimeRepository {
 
     fun getAnimeByUrlAndSourceIdAsFlow(url: String, sourceId: Long): Flow<Anime?>
 
+    suspend fun latestUpdateForUrls(sourceId: Long, urls: Collection<String>): Long
+
     suspend fun getAnimeFavorites(): List<Anime>
 
     suspend fun getWatchedAnimeNotInLibrary(): List<Anime>

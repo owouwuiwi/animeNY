@@ -6,6 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.SortByAlpha
 import androidx.compose.material.icons.outlined.SwapVert
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -15,12 +16,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalHapticFeedback
 import cafe.adriel.voyager.core.stack.StackEvent
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.browse.FeedAddDialog
 import eu.kanade.presentation.browse.FeedAddSearchDialog
+import eu.kanade.presentation.browse.FeedDisplayOptionsDialog
 import eu.kanade.presentation.browse.FeedOrderScreen
 import eu.kanade.presentation.browse.FeedScreen
 import eu.kanade.presentation.browse.components.FeedActionsDialog
@@ -47,6 +50,9 @@ fun feedTab(
 ): TabContent {
     val navigator = LocalNavigator.currentOrThrow
     val state by screenModel.state.collectAsState()
+    val groupBySource by screenModel.sourcePreferences.feedGroupBySource.collectAsState()
+    val sortOrder by screenModel.sourcePreferences.feedSortOrder.collectAsState()
+    var showFeedDisplayOptions by rememberSaveable { mutableStateOf(false) }
 
     // KMK -->
     val scope = rememberCoroutineScope()
@@ -108,6 +114,11 @@ fun feedTab(
                     icon = Icons.Outlined.SwapVert,
                     onClick = { showingFeedOrderScreen.value = true },
                 ),
+                AppBar.Action(
+                    title = stringResource(TLMR.strings.feed_display_options),
+                    icon = Icons.Outlined.Tune,
+                    onClick = { showFeedDisplayOptions = true },
+                ),
                 // KMK <--
             )
         },
@@ -129,12 +140,15 @@ fun feedTab(
                     FeedScreen(
                         state = state,
                         contentPadding = contentPadding,
+                        groupBySource = groupBySource,
+                        sortOrder = sortOrder,
                         onClickSavedSearch = { savedSearch, source ->
                             screenModel.sourcePreferences.lastUsedSource.set(savedSearch.source)
                             navigator.push(
                                 BrowseAnimeSourceScreen(
                                     source.id,
-                                    listingQuery = null,
+                                    listingQuery = savedSearch.query,
+                                    savedSearch = savedSearch.id,
                                 ),
                             )
                         },
@@ -176,6 +190,16 @@ fun feedTab(
                         getAnimeState = { anime -> screenModel.getManga(initialanime = anime) },
                     )
                 }
+            }
+
+            if (showFeedDisplayOptions) {
+                FeedDisplayOptionsDialog(
+                    groupBySource = groupBySource,
+                    sortOrder = sortOrder,
+                    onGroupBySourceChange = screenModel.sourcePreferences.feedGroupBySource::set,
+                    onSortOrderChange = screenModel.sourcePreferences.feedSortOrder::set,
+                    onDismiss = { showFeedDisplayOptions = false },
+                )
             }
 
             state.dialog?.let { dialog ->

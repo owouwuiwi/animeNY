@@ -14,6 +14,7 @@ import eu.kanade.tachiyomi.util.system.LocaleHelper
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -318,18 +319,18 @@ open class FeedScreenModel(
                         } else {
                             emptyList()
                         }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         emptyList()
                     }
 
                     val result = withIOContext {
+                        val entries = page.map { it.toDomainAnime(itemUI.feed.source) }
+                            .filter { !hideInLibraryFeedItems.get() || !it.favorite }
                         itemUI.copy(
-                            results = page.map {
-                                // KMK -->
-                                it.toDomainAnime(itemUI.source!!.id)
-                            }
-                                .filter { !hideInLibraryFeedItems.get() || !it.favorite },
-                            // KMK <--
+                            results = entries,
+                            lastLocalUpdate = getAnime.latestUpdateForUrls(itemUI.feed.source, entries.map { it.url }),
                         )
                     }
 

@@ -99,6 +99,11 @@ FROM animes
 WHERE url = :url AND source = :source
 LIMIT 1;
 
+latestUpdateForUrls:
+SELECT coalesce(max(last_update), 0)
+FROM animes
+WHERE source = :sourceId AND url IN :urls;
+
 getFavorites:
 SELECT
     _id, source, url, artist, author, description, genre, title, status, thumbnail_url, favorite,
