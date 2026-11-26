@@ -389,5 +389,9 @@
     <string name="upcoming_week_next">Settimana successiva</string>
     <string name="upcoming_empty_period">Nessuna uscita prevista per queste date.</string>
     <string name="upcoming_confirmed_airing_only">Solo orari di uscita confermati</string>
+    <string name="anilist_recommendations">Suggerimenti di AniList</string>
+    <string name="anilist_recommendations_needs_link">Collega il titolo ad AniList o MyAnimeList in Tracciamento per vedere i suggerimenti.</string>
+    <string name="anilist_recommendations_failed">Impossibile caricare i suggerimenti di AniList.</string>
+    <string name="anilist_recommendations_find_in_sources">Cerca nelle fonti</string>
     <string name="backup_custom_manga_covers">Copertine manga personalizzate</string>
 </resources>

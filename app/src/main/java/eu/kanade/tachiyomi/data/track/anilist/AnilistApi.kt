@@ -35,6 +35,7 @@ import mihon.graphql.anilist.AniListGetMangaMetadataQuery
 import mihon.graphql.anilist.AniListGetPopularAnimeQuery
 import mihon.graphql.anilist.AniListGetPopularMangaQuery
 import mihon.graphql.anilist.AniListGetRepeatEntryQuery
+import mihon.graphql.anilist.AniListRecommendationsQuery
 import mihon.graphql.anilist.AniListSearchAnimeQuery
 import mihon.graphql.anilist.AniListSearchCastQuery
 import mihon.graphql.anilist.AniListSearchMangaQuery
@@ -43,6 +44,7 @@ import mihon.graphql.anilist.AniListUpdateMangaMutation
 import mihon.graphql.anilist.AniListUpdateRepeatEntryMutation
 import mihon.graphql.anilist.type.FuzzyDateInput
 import mihon.graphql.anilist.type.MediaListStatus
+import mihon.graphql.anilist.type.MediaType
 import okhttp3.OkHttpClient
 import tachiyomi.core.common.util.system.logcat
 import kotlin.time.Duration.Companion.minutes
@@ -66,13 +68,43 @@ class AnilistApi(
         .build()
 
     private val graphQlClient by lazy {
-        ApolloClient.Builder()
+        newGraphQlClient(authClient)
+    }
+
+    private val publicGraphQlClient by lazy {
+        newGraphQlClient(publicClient)
+    }
+
+    private fun newGraphQlClient(httpClient: OkHttpClient): ApolloClient {
+        return ApolloClient.Builder()
             .serverUrl("https://graphql.anilist.co")
-            .okHttpClient(authClient)
+            .okHttpClient(httpClient)
             .dispatcher(Dispatchers.IO)
             // required to log the error body in dataOrElse, which also properly closes it
             .httpExposeErrorBody(true)
             .build()
+    }
+
+    internal suspend fun getRecommendations(
+        aniListId: Int?,
+        myAnimeListId: Int?,
+        type: MediaType,
+    ): List<AniListRecommendation> {
+        val media = publicGraphQlClient.query(
+            AniListRecommendationsQuery(
+                id = Optional.presentIfNotNull(aniListId),
+                malId = Optional.presentIfNotNull(myAnimeListId),
+                type = type,
+            ),
+        ).execute().dataAssertNoErrors.Media ?: return emptyList()
+        return media.recommendations?.nodes.orEmpty()
+            .mapNotNull { node ->
+                val suggestion = node?.mediaRecommendation ?: return@mapNotNull null
+                val title = suggestion.title?.userPreferred?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                if (suggestion.type != type || suggestion.id == media.id) return@mapNotNull null
+                AniListRecommendation(suggestion.id, title, suggestion.coverImage?.large, suggestion.isAdult)
+            }
+            .distinctBy { it.id }
     }
 
     internal suspend fun getRepeat(remoteId: Long, userId: Int): RemoteRepeat? {

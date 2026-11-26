@@ -23,6 +23,7 @@ import eu.kanade.tachiyomi.data.track.model.MangaTrackSearch
 import eu.kanade.tachiyomi.data.track.model.TrackAnimeMetadata
 import eu.kanade.tachiyomi.data.track.model.TrackMangaMetadata
 import kotlinx.serialization.json.Json
+import mihon.graphql.anilist.type.MediaType
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.domain.track.anime.model.AnimeTrack as DomainAnimeTrack
@@ -75,6 +76,13 @@ class Anilist(id: Long) :
     private val interceptor by lazy { AnilistInterceptor(this, getPassword()) }
 
     private val api by lazy { AnilistApi(id, client, interceptor) }
+
+    internal suspend fun getRecommendations(aniListId: Int?, myAnimeListId: Int?, anime: Boolean) =
+        api.getRecommendations(
+            aniListId,
+            myAnimeListId,
+            if (anime) MediaType.ANIME else MediaType.MANGA,
+        )
 
     override val supportsReadingDates: Boolean = true
 
