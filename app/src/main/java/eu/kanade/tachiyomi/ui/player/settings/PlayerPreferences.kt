@@ -94,6 +94,8 @@ class PlayerPreferences(
     )
     fun invertDuration() = preferenceStore.getBoolean("invert_duration", false)
     fun aspectState() = preferenceStore.getEnum("pref_player_aspect_state", VideoAspect.Fit)
+    fun seriesAspectState(seriesId: Long) =
+        preferenceStore.getEnum("pref_player_aspect_series_$seriesId", aspectState().get())
 
     // Old
 

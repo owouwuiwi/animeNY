@@ -267,6 +267,8 @@ class PlayerViewModel(
 
     private val _currentAnime = MutableStateFlow<Anime?>(null)
     val currentAnime = _currentAnime.asStateFlow()
+    private val _videoAspect = MutableStateFlow(playerPreferences.aspectState().get())
+    val videoAspect = _videoAspect.asStateFlow()
 
     /** The current anime's audio language; null until it is resolved, or for network streams. */
     @Volatile
@@ -956,12 +958,20 @@ class PlayerViewModel(
         playerPreferences.autoplayEnabled().set(value)
     }
 
-    @Suppress("DEPRECATION")
     fun changeVideoAspect(aspect: VideoAspect) {
-        mpv.applyVideoAspect(aspect, videoSurfaceAspect())
-        playerPreferences.aspectState().set(aspect)
+        videoAspectPreference(currentAnime.value).set(aspect)
+        _videoAspect.value = aspect
+        applyCurrentVideoAspect()
         playerUpdate.update { PlayerUpdates.AspectRatio }
     }
+
+    fun applyCurrentVideoAspect() {
+        mpv.applyVideoAspect(videoAspect.value, videoSurfaceAspect())
+    }
+
+    private fun videoAspectPreference(anime: Anime?) =
+        (anime?.parentId ?: anime?.id)?.takeIf { it > 0 }?.let(playerPreferences::seriesAspectState)
+            ?: playerPreferences.aspectState()
 
     /** Aspect ratio of the surface mpv renders into, which is smaller than the screen in tabletop mode. */
     private fun videoSurfaceAspect(): Double {
@@ -1457,6 +1467,7 @@ class PlayerViewModel(
             val anime = getAnime.await(animeId)
             if (anime != null) {
                 _currentAnime.update { _ -> anime }
+                _videoAspect.value = videoAspectPreference(anime).get()
                 animeTitle.update { _ -> anime.title }
                 sourceManager.isInitialized.first { it }
                 episodeId = initialEpisodeId
@@ -1577,6 +1588,7 @@ class PlayerViewModel(
         animeTitle.update { fallbackTitle }
         mediaTitle.update { fallbackTitle }
         _currentAnime.update { anime }
+        _videoAspect.value = videoAspectPreference(anime).get()
         _currentEpisode.update { episode }
         _currentPlaylist.update { listOf(episode) }
         _currentSource.update { NetworkStreamSource }

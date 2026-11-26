@@ -592,6 +592,7 @@ class PlayerActivity : BaseActivity() {
     }
 
     private fun setupPlayerMPV(isRecreated: Boolean) {
+        player.currentVideoAspect = { viewModel.videoAspect.value }
         val mpvDir = UniFile.fromFile(applicationContext.filesDir)!!.createDirectory(MPV_DIR)!!
 
         val mpvConfFile = mpvDir.createFile("mpv.conf")!!
@@ -716,7 +717,7 @@ class PlayerActivity : BaseActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         if (!isInPictureInPictureMode) {
-            viewModel.changeVideoAspect(playerPreferences.aspectState().get())
+            viewModel.applyCurrentVideoAspect()
         } else {
             viewModel.hideControls()
         }
@@ -1466,6 +1467,7 @@ class PlayerActivity : BaseActivity() {
     private suspend fun fileLoaded() {
         if (player.isExiting) return
         setMpvOptions()
+        viewModel.applyCurrentVideoAspect()
         setMpvMediaTitle()
         runOnUiThread { setupPlayerOrientation() }
         setupChapters()

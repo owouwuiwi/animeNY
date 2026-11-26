@@ -52,6 +52,7 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet?) : BaseMPVView(
     private val networkPreferences: NetworkPreferences by injectLazy()
 
     var isExiting = false
+    var currentVideoAspect: () -> VideoAspect = { playerPreferences.aspectState().get() }
 
     private val optionNameRegex = Regex("""^[ \t]*(?:--)?([\w-]+)[ \t]*(?:=|#|$)""", RegexOption.MULTILINE)
     private val mpvOptionNames = optionNameRegex.findAll(advancedPreferences.mpvConf().get()).map {
@@ -87,7 +88,7 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet?) : BaseMPVView(
         // The surface is resized by folding, rotating and the tabletop split; Stretch has to follow it.
         val mpv = mpv ?: return
         if (width <= 0 || height <= 0) return
-        mpv.applyVideoAspect(playerPreferences.aspectState().get(), width / height.toDouble())
+        mpv.applyVideoAspect(currentVideoAspect(), width / height.toDouble())
         // mpv only renders the resized surface with the next frame, so a paused video would keep showing a
         // stale, wrongly sized buffer. Re-decoding the current frame is how mpv itself refreshes paused video.
         if (mpv.getPropertyBoolean("pause") == true && mpv.getPropertyDouble("time-pos") != null) {

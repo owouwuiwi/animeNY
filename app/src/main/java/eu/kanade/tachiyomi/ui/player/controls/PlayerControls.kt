@@ -306,7 +306,7 @@ fun PlayerControls(
                 }
 
                 val currentPlayerUpdate by viewModel.playerUpdate.collectAsState()
-                val aspectRatio by playerPreferences.aspectState().collectAsState()
+                val aspectRatio by viewModel.videoAspect.collectAsState()
                 LaunchedEffect(currentPlayerUpdate, aspectRatio) {
                     if (currentPlayerUpdate is PlayerUpdates.DoubleSpeed || currentPlayerUpdate is PlayerUpdates.None) {
                         return@LaunchedEffect
