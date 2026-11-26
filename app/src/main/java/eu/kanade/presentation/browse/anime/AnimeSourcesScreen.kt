@@ -56,7 +56,7 @@ fun AnimeSourcesScreen(
         state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
 
         state.isEmpty -> EmptyScreen(
-            stringRes = MR.strings.source_empty_screen,
+            stringRes = if (state.searchQuery.isNullOrBlank()) MR.strings.source_empty_screen else MR.strings.no_results_found,
             modifier = Modifier.padding(contentPadding),
         )
 

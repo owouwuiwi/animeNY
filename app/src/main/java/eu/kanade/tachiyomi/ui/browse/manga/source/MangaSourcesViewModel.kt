@@ -9,6 +9,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import eu.kanade.domain.base.BasePreferences
+import eu.kanade.domain.source.interactor.filterSourcesByName
 import eu.kanade.domain.source.manga.interactor.GetEnabledMangaSources
 import eu.kanade.domain.source.manga.interactor.ToggleExcludeFromMangaDataSaver
 import eu.kanade.domain.source.manga.interactor.ToggleMangaSource
@@ -27,7 +28,6 @@ import kotlinx.coroutines.flow.WhileSubscribed
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -56,24 +56,27 @@ class MangaSourcesViewModel(
     val events = _events.receiveAsFlow()
 
     private val dialog = MutableStateFlow<Dialog?>(null)
+    private val sourceQuery = MutableStateFlow<String?>(null)
 
     private val enabledSources = getEnabledSources.subscribe()
         .catch {
             logcat(LogPriority.ERROR, it)
             _events.send(Event.FailedFetchingSources)
         }
-        .map(::toSourceUiModels)
 
     val state: StateFlow<State> = combine(
         enabledSources,
         dialog,
         sourcePreferences.dataSaver.changes(),
-    ) { items, dialog, dataSaver ->
+        sourceQuery,
+    ) { sources, dialog, dataSaver, query ->
+        val items = toSourceUiModels(sources.filterSourcesByName(query) { it.name })
         State(
             dialog = dialog,
             isLoading = false,
             items = items,
             dataSaverEnabled = dataSaver != DataSaver.NONE,
+            searchQuery = query,
         )
     }
         .flowOn(Dispatchers.IO)
@@ -128,6 +131,10 @@ class MangaSourcesViewModel(
         dialog.update { Dialog(source) }
     }
 
+    fun setSearchQuery(query: String?) {
+        sourceQuery.value = query
+    }
+
     fun closeDialog() {
         dialog.update { null }
     }
@@ -146,6 +153,7 @@ class MangaSourcesViewModel(
         // SY -->
         val dataSaverEnabled: Boolean = false,
         // SY <--
+        val searchQuery: String? = null,
     ) {
         val isEmpty = items.isEmpty()
     }

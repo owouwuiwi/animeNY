@@ -15,6 +15,7 @@ import eu.kanade.presentation.browse.anime.AnimeSourceOptionsDialog
 import eu.kanade.presentation.browse.anime.AnimeSourcesScreen
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.TabContent
+import eu.kanade.presentation.components.TabSearch
 import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceScreen
 import eu.kanade.tachiyomi.ui.browse.anime.source.browse.BrowseAnimeSourceViewModel
 import eu.kanade.tachiyomi.ui.browse.anime.source.feed.SourceFeedScreen
@@ -34,6 +35,8 @@ fun Screen.animeSourcesTab(): TabContent {
 
     return TabContent(
         titleRes = AYMR.strings.label_anime_sources,
+        searchEnabled = true,
+        search = TabSearch(state.searchQuery, viewModel::setSearchQuery),
         actions = persistentListOf(
             AppBar.Action(
                 title = stringResource(MR.strings.action_global_search),

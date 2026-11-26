@@ -12,6 +12,7 @@ import eu.kanade.presentation.browse.manga.MangaSourceOptionsDialog
 import eu.kanade.presentation.browse.manga.MangaSourcesScreen
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.TabContent
+import eu.kanade.presentation.components.TabSearch
 import eu.kanade.tachiyomi.ui.browse.manga.source.browse.BrowseMangaSourceScreen
 import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.GlobalMangaSearchScreen
 import kotlinx.coroutines.flow.collectLatest
@@ -31,6 +32,8 @@ fun Screen.mangaSourcesTab(): TabContent {
 
     return TabContent(
         titleRes = AYMR.strings.label_manga_sources,
+        searchEnabled = true,
+        search = TabSearch(state.searchQuery, viewModel::setSearchQuery),
         actions = listOf(
             AppBar.Action(
                 title = stringResource(MR.strings.action_global_search),

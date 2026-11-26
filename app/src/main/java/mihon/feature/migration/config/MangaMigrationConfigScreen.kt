@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,10 +39,13 @@ import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.domain.source.interactor.filterSourcesByName
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.presentation.browse.manga.components.MangaSourceIcon
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarActions
+import eu.kanade.presentation.components.AppBarTitle
+import eu.kanade.presentation.components.SearchToolbar
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.browse.manga.migration.search.MigrateMangaSearchScreen
@@ -77,6 +82,10 @@ class MangaMigrationConfigScreen(private val mangaIds: Collection<Long>) : Scree
         val state by screenModel.state.collectAsState()
 
         var migrationSheetOpen by rememberSaveable { mutableStateOf(false) }
+        var searchQuery by rememberSaveable { mutableStateOf<String?>(null) }
+        val visibleSources = remember(state.sources, searchQuery) {
+            state.sources.filterSourcesByName(searchQuery) { it.name }
+        }
 
         fun continueMigration(openSheet: Boolean, extraSearchQuery: String?) {
             val mangaId = mangaIds.singleOrNull()
@@ -99,8 +108,10 @@ class MangaMigrationConfigScreen(private val mangaIds: Collection<Long>) : Scree
 
         Scaffold(
             topBar = { scrollBehavior ->
-                AppBar(
-                    title = stringResource(MR.strings.migrationConfigScreen_selectedHeader),
+                SearchToolbar(
+                    searchQuery = searchQuery,
+                    onChangeSearchQuery = { searchQuery = it },
+                    titleContent = { AppBarTitle(stringResource(MR.strings.migrationConfigScreen_selectedHeader)) },
                     navigateUp = navigator::pop,
                     actions = {
                         AppBarActions(
@@ -143,15 +154,26 @@ class MangaMigrationConfigScreen(private val mangaIds: Collection<Long>) : Scree
         ) { contentPadding ->
             val lazyListState = rememberLazyListState()
             val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
-                screenModel.reorderSources(from.index, to.index)
+                val sources = screenModel.state.value.sources
+                val fromIndex = sources.indexOfFirst { it.id == from.key }
+                val toIndex = sources.indexOfFirst { it.id == to.key }
+                if (fromIndex >= 0 && toIndex >= 0) screenModel.reorderSources(fromIndex, toIndex)
             }
 
             FastScrollLazyColumn(
                 state = lazyListState,
                 contentPadding = contentPadding,
             ) {
+                if (visibleSources.isEmpty() && !searchQuery.isNullOrBlank()) {
+                    item {
+                        Text(
+                            text = stringResource(MR.strings.no_results_found),
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                }
                 itemsIndexed(
-                    items = state.sources,
+                    items = visibleSources,
                     key = { _, source -> source.id },
                 ) { index, source ->
                     ReorderableItem(reorderableState, key = source.id) { isDragging ->

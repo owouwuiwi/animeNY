@@ -18,6 +18,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -63,33 +64,28 @@ fun TabbedScreen(
                 val tab = tabs[currentPage]
                 val searchEnabled = tab.searchEnabled
 
-                val actualQuery = when (currentPage) {
-                    mangaExtensionsTabIndex -> mangaSearchQuery
-                    animeExtensionsTabIndex -> animeSearchQuery
-                    else -> null
+                val search = tab.search ?: when (currentPage) {
+                    mangaExtensionsTabIndex -> TabSearch(mangaSearchQuery, onChangeMangaSearchQuery)
+                    animeExtensionsTabIndex -> TabSearch(animeSearchQuery, onChangeAnimeSearchQuery)
+                    else -> TabSearch(null) {}
                 }
-
-                val actualOnChange = when (currentPage) {
-                    mangaExtensionsTabIndex -> onChangeMangaSearchQuery
-                    animeExtensionsTabIndex -> onChangeAnimeSearchQuery
-                    else -> ({})
+                key(currentPage) {
+                    SearchToolbar(
+                        titleContent = {
+                            AppBarTitle(
+                                stringResource(titleRes),
+                                modifier = modifier,
+                                null,
+                                tab.numberTitle,
+                            )
+                        },
+                        searchEnabled = searchEnabled,
+                        searchQuery = search.query.takeIf { searchEnabled },
+                        onChangeSearchQuery = search.onQueryChanged,
+                        actions = { AppBarActions(tab.actions) },
+                        navigateUp = tab.navigateUp,
+                    )
                 }
-
-                SearchToolbar(
-                    titleContent = {
-                        AppBarTitle(
-                            stringResource(titleRes),
-                            modifier = modifier,
-                            null,
-                            tab.numberTitle,
-                        )
-                    },
-                    searchEnabled = searchEnabled,
-                    searchQuery = if (searchEnabled) actualQuery else null,
-                    onChangeSearchQuery = actualOnChange,
-                    actions = { AppBarActions(tab.actions) },
-                    navigateUp = tab.navigateUp,
-                )
             }
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -143,7 +139,10 @@ data class TabContent(
     val numberTitle: Int = 0,
     val cancelAction: () -> Unit = {},
     val navigateUp: (() -> Unit)? = null,
+    val search: TabSearch? = null,
 )
+
+data class TabSearch(val query: String?, val onQueryChanged: (String?) -> Unit)
 
 @Composable
 private fun FlexibleTabRow(

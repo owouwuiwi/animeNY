@@ -14,6 +14,7 @@ import eu.kanade.domain.base.BasePreferences
 import eu.kanade.domain.source.anime.interactor.GetEnabledAnimeSources
 import eu.kanade.domain.source.anime.interactor.ToggleAnimeSource
 import eu.kanade.domain.source.anime.interactor.ToggleAnimeSourcePin
+import eu.kanade.domain.source.interactor.filterSourcesByName
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.browse.anime.AnimeSourceUiModel
@@ -29,7 +30,6 @@ import kotlinx.coroutines.flow.WhileSubscribed
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -57,24 +57,27 @@ class AnimeSourcesViewModel(
     val useNewSourceNavigation by uiPreferences.useNewSourceNavigation.asState(viewModelScope)
 
     private val dialog = MutableStateFlow<Dialog?>(null)
+    private val sourceQuery = MutableStateFlow<String?>(null)
 
     private val enabledSources = getEnabledAnimeSources.subscribe()
         .catch {
             logcat(LogPriority.ERROR, it)
             _events.send(Event.FailedFetchingSources)
         }
-        .map(::toSourceUiModels)
 
     val state: StateFlow<State> = combine(
         enabledSources,
         dialog,
         sourcePreferences.dataSaver.changes(),
-    ) { items, dialog, dataSaver ->
+        sourceQuery,
+    ) { sources, dialog, dataSaver, query ->
+        val items = toSourceUiModels(sources.filterSourcesByName(query) { it.name })
         State(
             dialog = dialog,
             isLoading = false,
             items = items.toImmutableList(),
             dataSaverEnabled = dataSaver != SourcePreferences.DataSaver.NONE,
+            searchQuery = query,
         )
     }
         .flowOn(Dispatchers.IO)
@@ -124,6 +127,10 @@ class AnimeSourcesViewModel(
 
     fun showSourceDialog(source: AnimeSource) {
         dialog.update { Dialog(source) }
+    }
+
+    fun setSearchQuery(query: String?) {
+        sourceQuery.value = query
     }
 
     fun closeDialog() {

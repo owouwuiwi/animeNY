@@ -51,13 +51,14 @@ fun MigrateAnimeSourceScreen(
     onClickItem: (AnimeSource) -> Unit,
     onToggleSortingDirection: () -> Unit,
     onToggleSortingMode: () -> Unit,
+    hasSearchQuery: Boolean = false,
 ) {
     val context = LocalContext.current
     when {
         state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
 
         state.isEmpty -> EmptyScreen(
-            stringRes = MR.strings.information_empty_library,
+            stringRes = if (hasSearchQuery) MR.strings.no_results_found else MR.strings.information_empty_library,
             modifier = Modifier.padding(contentPadding),
         )
 
