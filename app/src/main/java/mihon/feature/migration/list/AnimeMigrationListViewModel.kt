@@ -29,6 +29,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -130,10 +131,14 @@ class AnimeMigrationListViewModel(
 
                     if (result != null && result.first.thumbnailUrl == null) {
                         try {
-                            val newAnime = sourceManager.getOrStub(
-                                result.first.source,
-                            ).getAnimeDetails(result.first.toSAnime())
-                            updateAnime.awaitUpdateFromSource(result.first, newAnime, true)
+                            val newAnime = compatibleMigrationSourceCall(result.first.source) {
+                                sourceManager.getOrStub(result.first.source).getAnimeDetails(result.first.toSAnime())
+                            }
+                            if (newAnime != null) {
+                                updateAnime.awaitUpdateFromSource(result.first, newAnime, true)
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
                         } catch (_: Exception) {
                         }
                     }
@@ -156,9 +161,9 @@ class AnimeMigrationListViewModel(
         val sources = sourceIds
             .mapNotNull { sourceManager.get(it) as? AnimeCatalogueSource }
 
-        return if (prioritizeByEpisodes) {
+        return if (prioritizeByEpisodes) coroutineScope {
             val results = sources.map { source ->
-                viewModelScope.async { searchSource(anime, source, deepSearchMode) }
+                async { searchSource(anime, source, deepSearchMode) }
             }
                 .awaitAll()
                 .filterNotNull()
@@ -179,18 +184,24 @@ class AnimeMigrationListViewModel(
         deepSearchMode: Boolean,
     ): Pair<Anime, EpisodeInfo>? {
         return try {
-            val searchResult = if (deepSearchMode) {
-                smartSearchEngine.deepSearch(source, anime.title)
-            } else {
-                smartSearchEngine.regularSearch(source, anime.title)
-            }
+            val searchResult = compatibleMigrationSourceCall(source.id) {
+                if (deepSearchMode) {
+                    smartSearchEngine.deepSearch(source, anime.title)
+                } else {
+                    smartSearchEngine.regularSearch(source, anime.title)
+                }
+            } ?: return null
 
-            if (searchResult == null || (searchResult.url == anime.url && source.id == anime.source)) return null
+            if (searchResult.url == anime.url && source.id == anime.source) return null
 
             val localAnime = networkToLocalAnime.await(searchResult)
             try {
-                val episodes = source.getEpisodeList(localAnime.toSAnime())
+                val episodes = compatibleMigrationSourceCall(source.id) {
+                    source.getEpisodeList(localAnime.toSAnime())
+                } ?: return null
                 syncEpisodesWithSource.await(episodes, localAnime, source)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR, e)
             }

@@ -25,6 +25,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -126,10 +127,14 @@ class MangaMigrationListViewModel(
 
                     if (result != null && result.first.thumbnailUrl == null) {
                         try {
-                            val newManga = sourceManager.getOrStub(
-                                result.first.source,
-                            ).getMangaDetails(result.first.toSManga())
-                            updateManga.awaitUpdateFromSource(result.first, newManga, true)
+                            val newManga = compatibleMigrationSourceCall(result.first.source) {
+                                sourceManager.getOrStub(result.first.source).getMangaDetails(result.first.toSManga())
+                            }
+                            if (newManga != null) {
+                                updateManga.awaitUpdateFromSource(result.first, newManga, true)
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
                         } catch (_: Exception) {
                         }
                     }
@@ -152,9 +157,9 @@ class MangaMigrationListViewModel(
         val sources = sourceIds
             .mapNotNull { sourceManager.get(it) as? CatalogueSource }
 
-        return if (prioritizeByChapters) {
+        return if (prioritizeByChapters) coroutineScope {
             val results = sources.map { source ->
-                viewModelScope.async { searchSource(manga, source, deepSearchMode) }
+                async { searchSource(manga, source, deepSearchMode) }
             }
                 .awaitAll()
                 .filterNotNull()
@@ -175,18 +180,24 @@ class MangaMigrationListViewModel(
         deepSearchMode: Boolean,
     ): Pair<Manga, ChapterInfo>? {
         return try {
-            val searchResult = if (deepSearchMode) {
-                smartSearchEngine.deepSearch(source, manga.title)
-            } else {
-                smartSearchEngine.regularSearch(source, manga.title)
-            }
+            val searchResult = compatibleMigrationSourceCall(source.id) {
+                if (deepSearchMode) {
+                    smartSearchEngine.deepSearch(source, manga.title)
+                } else {
+                    smartSearchEngine.regularSearch(source, manga.title)
+                }
+            } ?: return null
 
-            if (searchResult == null || (searchResult.url == manga.url && source.id == manga.source)) return null
+            if (searchResult.url == manga.url && source.id == manga.source) return null
 
             val localManga = networkToLocalManga.await(searchResult)
             try {
-                val chapters = source.getChapterList(localManga.toSManga())
+                val chapters = compatibleMigrationSourceCall(source.id) {
+                    source.getChapterList(localManga.toSManga())
+                } ?: return null
                 syncChaptersWithSource.await(chapters, localManga, source)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR, e)
             }
