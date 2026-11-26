@@ -87,8 +87,9 @@ import eu.kanade.presentation.reader.components.ChapterNavigatorType
 import eu.kanade.presentation.reader.settings.ReaderSettingsDialog
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.common.Constants
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
+import eu.kanade.tachiyomi.data.connections.discord.DISCORD_PRESENCE_AVAILABLE
 import eu.kanade.tachiyomi.data.connections.discord.ReaderData
+import eu.kanade.tachiyomi.data.connections.discord.discordPresence
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.source.manga.isNsfw
@@ -1246,10 +1247,10 @@ class ReaderActivity : BaseActivity() {
 
     // AM (DISCORD) -->
     private fun updateDiscordRPC(exitingReader: Boolean) {
-        if (connectionsPreferences.enableDiscordRPC().get()) {
+        if (DISCORD_PRESENCE_AVAILABLE && connectionsPreferences.enableDiscordRPC().get()) {
             viewModel.viewModelScope.launchIO {
                 if (!exitingReader) {
-                    DiscordRPCService.setReaderActivity(
+                    discordPresence.setReaderActivity(
                         context = this@ReaderActivity,
                         ReaderData(
                             incognitoMode = viewModel.currentSource?.isNsfw() == true || viewModel.incognitoMode,
@@ -1267,8 +1268,8 @@ class ReaderActivity : BaseActivity() {
                         ),
                     )
                 } else {
-                    val lastUsedScreen = DiscordRPCService.lastUsedScreen
-                    DiscordRPCService.setMangaScreen(this@ReaderActivity, lastUsedScreen)
+                    val lastUsedScreen = discordPresence.lastUsedScreen
+                    discordPresence.setMangaScreen(this@ReaderActivity, lastUsedScreen)
                 }
             }
         }

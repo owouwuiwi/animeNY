@@ -20,8 +20,8 @@ import eu.kanade.core.preference.asState
 import eu.kanade.presentation.components.TabbedScreen
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
+import eu.kanade.tachiyomi.data.connections.discord.discordPresence
 import eu.kanade.tachiyomi.ui.browse.anime.extension.AnimeExtensionsViewModel
 import eu.kanade.tachiyomi.ui.browse.anime.extension.animeExtensionsTab
 import eu.kanade.tachiyomi.ui.browse.anime.migration.sources.migrateAnimeSourceTab
@@ -184,7 +184,7 @@ data object BrowseTab : Tab {
         LaunchedEffect(Unit) {
             (context as? MainActivity)?.ready = true
             // AM (DISCORD) -->
-            DiscordRPCService.setScreen(context, DiscordScreen.BROWSE)
+            discordPresence.setScreen(context, DiscordScreen.BROWSE)
             // <-- AM (DISCORD)
         }
     }

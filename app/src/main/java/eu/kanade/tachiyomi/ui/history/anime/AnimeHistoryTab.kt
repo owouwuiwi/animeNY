@@ -20,8 +20,8 @@ import eu.kanade.presentation.entries.anime.DuplicateAnimeDialog
 import eu.kanade.presentation.history.HistoryDeleteAllDialog
 import eu.kanade.presentation.history.HistoryDeleteDialog
 import eu.kanade.presentation.history.anime.AnimeHistoryScreen
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
+import eu.kanade.tachiyomi.data.connections.discord.discordPresence
 import eu.kanade.tachiyomi.ui.browse.anime.migration.anime.season.MigrateSeasonSelectScreen
 import eu.kanade.tachiyomi.ui.browse.anime.migration.search.MigrateAnimeDialog
 import eu.kanade.tachiyomi.ui.browse.anime.migration.search.MigrateAnimeDialogScreenModel
@@ -170,7 +170,7 @@ fun Screen.animeHistoryTab(
 
             LaunchedEffect(Unit) {
                 // AM (DISCORD) -->
-                DiscordRPCService.setScreen(context, DiscordScreen.HISTORY)
+                discordPresence.setScreen(context, DiscordScreen.HISTORY)
                 // <-- AM (DISCORD)
                 viewModel.events.collectLatest { e ->
                     when (e) {

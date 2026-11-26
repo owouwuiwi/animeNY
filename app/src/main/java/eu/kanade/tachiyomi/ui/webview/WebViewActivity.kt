@@ -14,8 +14,8 @@ import dev.zacsweers.metro.Inject
 import eu.kanade.presentation.webview.WebViewScreenContent
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
+import eu.kanade.tachiyomi.data.connections.discord.discordPresence
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
@@ -106,8 +106,8 @@ class WebViewActivity : BaseActivity() {
         }
         // AM (DISCORD) -->
         lifecycleScope.launchIO {
-            DiscordRPCService.setAnimeScreen(this@WebViewActivity, DiscordScreen.WEBVIEW)
-            DiscordRPCService.setMangaScreen(this@WebViewActivity, DiscordScreen.WEBVIEW)
+            discordPresence.setAnimeScreen(this@WebViewActivity, DiscordScreen.WEBVIEW)
+            discordPresence.setMangaScreen(this@WebViewActivity, DiscordScreen.WEBVIEW)
         }
         // <-- AM (DISCORD)
     }
@@ -115,8 +115,8 @@ class WebViewActivity : BaseActivity() {
     // AM (DISCORD) -->
     override fun onDestroy() {
         lifecycleScope.launchIO {
-            DiscordRPCService.setAnimeScreen(this@WebViewActivity, DiscordRPCService.lastUsedScreen)
-            DiscordRPCService.setMangaScreen(this@WebViewActivity, DiscordRPCService.lastUsedScreen)
+            discordPresence.setAnimeScreen(this@WebViewActivity, discordPresence.lastUsedScreen)
+            discordPresence.setMangaScreen(this@WebViewActivity, discordPresence.lastUsedScreen)
         }
         super.onDestroy()
     }

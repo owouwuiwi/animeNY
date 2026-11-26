@@ -18,8 +18,9 @@ import eu.kanade.domain.track.service.TrackPreferences
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
+import eu.kanade.tachiyomi.data.connections.discord.DISCORD_PRESENCE_AVAILABLE
 import eu.kanade.tachiyomi.data.connections.discord.PlayerData
+import eu.kanade.tachiyomi.data.connections.discord.discordPresence
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.track.AnimeTracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
@@ -116,21 +117,20 @@ class ExternalIntents {
 
         val pkgName = playerPreferences.externalPlayerPreference().get()
 
-        // AM (DISCORD) -->
-        withIOContext {
-            DiscordRPCService.setPlayerActivity(
-                context = context,
-                playerData = PlayerData(
-                    incognitoMode = source.isNsfw() || basePreferences.incognitoMode.get(),
-                    animeId = anime.id,
-                    // AM (CU)>
-                    animeTitle = anime.ogTitle,
-                    episodeNumber = episode.episodeNumber.toString(),
-                    thumbnailUrl = anime.thumbnailUrl,
-                ),
-            )
+        if (DISCORD_PRESENCE_AVAILABLE) {
+            withIOContext {
+                discordPresence.setPlayerActivity(
+                    context = context,
+                    playerData = PlayerData(
+                        incognitoMode = source.isNsfw() || basePreferences.incognitoMode.get(),
+                        animeId = anime.id,
+                        animeTitle = anime.ogTitle,
+                        episodeNumber = episode.episodeNumber.toString(),
+                        thumbnailUrl = anime.thumbnailUrl,
+                    ),
+                )
+            }
         }
-        // <-- AM (DISCORD)
 
         return if (videoUrl.toString().startsWith("magnet:")) {
             torrentIntentForPackage(context, videoUrl, video)
@@ -472,7 +472,7 @@ class ExternalIntents {
         // Update the episode's progress and history
         scope.launchIO {
             // AM (DISCORD) -->
-            DiscordRPCService.setAnimeScreen(context, DiscordRPCService.lastUsedScreen)
+            discordPresence.setAnimeScreen(context, discordPresence.lastUsedScreen)
             // <-- AM (DISCORD)
             if (cause == "playback_completion" || (currentPosition == duration && duration == 0L)) {
                 saveEpisodeProgress(

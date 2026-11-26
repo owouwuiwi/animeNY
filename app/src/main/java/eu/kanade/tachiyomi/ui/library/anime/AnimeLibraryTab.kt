@@ -40,8 +40,8 @@ import eu.kanade.presentation.library.components.LibraryToolbar
 import eu.kanade.presentation.more.onboarding.GETTING_STARTED_URL
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
+import eu.kanade.tachiyomi.data.connections.discord.discordPresence
 import eu.kanade.tachiyomi.data.library.anime.AnimeLibraryUpdateJob
 import eu.kanade.tachiyomi.data.sync.SyncDataJob
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.GlobalAnimeSearchScreen
@@ -350,7 +350,7 @@ data object AnimeLibraryTab : Tab {
             if (!state.isLoading) {
                 (context as? MainActivity)?.ready = true
                 // AM (DISCORD) -->
-                DiscordRPCService.setScreen(context, DiscordScreen.LIBRARY)
+                discordPresence.setScreen(context, DiscordScreen.LIBRARY)
                 // <-- AM (DISCORD)
             }
         }
@@ -368,7 +368,7 @@ data object AnimeLibraryTab : Tab {
             if (!state.isLoading) {
                 (context as? MainActivity)?.ready = true
                 // AM (DISCORD) -->
-                DiscordRPCService.setScreen(context, DiscordScreen.LIBRARY)
+                discordPresence.setScreen(context, DiscordScreen.LIBRARY)
                 // <-- AM (DISCORD)
             }
         }

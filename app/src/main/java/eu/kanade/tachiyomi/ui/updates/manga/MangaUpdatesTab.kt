@@ -24,8 +24,8 @@ import eu.kanade.presentation.components.TabContent
 import eu.kanade.presentation.updates.UpdatesDeleteConfirmationDialog
 import eu.kanade.presentation.updates.UpdatesFilterDialog
 import eu.kanade.presentation.updates.manga.MangaUpdateScreen
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
+import eu.kanade.tachiyomi.data.connections.discord.discordPresence
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
@@ -110,7 +110,7 @@ fun Screen.mangaUpdatesTab(
 
             LaunchedEffect(Unit) {
                 // AM (DISCORD) -->
-                DiscordRPCService.setMangaScreen(context, DiscordScreen.UPDATES)
+                discordPresence.setMangaScreen(context, DiscordScreen.UPDATES)
                 // <-- AM (DISCORD)
                 viewModel.events.collectLatest { event ->
                     when (event) {

@@ -33,7 +33,9 @@ android {
         versionName = "0.21.2.0"
 
         buildConfigField("boolean", "UPDATER_ENABLED", "${Config.enableUpdater}")
-        buildConfigField("Long", "DISCORD_APP_ID", "1173423931865170070L")
+        if (!isFoss) {
+            buildConfigField("Long", "DISCORD_APP_ID", "1173423931865170070L")
+        }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -70,6 +72,9 @@ android {
             isShrinkResources = true
 
             proguardFiles("proguard-android-optimize.txt", "proguard-rules.pro")
+            if (!isFoss) {
+                proguardFile("src/standard/proguard-rules.pro")
+            }
         }
 
         val commonMatchingFallbacks = listOf(release.name)
@@ -101,6 +106,7 @@ android {
         getByName("main").kotlin.srcDir(if (isFoss) "src/foss/kotlin" else "src/standard/kotlin")
         if (!isFoss) {
             getByName("main").res.srcDir("src/standard/res")
+            getByName("main").jniLibs.srcDir("src/standard/jniLibs")
             buildTypes.names.forEach { buildType ->
                 getByName(buildType).manifest.srcFile("src/standard/AndroidManifest.xml")
             }
@@ -174,12 +180,14 @@ android {
         viewBinding = true
         buildConfig = true
         aidl = true
-        prefab = true
+        prefab = !isFoss
     }
 
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
+    if (!isFoss) {
+        externalNativeBuild {
+            cmake {
+                path = file("src/standard/cpp/CMakeLists.txt")
+            }
         }
     }
 
@@ -365,11 +373,10 @@ dependencies {
     implementation(libs.torrentserver)
     if (!isFoss) {
         implementation(libs.bundles.cast)
+        implementation(files("libs/discord_partner_sdk.aar"))
     }
     // nanohttpd server
     implementation(libs.nanohttpd)
-    // Discord Partner SDK
-    implementation(files("libs/discord_partner_sdk.aar"))
 
     // GraphQL generation
     implementation(libs.apollo)

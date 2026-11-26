@@ -28,8 +28,8 @@ import eu.kanade.presentation.more.MoreScreen
 import eu.kanade.presentation.util.Tab
 import eu.kanade.presentation.util.rememberAnimatedVectorPainter
 import eu.kanade.tachiyomi.R
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
+import eu.kanade.tachiyomi.data.connections.discord.discordPresence
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
 import eu.kanade.tachiyomi.ui.category.CategoriesTab
@@ -102,7 +102,7 @@ data object MoreTab : Tab {
         LaunchedEffect(Unit) {
             (context as? MainActivity)?.ready = true
             // AM (DISCORD) -->
-            DiscordRPCService.setScreen(context, DiscordScreen.MORE)
+            discordPresence.setScreen(context, DiscordScreen.MORE)
             // <-- AM (DISCORD)
         }
     }

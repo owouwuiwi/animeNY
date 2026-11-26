@@ -22,5 +22,29 @@
             android:name=".util.LocalHttpServerService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <activity
+            android:name=".ui.setting.connections.DiscordLoginActivity"
+            android:label="Discord Login"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:exported="false" />
+
+        <activity
+            android:name="com.discord.socialsdk.AuthenticationActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="discord-1173423931865170070" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".data.connections.discord.DiscordRPCService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

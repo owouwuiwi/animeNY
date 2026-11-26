@@ -102,7 +102,7 @@ import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.coil.MangaCoverKeyer
 import eu.kanade.tachiyomi.data.coil.MangaKeyer
 import eu.kanade.tachiyomi.data.connections.ConnectionsManager
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
+import eu.kanade.tachiyomi.data.connections.discord.discordPresence
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadProvider
@@ -476,7 +476,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         }
 
         // AM (DISCORD) -->
-        DiscordRPCService.start(applicationContext)
+        discordPresence.start(applicationContext)
         // <-- AM (DISCORD)
     }
 
@@ -489,7 +489,7 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
         }
 
         // AM (DISCORD) -->
-        DiscordRPCService.stop(applicationContext)
+        discordPresence.stop(applicationContext)
         // <-- AM (DISCORD)
     }
 

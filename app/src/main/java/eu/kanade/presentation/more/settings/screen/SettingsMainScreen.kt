@@ -177,7 +177,7 @@ object SettingsMainScreen : Screen() {
         val screen: VoyagerScreen,
     )
 
-    private val items = listOf(
+    private val items = listOfNotNull(
         Item(
             titleRes = MR.strings.pref_category_appearance,
             subtitleRes = MR.strings.pref_appearance_summary,
@@ -214,14 +214,14 @@ object SettingsMainScreen : Screen() {
             icon = MaterialSymbols.Rounded.Sync,
             screen = SettingsTrackingScreen,
         ),
-        // AM (CONNECTIONS) -->
-        Item(
-            titleRes = TLMR.strings.pref_category_connections,
-            subtitleRes = TLMR.strings.pref_connections_summary,
-            icon = Icons.Outlined.Link,
-            screen = SettingsConnectionsScreen,
-        ),
-        // <-- AM (CONNECTIONS)
+        connectionsSettingsScreen?.let {
+            Item(
+                titleRes = TLMR.strings.pref_category_connections,
+                subtitleRes = TLMR.strings.pref_connections_summary,
+                icon = Icons.Outlined.Link,
+                screen = it,
+            )
+        },
         Item(
             titleRes = MR.strings.browse,
             subtitleRes = MR.strings.pref_browse_summary,

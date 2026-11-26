@@ -6,6 +6,7 @@ import androidx.core.app.NotificationManagerCompat.IMPORTANCE_DEFAULT
 import androidx.core.app.NotificationManagerCompat.IMPORTANCE_HIGH
 import androidx.core.app.NotificationManagerCompat.IMPORTANCE_LOW
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.connections.discord.DISCORD_PRESENCE_AVAILABLE
 import eu.kanade.tachiyomi.data.connections.discord.RICH_PRESENCE_TAG
 import eu.kanade.tachiyomi.util.system.buildNotificationChannel
 import eu.kanade.tachiyomi.util.system.buildNotificationChannelGroup
@@ -144,7 +145,7 @@ object Notifications {
         )
 
         notificationManager.createNotificationChannelsCompat(
-            listOf(
+            listOfNotNull(
                 buildNotificationChannel(CHANNEL_COMMON, IMPORTANCE_LOW) {
                     setName(context.stringResource(MR.strings.channel_common))
                 },
@@ -189,11 +190,13 @@ object Notifications {
                     setName(context.stringResource(AYMR.strings.pref_category_torrentserver))
                     setShowBadge(false)
                 },
-                // AM (DISCORD) -->
-                buildNotificationChannel(CHANNEL_DISCORD_RPC, IMPORTANCE_LOW) {
-                    setName(context.getString(R.string.pref_discord_rpc))
+                if (DISCORD_PRESENCE_AVAILABLE) {
+                    buildNotificationChannel(CHANNEL_DISCORD_RPC, IMPORTANCE_LOW) {
+                        setName(context.getString(R.string.pref_discord_rpc))
+                    }
+                } else {
+                    null
                 },
-                // <-- AM (DISCORD)
                 buildNotificationChannel(CHANNEL_HTTP_SERVER, IMPORTANCE_LOW) {
                     setName(context.stringResource(AYMR.strings.pref_http_server_name))
                     setShowBadge(false)

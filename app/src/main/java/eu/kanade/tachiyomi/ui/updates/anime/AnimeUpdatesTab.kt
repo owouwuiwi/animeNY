@@ -22,8 +22,8 @@ import eu.kanade.presentation.components.TabContent
 import eu.kanade.presentation.entries.anime.EpisodeOptionsDialogScreen
 import eu.kanade.presentation.updates.UpdatesDeleteConfirmationDialog
 import eu.kanade.presentation.updates.anime.AnimeUpdateScreen
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
 import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
+import eu.kanade.tachiyomi.data.connections.discord.discordPresence
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
@@ -122,7 +122,7 @@ fun Screen.animeUpdatesTab(
 
             LaunchedEffect(Unit) {
                 // AM (DISCORD) -->
-                DiscordRPCService.setScreen(context, DiscordScreen.UPDATES)
+                discordPresence.setScreen(context, DiscordScreen.UPDATES)
                 // <-- AM (DISCORD)
                 viewModel.events.collectLatest { event ->
                     when (event) {

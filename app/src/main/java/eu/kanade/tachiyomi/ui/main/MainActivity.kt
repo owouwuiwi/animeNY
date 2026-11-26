@@ -74,7 +74,6 @@ import cafe.adriel.voyager.navigator.NavigatorDisposeBehavior
 import cafe.adriel.voyager.navigator.currentOrThrow
 import dev.zacsweers.metro.Inject
 import eu.kanade.domain.base.BasePreferences
-import eu.kanade.domain.connections.service.ConnectionsPreferences
 import eu.kanade.domain.source.anime.interactor.GetAnimeIncognitoState
 import eu.kanade.domain.source.manga.interactor.GetMangaIncognitoState
 import eu.kanade.presentation.components.AdaptiveSheet
@@ -92,9 +91,7 @@ import eu.kanade.tachiyomi.animesource.model.Hoster
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.core.common.Constants
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRpcManager
-import eu.kanade.tachiyomi.data.connections.discord.DiscordScreen
+import eu.kanade.tachiyomi.data.connections.discord.discordPresence
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadCache
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
@@ -202,7 +199,6 @@ class MainActivity : BaseActivity() {
     private var navigator: Navigator? = null
 
     // AM (CONNECTIONS) -->
-    @Inject lateinit var connectionsPreferences: ConnectionsPreferences
     // <-- AM (CONNECTIONS)
 
     // AM -->
@@ -219,9 +215,7 @@ class MainActivity : BaseActivity() {
 
         super.onCreate(savedInstanceState)
 
-        try {
-            com.discord.socialsdk.DiscordSocialSdkInit.setEngineActivity(this)
-        } catch (_: Exception) {}
+        discordPresence.setEngineActivity(this)
 
         lifecycleScope.launch {
             didMigration.value = Migrator.awaitAndRelease()
@@ -237,10 +231,7 @@ class MainActivity : BaseActivity() {
             return
         }
 
-        // AM (DISCORD) -->
-        // Initialize Discord RPC Manager early so native library is loaded
-        DiscordRpcManager.init(applicationContext)
-        // <-- AM (DISCORD)
+        discordPresence.initialize(applicationContext)
 
         setComposeContent {
             val appMigrating by isAppMigrating.collectAsState()
@@ -376,26 +367,7 @@ class MainActivity : BaseActivity() {
                         }
                         .launchIn(this)
 
-                    // AM (DISCORD) -->
-                    connectionsPreferences.enableDiscordRPC().changes()
-                        .drop(1)
-                        .onEach {
-                            if (it) {
-                                DiscordRPCService.start(this@MainActivity.applicationContext)
-                            } else {
-                                DiscordRPCService.stop(this@MainActivity.applicationContext, 0L)
-                            }
-                        }.launchIn(this)
-
-                    connectionsPreferences.discordRPCStatus().changes()
-                        .drop(1)
-                        .onEach {
-                            DiscordRPCService.stop(this@MainActivity.applicationContext, 0L)
-                            DiscordRPCService.start(this@MainActivity.applicationContext)
-                            DiscordRPCService.setAnimeScreen(this@MainActivity, DiscordScreen.MORE)
-                            DiscordRPCService.setMangaScreen(this@MainActivity, DiscordScreen.MORE)
-                        }.launchIn(this)
-                    // <-- AM (DISCORD)
+                    discordPresence.observePreferences(this@MainActivity, this)
                 }
 
                 HandleOnNewIntent(context = context, navigator = navigator)
@@ -849,9 +821,7 @@ class MainActivity : BaseActivity() {
         mpvConfig.copyFiles()
     }
     override fun onDestroy() {
-        try {
-            com.discord.socialsdk.DiscordSocialSdkInit.setEngineActivity(null)
-        } catch (_: Exception) {}
+        discordPresence.setEngineActivity(null)
         super.onDestroy()
     }
 

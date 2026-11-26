@@ -331,15 +331,13 @@ private val playerSettingScreens: List<SearchableSettings> = listOf(
     PlayerSettingsAdvancedScreen,
 )
 
-private val settingScreens: List<SearchableSettings> = listOf(
+private val settingScreens: List<SearchableSettings> = listOfNotNull(
     SettingsAppearanceScreen,
     SettingsLibraryScreen,
     SettingsReaderScreen,
     SettingsDownloadScreen,
     SettingsTrackingScreen,
-    // AM (CONNECTIONS) -->
-    SettingsConnectionsScreen,
-    // <-- AM (CONNECTIONS)
+    connectionsSettingsScreen,
     SettingsBrowseScreen,
     SettingsDataScreen,
     SettingsSecurityScreen,

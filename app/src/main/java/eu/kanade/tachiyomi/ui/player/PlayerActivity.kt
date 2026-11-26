@@ -70,8 +70,9 @@ import eu.kanade.tachiyomi.animesource.model.HttpServer
 import eu.kanade.tachiyomi.animesource.model.SerializableHoster.Companion.serialize
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
-import eu.kanade.tachiyomi.data.connections.discord.DiscordRPCService
+import eu.kanade.tachiyomi.data.connections.discord.DISCORD_PRESENCE_AVAILABLE
 import eu.kanade.tachiyomi.data.connections.discord.PlayerData
+import eu.kanade.tachiyomi.data.connections.discord.discordPresence
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
@@ -1590,7 +1591,7 @@ class PlayerActivity : BaseActivity() {
 
     // AM (DISCORD) -->
     private fun updateDiscordRPC(exitingPlayer: Boolean) {
-        if (!connectionsPreferences.enableDiscordRPC().get()) return
+        if (!DISCORD_PRESENCE_AVAILABLE || !connectionsPreferences.enableDiscordRPC().get()) return
 
         viewModel.viewModelScope.launchIO {
             try {
@@ -1610,7 +1611,7 @@ class PlayerActivity : BaseActivity() {
                     val anime = viewModel.currentAnime.value ?: return@launchIO
                     val episode = viewModel.currentEpisode.value ?: return@launchIO
 
-                    DiscordRPCService.setPlayerActivity(
+                    discordPresence.setPlayerActivity(
                         context = this@PlayerActivity,
                         PlayerData(
                             incognitoMode = viewModel.currentSource.value?.isNsfw() == true || viewModel.incognitoMode,
@@ -1631,8 +1632,8 @@ class PlayerActivity : BaseActivity() {
                         ),
                     )
                 } else {
-                    val lastUsedScreen = DiscordRPCService.lastUsedScreen
-                    DiscordRPCService.setAnimeScreen(this@PlayerActivity, lastUsedScreen)
+                    val lastUsedScreen = discordPresence.lastUsedScreen
+                    discordPresence.setAnimeScreen(this@PlayerActivity, lastUsedScreen)
                 }
             } catch (e: Exception) {
                 logcat(LogPriority.ERROR) { "Error updating Discord RPC: ${e.message}" }

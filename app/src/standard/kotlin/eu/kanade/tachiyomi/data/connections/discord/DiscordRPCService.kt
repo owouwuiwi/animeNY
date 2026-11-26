@@ -4,6 +4,7 @@
 
 package eu.kanade.tachiyomi.data.connections.discord
 
+import android.app.Activity
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -13,6 +14,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import androidx.compose.ui.util.fastAny
+import com.discord.socialsdk.DiscordSocialSdkInit
 import eu.kanade.domain.connections.service.ConnectionsPreferences
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.connections.ConnectionsManager
@@ -22,6 +24,9 @@ import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.util.system.notificationBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
@@ -123,14 +128,46 @@ class DiscordRPCService : Service() {
         startForeground(Notifications.ID_DISCORD_RPC, builder.build())
     }
 
-    companion object {
+    internal companion object : DiscordPresence {
 
         private val connectionsPreferences: ConnectionsPreferences by injectLazy()
 
         private val handler = Handler(Looper.getMainLooper())
         private val playerPreferences: PlayerPreferences by injectLazy()
 
-        fun start(context: Context) {
+        override fun setEngineActivity(activity: Activity?) {
+            try {
+                DiscordSocialSdkInit.setEngineActivity(activity)
+            } catch (_: Exception) {
+                // Some devices do not support the SDK.
+            }
+        }
+
+        override fun initialize(context: Context) {
+            DiscordRpcManager.init(context)
+        }
+
+        override fun observePreferences(context: Context, scope: CoroutineScope) {
+            val applicationContext = context.applicationContext
+            connectionsPreferences.enableDiscordRPC().changes()
+                .drop(1)
+                .onEach { enabled ->
+                    if (enabled) start(applicationContext) else stop(applicationContext, delay = 0L)
+                }
+                .launchIn(scope)
+
+            connectionsPreferences.discordRPCStatus().changes()
+                .drop(1)
+                .onEach {
+                    stop(applicationContext, delay = 0L)
+                    start(applicationContext)
+                    setAnimeScreen(context, DiscordScreen.MORE)
+                    setMangaScreen(context, DiscordScreen.MORE)
+                }
+                .launchIn(scope)
+        }
+
+        override fun start(context: Context) {
             handler.removeCallbacksAndMessages(null)
             if (connectionsPreferences.enableDiscordRPC().get()) {
                 since = System.currentTimeMillis()
@@ -138,7 +175,7 @@ class DiscordRPCService : Service() {
             }
         }
 
-        fun stop(context: Context, delay: Long = 30000L) {
+        override fun stop(context: Context, delay: Long) {
             handler.postDelayed(
                 { context.stopService(Intent(context, DiscordRPCService::class.java)) },
                 delay,
@@ -147,8 +184,8 @@ class DiscordRPCService : Service() {
 
         private var since = 0L
 
-        internal var lastUsedScreen = DiscordScreen.APP
-            set(value) {
+        override var lastUsedScreen = DiscordScreen.APP
+            private set(value) {
                 field = if ((
                         value == DiscordScreen.VIDEO ||
                             value == DiscordScreen.MANGA
@@ -191,7 +228,7 @@ class DiscordRPCService : Service() {
         /**
          * Sets the appropriate screen (anime or manga) based on the last used screen context
          */
-        internal suspend fun setScreen(context: Context, discordScreen: DiscordScreen) {
+        override suspend fun setScreen(context: Context, discordScreen: DiscordScreen) {
             if (!connectionsPreferences.enableDiscordRPC().get()) return
             ensureTokenValid()
             currentScreen = discordScreen
@@ -218,10 +255,10 @@ class DiscordRPCService : Service() {
             }
         }
 
-        internal suspend fun setAnimeScreen(
+        override suspend fun setAnimeScreen(
             context: Context,
             discordScreen: DiscordScreen,
-            playerData: PlayerData = PlayerData(),
+            playerData: PlayerData,
         ) {
             if (!connectionsPreferences.enableDiscordRPC().get()) return
             ensureTokenValid()
@@ -313,10 +350,10 @@ class DiscordRPCService : Service() {
             )
         }
 
-        internal suspend fun setMangaScreen(
+        override suspend fun setMangaScreen(
             context: Context,
             discordScreen: DiscordScreen,
-            readerData: ReaderData = ReaderData(),
+            readerData: ReaderData,
         ) {
             if (!connectionsPreferences.enableDiscordRPC().get()) return
             ensureTokenValid()
@@ -378,9 +415,9 @@ class DiscordRPCService : Service() {
         }
 
         @Suppress("SwallowedException", "TooGenericExceptionCaught", "CyclomaticComplexMethod")
-        internal suspend fun setPlayerActivity(
+        override suspend fun setPlayerActivity(
             context: Context,
-            playerData: PlayerData = PlayerData(),
+            playerData: PlayerData,
         ) {
             if (!connectionsPreferences.enableDiscordRPC().get()) return
             if (playerData.animeId == null) return
@@ -430,9 +467,9 @@ class DiscordRPCService : Service() {
         }
 
         @Suppress("SwallowedException", "TooGenericExceptionCaught", "CyclomaticComplexMethod")
-        internal suspend fun setReaderActivity(
+        override suspend fun setReaderActivity(
             context: Context,
-            readerData: ReaderData = ReaderData(),
+            readerData: ReaderData,
         ) {
             if (!connectionsPreferences.enableDiscordRPC().get()) return
             if (readerData.mangaId == null) return

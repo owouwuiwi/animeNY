@@ -2,6 +2,7 @@
 package eu.kanade.presentation.more.settings.screen
 
 import android.content.Context
+import android.content.Intent
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -45,7 +46,7 @@ import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.connections.ConnectionsManager
 import eu.kanade.tachiyomi.data.connections.ConnectionsService
-import eu.kanade.tachiyomi.util.system.openDiscordLoginActivity
+import eu.kanade.tachiyomi.ui.setting.connections.DiscordLoginActivity
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.persistentListOf
 import tachiyomi.core.common.util.lang.launchIO
@@ -54,6 +55,8 @@ import tachiyomi.i18n.MR
 import tachiyomi.i18n.tail.TLMR
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+
+internal val connectionsSettingsScreen: SearchableSettings? get() = SettingsConnectionsScreen
 
 object SettingsConnectionsScreen : SearchableSettings {
 
@@ -228,6 +231,14 @@ object SettingsConnectionsScreen : SearchableSettings {
             withUIContext { context.toast(e.message.toString()) }
             false
         }
+    }
+}
+
+private fun Context.openDiscordLoginActivity() {
+    try {
+        startActivity(Intent(this, DiscordLoginActivity::class.java))
+    } catch (e: Exception) {
+        toast(e.message)
     }
 }
 
