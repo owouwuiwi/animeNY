@@ -34,6 +34,7 @@ import eu.kanade.tachiyomi.ui.browse.manga.migration.MangaMigrationFlags
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.update
 import logcat.LogPriority
+import mihon.domain.migration.usecases.MigrateEntryTags
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
 import tachiyomi.core.common.util.lang.launchIO
@@ -162,6 +163,7 @@ internal class MigrateMangaDialogScreenModel(
     private val getTracks: GetMangaTracks = Injekt.get(),
     private val insertTrack: InsertMangaTrack = Injekt.get(),
     private val coverCache: MangaCoverCache = Injekt.get(),
+    private val migrateEntryTags: MigrateEntryTags = Injekt.get(),
     private val preferenceStore: PreferenceStore = Injekt.get(),
 ) : StateScreenModel<MigrateMangaDialogScreenModel.State>(State()) {
 
@@ -274,6 +276,10 @@ internal class MigrateMangaDialogScreenModel(
         if (migrateCategories) {
             val categoryIds = getCategories.await(oldManga.id).map { it.id }
             setMangaCategories.await(newManga.id, categoryIds)
+        }
+
+        if (MangaMigrationFlags.hasTags(flags)) {
+            migrateEntryTags.copy(oldManga, newManga)
         }
 
         // Update track

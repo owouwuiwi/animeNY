@@ -42,6 +42,7 @@ import eu.kanade.tachiyomi.ui.browse.anime.migration.AnimeMigrationFlags
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.update
 import logcat.LogPriority
+import mihon.domain.migration.usecases.MigrateEntryTags
 import mihon.domain.source.interactor.UpdateAnimeFromRemote
 import tachiyomi.core.common.preference.Preference
 import tachiyomi.core.common.preference.PreferenceStore
@@ -210,6 +211,7 @@ internal class MigrateAnimeDialogScreenModel(
     private val getTracks: GetAnimeTracks = Injekt.get(),
     private val insertTrack: InsertAnimeTrack = Injekt.get(),
     private val coverCache: AnimeCoverCache = Injekt.get(),
+    private val migrateEntryTags: MigrateEntryTags = Injekt.get(),
     private val backgroundCache: AnimeBackgroundCache = Injekt.get(),
     private val preferenceStore: PreferenceStore = Injekt.get(),
     private val updateAnimeFromRemote: UpdateAnimeFromRemote = Injekt.get(),
@@ -315,6 +317,10 @@ internal class MigrateAnimeDialogScreenModel(
         if (migrateCategories) {
             val categoryIds = getCategories.await(oldAnime.id).map { it.id }
             setAnimeCategories.await(newAnime.id, categoryIds)
+        }
+
+        if (AnimeMigrationFlags.hasTags(flags)) {
+            migrateEntryTags.copy(oldAnime, newAnime)
         }
 
         // Update track

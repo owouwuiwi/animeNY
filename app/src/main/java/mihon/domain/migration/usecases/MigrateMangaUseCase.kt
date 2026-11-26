@@ -40,6 +40,7 @@ class MigrateMangaUseCase(
     private val setMangaCategories: SetMangaCategories,
     private val getTracks: GetMangaTracks,
     private val upsertTrack: UpsertMangaTrack,
+    private val migrateEntryTags: MigrateEntryTags,
     private val coverCache: MangaCoverCache,
 ) {
     private val enhancedServices by lazy { trackerManager.trackers.filterIsInstance<EnhancedMangaTracker>() }
@@ -102,6 +103,10 @@ class MigrateMangaUseCase(
             if (MigrationFlag.CATEGORY in flags) {
                 val categoryIds = getCategories.await(current.id).map { it.id }
                 setMangaCategories.await(target.id, categoryIds)
+            }
+
+            if (MigrationFlag.TAGS in flags) {
+                migrateEntryTags.copy(current, target)
             }
 
             // Update track

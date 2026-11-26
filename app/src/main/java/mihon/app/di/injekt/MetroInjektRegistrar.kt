@@ -102,6 +102,7 @@ import mihon.domain.extension.anime.interactor.GetAnimeExtensionStoreCountAsFlow
 import mihon.domain.extension.anime.interactor.GetAnimeExtensionStores
 import mihon.domain.extension.manga.interactor.GetMangaExtensionStoreCountAsFlow
 import mihon.domain.extension.manga.interactor.GetMangaExtensionStores
+import mihon.domain.migration.usecases.MigrateEntryTags
 import mihon.domain.source.interactor.UpdateAnimeFromRemote
 import nl.adaptivity.xmlutil.serialization.XML
 import tachiyomi.core.common.preference.PreferenceStore
@@ -411,6 +412,7 @@ class MetroInjektRegistrar(
         SetCustomMangaInfo::class.java to { graph.setCustomMangaInfo },
         GetCustomAnimeInfo::class.java to { graph.getCustomAnimeInfo },
         GetCustomMangaInfo::class.java to { graph.getCustomMangaInfo },
+        MigrateEntryTags::class.java to { graph.migrateEntryTags },
         GetAnimeWithEpisodesAndSeasons::class.java to { graph.getAnimeWithEpisodesAndSeasons },
         GetMangaWithChapters::class.java to { graph.getMangaWithChapters },
         AnimeFetchInterval::class.java to { graph.animeFetchInterval },

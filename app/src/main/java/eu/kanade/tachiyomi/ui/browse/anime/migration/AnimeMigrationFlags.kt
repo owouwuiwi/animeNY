@@ -7,6 +7,8 @@ import eu.kanade.tachiyomi.animesource.model.FetchType
 import eu.kanade.tachiyomi.data.cache.AnimeBackgroundCache
 import eu.kanade.tachiyomi.data.cache.AnimeCoverCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
+import mihon.domain.migration.models.MigrationFlag
+import mihon.feature.common.utils.getLabel
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
@@ -65,6 +67,10 @@ object AnimeMigrationFlags {
         return value and NOTES != 0
     }
 
+    fun hasTags(value: Int): Boolean {
+        return value and MigrationFlag.TAGS.flag != 0
+    }
+
     /** Returns information about applicable flags with default selections. */
     fun getFlags(anime: Anime?, defaultSelectedBitMap: Int): List<AnimeMigrationFlag> {
         val flags = mutableListOf<AnimeMigrationFlag>()
@@ -73,6 +79,7 @@ object AnimeMigrationFlags {
             flags += AnimeMigrationFlag.create(EPISODES, defaultSelectedBitMap, AYMR.strings.episodes)
         }
         flags += AnimeMigrationFlag.create(CATEGORIES, defaultSelectedBitMap, MR.strings.categories)
+        flags += AnimeMigrationFlag.create(MigrationFlag.TAGS.flag, defaultSelectedBitMap, MigrationFlag.TAGS.getLabel())
 
         if (anime != null) {
             if (anime.hasCustomCover(coverCache)) {

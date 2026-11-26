@@ -4,6 +4,8 @@ import dev.icerock.moko.resources.StringResource
 import eu.kanade.domain.entries.manga.model.hasCustomCover
 import eu.kanade.tachiyomi.data.cache.MangaCoverCache
 import eu.kanade.tachiyomi.data.download.manga.MangaDownloadCache
+import mihon.domain.migration.models.MigrationFlag
+import mihon.feature.common.utils.getLabel
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.i18n.MR
 import uy.kohesive.injekt.injectLazy
@@ -55,11 +57,16 @@ object MangaMigrationFlags {
         return value and NOTES != 0
     }
 
+    fun hasTags(value: Int): Boolean {
+        return value and MigrationFlag.TAGS.flag != 0
+    }
+
     /** Returns information about applicable flags with default selections. */
     fun getFlags(manga: Manga?, defaultSelectedBitMap: Int): List<MangaMigrationFlag> {
         val flags = mutableListOf<MangaMigrationFlag>()
         flags += MangaMigrationFlag.create(CHAPTERS, defaultSelectedBitMap, MR.strings.chapters)
         flags += MangaMigrationFlag.create(CATEGORIES, defaultSelectedBitMap, MR.strings.categories)
+        flags += MangaMigrationFlag.create(MigrationFlag.TAGS.flag, defaultSelectedBitMap, MigrationFlag.TAGS.getLabel())
 
         if (manga != null) {
             if (manga.hasCustomCover(coverCache)) {

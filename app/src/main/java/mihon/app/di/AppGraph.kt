@@ -126,6 +126,7 @@ import mihon.domain.extension.anime.interactor.GetAnimeExtensionStoreCountAsFlow
 import mihon.domain.extension.anime.interactor.GetAnimeExtensionStores
 import mihon.domain.extension.manga.interactor.GetMangaExtensionStoreCountAsFlow
 import mihon.domain.extension.manga.interactor.GetMangaExtensionStores
+import mihon.domain.migration.usecases.MigrateEntryTags
 import mihon.domain.source.interactor.UpdateAnimeFromRemote
 import nl.adaptivity.xmlutil.serialization.XML
 import tachiyomi.core.common.preference.PreferenceStore
@@ -450,6 +451,7 @@ interface AppGraph : ViewModelGraph {
     val setCustomMangaInfo: SetCustomMangaInfo
     val getCustomAnimeInfo: GetCustomAnimeInfo
     val getCustomMangaInfo: GetCustomMangaInfo
+    val migrateEntryTags: MigrateEntryTags
     val getAnimeWithEpisodesAndSeasons: GetAnimeWithEpisodesAndSeasons
     val getMangaWithChapters: GetMangaWithChapters
     val animeFetchInterval: AnimeFetchInterval
