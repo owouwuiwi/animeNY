@@ -159,6 +159,7 @@ fun MangaScreen(
     downloadProgressProvider: (Long) -> Int = { 0 },
     onTrackRepeat: (() -> Unit)? = null,
     onTrackerRecommendations: (() -> Unit)? = null,
+    onMergeEntries: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val onCopyTagToClipboard: (tag: String) -> Unit = {
@@ -201,6 +202,7 @@ fun MangaScreen(
             onMigrateClicked = onMigrateClicked,
             onTrackRepeat = onTrackRepeat,
             onTrackerRecommendations = onTrackerRecommendations,
+            onMergeEntries = onMergeEntries,
             onEditNotesClicked = onEditNotesClicked,
             // SY -->
             onEditInfoClicked = onEditInfoClicked,
@@ -251,6 +253,7 @@ fun MangaScreen(
             onMigrateClicked = onMigrateClicked,
             onTrackRepeat = onTrackRepeat,
             onTrackerRecommendations = onTrackerRecommendations,
+            onMergeEntries = onMergeEntries,
             onEditNotesClicked = onEditNotesClicked,
             // SY -->
             onEditInfoClicked = onEditInfoClicked,
@@ -341,6 +344,7 @@ private fun MangaScreenSmallImpl(
     downloadProgressProvider: (Long) -> Int = { 0 },
     onTrackRepeat: (() -> Unit)? = null,
     onTrackerRecommendations: (() -> Unit)? = null,
+    onMergeEntries: (() -> Unit)? = null,
 ) {
     val chapterListState = rememberLazyListState()
 
@@ -401,6 +405,7 @@ private fun MangaScreenSmallImpl(
                 onClickMigrate = onMigrateClicked,
                 onTrackRepeat = onTrackRepeat,
                 onTrackerRecommendations = onTrackerRecommendations,
+                onMergeEntries = onMergeEntries,
                 onClickEditNotes = onEditNotesClicked,
                 // SY -->
                 onClickEditInfo = onEditInfoClicked.takeIf { state.manga.favorite },
@@ -679,6 +684,7 @@ fun MangaScreenLargeImpl(
     downloadProgressProvider: (Long) -> Int = { 0 },
     onTrackRepeat: (() -> Unit)? = null,
     onTrackerRecommendations: (() -> Unit)? = null,
+    onMergeEntries: (() -> Unit)? = null,
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val density = LocalDensity.current
@@ -732,6 +738,7 @@ fun MangaScreenLargeImpl(
                 onClickMigrate = onMigrateClicked,
                 onTrackRepeat = onTrackRepeat,
                 onTrackerRecommendations = onTrackerRecommendations,
+                onMergeEntries = onMergeEntries,
                 onClickEditNotes = onEditNotesClicked,
                 onCancelActionMode = { onAllChapterSelected(false) },
                 // SY -->

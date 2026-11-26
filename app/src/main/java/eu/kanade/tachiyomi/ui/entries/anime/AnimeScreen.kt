@@ -74,6 +74,7 @@ import eu.kanade.tachiyomi.ui.category.CategoriesTab
 import eu.kanade.tachiyomi.ui.entries.TrackerRecommendationsScreen
 import eu.kanade.tachiyomi.ui.entries.anime.notes.AnimeNotesScreen
 import eu.kanade.tachiyomi.ui.entries.anime.track.AnimeTrackInfoDialogHomeScreen
+import eu.kanade.tachiyomi.ui.entries.merge.CombinedEntriesScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryTab
 import eu.kanade.tachiyomi.ui.main.MainActivity
@@ -93,6 +94,7 @@ import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.entries.anime.model.Anime
+import tachiyomi.domain.entries.merge.model.MergeMedia
 import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.items.episode.service.episodeTrackingNumbers
 import tachiyomi.domain.items.episode.service.seasonalEpisodeNumber
@@ -297,6 +299,11 @@ class AnimeScreen(
             onTrackerRecommendations = {
                 navigator.push(TrackerRecommendationsScreen(successState.anime.id, anime = true))
             },
+            onMergeEntries = {
+                navigator.push(
+                    CombinedEntriesScreen(MergeMedia.Anime, successState.anime.source, successState.anime.url),
+                )
+            }.takeIf { successState.anime.url.isNotBlank() && successState.anime.fetchType == FetchType.Episodes },
             onSearch = { query, global -> scope.launch { performSearch(navigator, query, global) } },
             onCoverClicked = viewModel::showImagesDialog,
             onShareClicked = {

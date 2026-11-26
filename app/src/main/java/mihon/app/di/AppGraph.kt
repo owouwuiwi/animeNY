@@ -189,6 +189,8 @@ import tachiyomi.domain.entries.manga.interactor.ResetMangaViewerFlags
 import tachiyomi.domain.entries.manga.interactor.SetCustomMangaInfo
 import tachiyomi.domain.entries.manga.interactor.SetMangaChapterFlags
 import tachiyomi.domain.entries.manga.interactor.UpdateMangaNotes
+import tachiyomi.domain.entries.merge.interactor.ObserveMergedEntry
+import tachiyomi.domain.entries.merge.repository.EntryMergeRepository
 import tachiyomi.domain.history.anime.interactor.GetAnimeHistory
 import tachiyomi.domain.history.anime.interactor.GetNextEpisodes
 import tachiyomi.domain.history.anime.interactor.RemoveAnimeHistory
@@ -346,6 +348,8 @@ interface AppGraph : ViewModelGraph {
     val getAnime: GetAnime
     val getMangaFavorites: GetMangaFavorites
     val getAnimeFavorites: GetAnimeFavorites
+    val entryMerges: EntryMergeRepository
+    val observeMergedEntry: ObserveMergedEntry
     val getMangaCategories: GetMangaCategories
     val getAnimeCategories: GetAnimeCategories
     val resetMangaViewerFlags: ResetMangaViewerFlags

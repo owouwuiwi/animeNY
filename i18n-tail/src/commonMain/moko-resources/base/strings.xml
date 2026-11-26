@@ -451,6 +451,22 @@
     <string name="action_track_rewatch">Rewatch with tracker</string>
     <string name="track_repeat_no_next_part">There are no more parts available to repeat.</string>
     <string name="track_repeat_open_error">Could not open the repeated title.</string>
+    <string name="entry_merge_title">Combined entries</string>
+    <string name="entry_merge_edit">Choose entries to combine</string>
+    <string name="entry_merge_priority">Source priority</string>
+    <string name="entry_merge_metadata">Choose which entry supplies the title and cover.</string>
+    <string name="entry_merge_move_up">Move source up</string>
+    <string name="entry_merge_move_down">Move source down</string>
+    <string name="entry_merge_keep_all">Keep all parts</string>
+    <string name="entry_merge_by_number">Hide matching numbers</string>
+    <string name="entry_merge_by_title">Hide matching titles</string>
+    <string name="entry_merge_choose_library">Add another version to your library to combine it here.</string>
+    <string name="entry_merge_conflict">An entry already belongs to another group.</string>
+    <string name="entry_merge_unlink">Unlink entries</string>
+    <string name="entry_merge_unlink_description">Remove this group? The original entries and their progress are kept.</string>
+    <string name="entry_merge_unavailable">Some linked entries are unavailable.</string>
+    <string name="entry_merge_empty">Open the original entries to load their episodes or chapters.</string>
+    <string name="entry_merge_completed_part">Completed</string>
     <string name="pref_smart_sync_tracker">Smart sync seasons</string>
     <string name="pref_smart_sync_tracker_summary">Skip completed items and stop at entry in progress</string>
 

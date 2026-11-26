@@ -58,6 +58,7 @@ import eu.kanade.tachiyomi.ui.category.CategoriesTab
 import eu.kanade.tachiyomi.ui.entries.TrackerRecommendationsScreen
 import eu.kanade.tachiyomi.ui.entries.manga.notes.MangaNotesScreen
 import eu.kanade.tachiyomi.ui.entries.manga.track.MangaTrackInfoDialogHomeScreen
+import eu.kanade.tachiyomi.ui.entries.merge.CombinedEntriesScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryTab
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
@@ -74,6 +75,7 @@ import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.entries.merge.model.MergeMedia
 import tachiyomi.domain.items.chapter.model.Chapter
 import tachiyomi.presentation.core.screens.LoadingScreen
 
@@ -411,6 +413,11 @@ class MangaScreen(
             onTrackerRecommendations = {
                 navigator.push(TrackerRecommendationsScreen(successState.manga.id, anime = false))
             },
+            onMergeEntries = {
+                navigator.push(
+                    CombinedEntriesScreen(MergeMedia.Manga, successState.manga.source, successState.manga.url),
+                )
+            }.takeIf { successState.manga.url.isNotBlank() },
             onSearch = { query, global -> scope.launch { performSearch(navigator, query, global) } },
             onCoverClicked = viewModel::showCoverDialog,
             onShareClicked = { shareManga(context, viewModel.manga, viewModel.source) }.takeIf { isHttpSource },

@@ -69,6 +69,7 @@ fun EntryToolbar(
     onImportEpisodes: (() -> Unit)? = null,
     onTrackRepeat: (() -> Unit)? = null,
     onTrackerRecommendations: (() -> Unit)? = null,
+    onMergeEntries: (() -> Unit)? = null,
 ) {
     val navigator = LocalNavigator.current
     fun onHomeClicked() = navigator?.popUntil { screen ->
@@ -164,6 +165,14 @@ fun EntryToolbar(
                             AppBar.OverflowAction(
                                 title = stringResource(label),
                                 onClick = onTrackRepeat,
+                            ),
+                        )
+                    }
+                    if (onMergeEntries != null) {
+                        add(
+                            AppBar.OverflowAction(
+                                title = stringResource(TLMR.strings.entry_merge_title),
+                                onClick = onMergeEntries,
                             ),
                         )
                     }
