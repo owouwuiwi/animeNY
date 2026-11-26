@@ -63,6 +63,7 @@ import tachiyomi.domain.items.season.interactor.GetAnimeSeasonsByParentId
 import tachiyomi.domain.library.anime.LibraryAnime
 import tachiyomi.domain.library.anime.model.AnimeGroupLibraryMode
 import tachiyomi.domain.library.anime.model.AnimeLibraryGroup
+import tachiyomi.domain.library.model.groupLibraryEntriesByTag
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.library.service.LibraryPreferences.Companion.DEVICE_CHARGING
 import tachiyomi.domain.library.service.LibraryPreferences.Companion.DEVICE_NETWORK_NOT_METERED
@@ -187,6 +188,7 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             libraryAnime.filter { it.category == categoryId }
         } else if (
             group == AnimeLibraryGroup.BY_DEFAULT ||
+            groupExtra == null ||
             groupAnimeLibraryUpdateType == AnimeGroupLibraryMode.GLOBAL ||
             (
                 groupAnimeLibraryUpdateType == AnimeGroupLibraryMode.ALL_BUT_UNGROUPED &&
@@ -234,12 +236,11 @@ class AnimeLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                 }
 
                 AnimeLibraryGroup.BY_TAG -> {
-                    val tagExtra = groupExtra?.nullIfBlank()?.toIntOrNull()
-                    val tag = libraryAnime.map { it.anime.genre }
-                        .distinct()
-                        .getOrNull(tagExtra ?: -1)
-
-                    if (tag != null) libraryAnime.filter { it.anime.genre == tag } else emptyList()
+                    val groupId = groupExtra.toLongOrNull()
+                    val uniqueEntries = libraryAnime.distinctBy { it.anime.id }
+                    groupLibraryEntriesByTag(uniqueEntries) { it.anime.genre }
+                        .firstOrNull { it.id == groupId }
+                        ?.entries.orEmpty()
                 }
 
                 AnimeLibraryGroup.BY_STATUS -> {

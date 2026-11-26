@@ -171,9 +171,7 @@ data object AnimeLibraryTab : Tab {
                     },
                     onClickFilter = viewModel::showSettingsDialog,
                     onClickRefresh = {
-                        onClickRefresh(
-                            state.categories[viewModel.activeCategoryIndex],
-                        )
+                        state.categories.getOrNull(viewModel.activeCategoryIndex)?.let(onClickRefresh)
                     },
                     onClickGlobalUpdate = { onClickRefresh(null) },
                     onClickOpenRandomEntry = {

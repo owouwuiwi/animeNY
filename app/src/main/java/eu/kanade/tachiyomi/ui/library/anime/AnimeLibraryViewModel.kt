@@ -81,6 +81,7 @@ import tachiyomi.domain.library.anime.model.AnimeLibraryGroup
 import tachiyomi.domain.library.anime.model.AnimeLibrarySort
 import tachiyomi.domain.library.anime.model.sort
 import tachiyomi.domain.library.model.LibraryDisplayMode
+import tachiyomi.domain.library.model.groupLibraryEntriesByTag
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import tachiyomi.domain.track.anime.interactor.GetAnimeTracks
@@ -746,12 +747,10 @@ class AnimeLibraryViewModel(
     }
 
     suspend fun getRandomAnimelibItemForCurrentCategory(): AnimeLibraryItem? {
-        if (state.value.categories.isEmpty()) return null
-
         return withIOContext {
-            state.value
-                .getAnimelibItemsByCategoryId(state.value.categories[activeCategoryIndex].id)
-                ?.randomOrNull()
+            val snapshot = state.value
+            val category = snapshot.categories.getOrNull(activeCategoryIndex) ?: return@withIOContext null
+            snapshot.getAnimelibItemsByCategoryId(category.id)?.randomOrNull()
         }
     }
 
@@ -830,7 +829,7 @@ class AnimeLibraryViewModel(
     fun invertSelection(index: Int) {
         state.update { state ->
             val newSelection = state.selection.mutate { list ->
-                val categoryId = state.categories[index].id
+                val categoryId = state.categories.getOrNull(index)?.id ?: return@mutate
                 val items = state.getAnimelibItemsByCategoryId(categoryId)?.fastMap { it.libraryAnime }.orEmpty()
                 val selectedIds = list.fastMap { it.id }
                 val (toRemove, toAdd) = items.fastPartition { it.id in selectedIds }
@@ -957,31 +956,15 @@ class AnimeLibraryViewModel(
             }
 
             AnimeLibraryGroup.BY_TAG -> {
-                val defaultTag = context.stringResource(TLMR.strings.ungrouped)
-                val tags = libraryAnime.flatMap { it.libraryAnime.anime.genre.orEmpty() }.distinct()
-                val groupedAnime = libraryAnime.flatMap { item ->
-                    item.libraryAnime.anime.genre?.map { it to item } ?: listOf(defaultTag to item)
-                }.groupBy({ it.first }, { it.second }).toList()
-
-                val (bigGroups, defaultGroups) = groupedAnime.partition { (genre, groups) ->
-                    genre != defaultTag &&
-                        groups.size > 3
-                }
-                val groupedEntries = bigGroups.flatMap { it.second }
-                val defaultGroupEntries = defaultGroups.flatMap { it.second }.distinct().filterNot {
-                    it in
-                        groupedEntries
-                }
-
-                (bigGroups + (defaultTag to defaultGroupEntries)).toMap().mapKeys { (genre, _) ->
+                groupLibraryEntriesByTag(libraryAnime) { it.libraryAnime.anime.genre }.mapIndexed { order, group ->
                     Category(
-                        id = genre.hashCode().toLong(),
-                        name = genre,
-                        order = tags.indexOf(genre).takeUnless { it == -1 }?.toLong() ?: Long.MAX_VALUE,
+                        id = group.id,
+                        name = group.tag ?: context.stringResource(TLMR.strings.ungrouped),
+                        order = order.toLong(),
                         flags = 0,
                         hidden = false,
-                    )
-                }
+                    ) to group.entries
+                }.toMap()
             }
 
             else -> {

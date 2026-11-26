@@ -69,6 +69,7 @@ import tachiyomi.domain.items.chapter.model.NoChaptersException
 import tachiyomi.domain.library.manga.LibraryManga
 import tachiyomi.domain.library.manga.model.MangaGroupLibraryMode
 import tachiyomi.domain.library.manga.model.MangaLibraryGroup
+import tachiyomi.domain.library.model.groupLibraryEntriesByTag
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.library.service.LibraryPreferences.Companion.DEVICE_CHARGING
 import tachiyomi.domain.library.service.LibraryPreferences.Companion.DEVICE_NETWORK_NOT_METERED
@@ -200,6 +201,7 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
             libraryManga.filter { it.category == categoryId }
         } else if (
             group == MangaLibraryGroup.BY_DEFAULT ||
+            groupExtra == null ||
             groupMangaLibraryUpdateType == MangaGroupLibraryMode.GLOBAL ||
             (
                 groupMangaLibraryUpdateType == MangaGroupLibraryMode.ALL_BUT_UNGROUPED &&
@@ -247,11 +249,11 @@ class MangaLibraryUpdateJob(private val context: Context, workerParams: WorkerPa
                 }
 
                 MangaLibraryGroup.BY_TAG -> {
-                    val tagExtra = groupExtra?.nullIfBlank()?.toIntOrNull()
-                    val tag = libraryManga.map { it.manga.genre }
-                        .distinct()
-                        .getOrNull(tagExtra ?: -1)
-                    if (tag != null) libraryManga.filter { it.manga.genre == tag } else emptyList()
+                    val groupId = groupExtra.toLongOrNull()
+                    val uniqueEntries = libraryManga.distinctBy { it.manga.id }
+                    groupLibraryEntriesByTag(uniqueEntries) { it.manga.genre }
+                        .firstOrNull { it.id == groupId }
+                        ?.entries.orEmpty()
                 }
 
                 MangaLibraryGroup.BY_STATUS -> {

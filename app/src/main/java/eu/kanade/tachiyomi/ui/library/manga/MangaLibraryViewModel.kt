@@ -57,6 +57,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
 import mihon.domain.library.model.search.QueryNode
 import mihon.feature.library.matches
+import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.preference.CheckboxState
 import tachiyomi.core.common.preference.TriState
 import tachiyomi.core.common.util.lang.compareToWithCollator
@@ -79,11 +80,13 @@ import tachiyomi.domain.library.manga.model.MangaLibraryGroup
 import tachiyomi.domain.library.manga.model.MangaLibrarySort
 import tachiyomi.domain.library.manga.model.sort
 import tachiyomi.domain.library.model.LibraryDisplayMode
+import tachiyomi.domain.library.model.groupLibraryEntriesByTag
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.source.manga.service.MangaSourceManager
 import tachiyomi.domain.track.manga.interactor.GetMangaTracks
 import tachiyomi.domain.track.manga.interactor.GetTracksPerManga
 import tachiyomi.domain.track.manga.model.MangaTrack
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.source.local.entries.manga.LocalMangaSource
 import tachiyomi.source.local.entries.manga.isLocal
 import kotlin.random.Random
@@ -719,12 +722,10 @@ class MangaLibraryViewModel(
     }
 
     suspend fun getRandomLibraryItemForCurrentCategory(): MangaLibraryItem? {
-        if (state.value.categories.isEmpty()) return null
-
         return withIOContext {
-            state.value
-                .getLibraryItemsByCategoryId(state.value.categories[activeCategoryIndex].id)
-                ?.randomOrNull()
+            val snapshot = state.value
+            val category = snapshot.categories.getOrNull(activeCategoryIndex) ?: return@withIOContext null
+            snapshot.getLibraryItemsByCategoryId(category.id)?.randomOrNull()
         }
     }
 
@@ -803,7 +804,7 @@ class MangaLibraryViewModel(
     fun invertSelection(index: Int) {
         state.update { state ->
             val newSelection = state.selection.mutate { list ->
-                val categoryId = state.categories[index].id
+                val categoryId = state.categories.getOrNull(index)?.id ?: return@mutate
                 val items = state.getLibraryItemsByCategoryId(categoryId)?.fastMap { it.libraryManga }.orEmpty()
                 val selectedIds = list.fastMap { it.id }
                 val (toRemove, toAdd) = items.fastPartition { it.id in selectedIds }
@@ -933,23 +934,15 @@ class MangaLibraryViewModel(
             }
 
             MangaLibraryGroup.BY_TAG -> {
-                val tags: List<String> = libraryManga.flatMap { item ->
-                    item.libraryManga.manga.genre?.distinct() ?: emptyList()
-                }
-                libraryManga.flatMap { item ->
-                    item.libraryManga.manga.genre?.distinct()?.map { genre ->
-                        Pair(genre, item)
-                    } ?: emptyList()
-                }.groupBy({ it.first }, { it.second }).filterValues { it.size > 3 }
-                    .mapKeys { (genre, _) ->
-                        Category(
-                            id = genre.hashCode().toLong(),
-                            name = genre,
-                            order = tags.indexOf(genre).takeUnless { it == -1 }?.toLong() ?: Long.MAX_VALUE,
-                            flags = 0,
-                            hidden = false,
-                        )
-                    }
+                groupLibraryEntriesByTag(libraryManga) { it.libraryManga.manga.genre }.mapIndexed { order, group ->
+                    Category(
+                        id = group.id,
+                        name = group.tag ?: context.stringResource(TLMR.strings.ungrouped),
+                        order = order.toLong(),
+                        flags = 0,
+                        hidden = false,
+                    ) to group.entries
+                }.toMap()
             }
 
             else -> {
