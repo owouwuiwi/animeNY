@@ -17,7 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.Navigator
 import eu.kanade.core.preference.asState
@@ -58,8 +57,6 @@ fun RelatedMangasScreen(
     val sourcePreferences: SourcePreferences = Injekt.get()
     var displayMode by sourcePreferences.sourceDisplayMode.asState(scope)
 
-    val haptic = LocalHapticFeedback.current
-
     val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
@@ -87,12 +84,7 @@ fun RelatedMangasScreen(
                     navigator.push(MangaScreen(manga.id, true))
                 }
             },
-            onMangaLongClick = {
-                scope.launchIO {
-                    val manga = viewModel.networkToLocalManga.getLocal(it)
-                    navigator.push(MangaScreen(manga.id, true))
-                }
-            },
+            onMangaLongClick = viewModel::saveRelatedManga,
             onKeywordClick = { query ->
                 navigator.push(BrowseMangaSourceScreen(successState.source.id, query))
             },

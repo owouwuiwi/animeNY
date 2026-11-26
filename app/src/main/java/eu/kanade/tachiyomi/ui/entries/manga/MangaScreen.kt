@@ -416,12 +416,7 @@ class MangaScreen(
                     navigator.push(MangaScreen(manga.id, true))
                 }
             },
-            onRelatedMangaLongClick = {
-                scope.launch {
-                    val manga = withIOContext { viewModel.networkToLocalManga.getLocal(it) }
-                    navigator.push(MangaScreen(manga.id, true))
-                }
-            },
+            onRelatedMangaLongClick = viewModel::saveRelatedManga,
             onMultiBookmarkClicked = viewModel::bookmarkChapters,
             onMultiMarkAsReadClicked = viewModel::markChaptersRead,
             onMarkPreviousAsReadClicked = viewModel::markPreviousChapterRead,

@@ -583,17 +583,30 @@ class MangaViewModel(
 
     fun showChangeCategoryDialog() {
         val manga = successState?.manga ?: return
-        viewModelScope.launch {
+        viewModelScope.launch { showCategoryDialog(manga, getCategories()) }
+    }
+
+    fun saveRelatedManga(related: Manga) {
+        viewModelScope.launchIO {
+            val manga = networkToLocalManga.getLocal(related)
             val categories = getCategories()
-            val selection = getMangaCategoryIds(manga)
-            updateSuccessState { successState ->
-                successState.copy(
-                    dialog = Dialog.ChangeCategory(
-                        manga = manga,
-                        initialSelection = categories.mapAsCheckboxState { it.id in selection },
-                    ),
-                )
+            if (categories.isEmpty() && !manga.favorite) {
+                addMangaToLibrary(manga, sourceManager.getOrStub(manga.source), emptyList())
+            } else {
+                showCategoryDialog(manga, categories)
             }
+        }
+    }
+
+    private suspend fun showCategoryDialog(manga: Manga, categories: List<Category>) {
+        val selection = getMangaCategoryIds(manga)
+        updateSuccessState { state ->
+            state.copy(
+                dialog = Dialog.ChangeCategory(
+                    manga = manga,
+                    initialSelection = categories.mapAsCheckboxState { it.id in selection },
+                ),
+            )
         }
     }
 
@@ -655,12 +668,11 @@ class MangaViewModel(
     }
 
     fun moveMangaToCategoriesAndAddToLibrary(manga: Manga, categories: List<Long>) {
-        val source = successState?.source ?: return
         viewModelScope.launchIO {
             if (manga.favorite) {
                 setMangaCategories.await(manga.id, categories)
             } else {
-                addMangaToLibrary(manga, source, categories)
+                addMangaToLibrary(manga, sourceManager.getOrStub(manga.source), categories)
             }
         }
     }
@@ -669,7 +681,11 @@ class MangaViewModel(
         if (!updateManga.awaitUpdateFavorite(manga.id, true)) return
         setMangaCategories.await(manga.id, categories)
         addTracks.bindEnhancedTrackers(manga, source)
-        if (successState?.hasLoggedInTrackers == true && trackPreferences.trackOnAddingToLibrary.get()) {
+        val state = successState
+        if (
+            state != null && state.manga.id == manga.id && state.hasLoggedInTrackers &&
+            trackPreferences.trackOnAddingToLibrary.get()
+        ) {
             showTrackDialog()
         }
     }
