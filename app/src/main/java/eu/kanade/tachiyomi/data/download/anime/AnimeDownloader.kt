@@ -178,7 +178,6 @@ class AnimeDownloader(
         } else {
             notifier.onComplete()
         }
-
     }
 
     /**
@@ -234,18 +233,18 @@ class AnimeDownloader(
 
             // Use supervisorScope to cancel child jobs when the downloader job is cancelled
             supervisorScope {
-                val downloadJobs = mutableMapOf<AnimeDownload, Job>()
+                val downloadJobs = mutableMapOf<Long, Job>()
 
                 activeDownloadsFlow.collectLatest { activeDownloads ->
-                    val downloadJobsToStop = downloadJobs.filter { it.key !in activeDownloads }
-                    downloadJobsToStop.forEach { (download, job) ->
-                        job.cancel()
-                        downloadJobs.remove(download)
+                    // Resolving the video mutates AnimeDownload, including its generated hash code.
+                    // The episode id remains stable throughout the transfer.
+                    val activeIds = activeDownloads.mapTo(mutableSetOf()) { it.episode.id }
+                    (downloadJobs.keys - activeIds).forEach { id ->
+                        downloadJobs.remove(id)?.cancel()
                     }
 
-                    val downloadsToStart = activeDownloads.filter { it !in downloadJobs }
-                    downloadsToStart.forEach { download ->
-                        downloadJobs[download] = launchDownloadJob(download)
+                    activeDownloads.forEach { download ->
+                        downloadJobs.getOrPut(download.episode.id) { launchDownloadJob(download) }
                     }
                 }
             }
@@ -1033,7 +1032,7 @@ class AnimeDownloader(
     }
 
     fun updateQueue(downloads: List<AnimeDownload>) {
-        if (queueState == downloads) return
+        if (queueState.value == downloads) return
 
         if (downloads.isEmpty()) {
             clearQueue()
