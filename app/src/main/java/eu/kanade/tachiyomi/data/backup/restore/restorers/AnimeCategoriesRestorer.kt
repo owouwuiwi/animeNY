@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.data.backup.restore.restorers
 
 import dev.zacsweers.metro.Inject
 import eu.kanade.tachiyomi.data.backup.models.BackupCategory
+import eu.kanade.tachiyomi.data.backup.models.resolveCategoryParents
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
 import tachiyomi.domain.category.anime.repository.AnimeCategoryRepository
 import tachiyomi.domain.category.model.NewCategory
@@ -22,8 +23,12 @@ class AnimeCategoriesRestorer(
 
         val newCategories = backupCategories
             .filter { it.name !in dbCategoryNames }
+            .distinctBy(BackupCategory::name)
             .sortedBy { it.order }
         categoryRepository.insertAllAnimeCategories(newCategories.map { NewCategory(name = it.name, flags = it.flags) })
+
+        val parents = backupCategories.resolveCategoryParents(getAnimeCategories.await())
+        categoryRepository.updateAnimeCategoryParents(parents)
 
         val flags = buildSet {
             dbCategories.mapTo(this) { it.flags }

@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.WhileSubscribed
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -20,7 +19,6 @@ import kotlinx.coroutines.launch
 import tachiyomi.domain.category.anime.interactor.CreateAnimeCategoryWithName
 import tachiyomi.domain.category.anime.interactor.DeleteAnimeCategory
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
-import tachiyomi.domain.category.anime.interactor.GetVisibleAnimeCategories
 import tachiyomi.domain.category.anime.interactor.HideAnimeCategory
 import tachiyomi.domain.category.anime.interactor.RenameAnimeCategory
 import tachiyomi.domain.category.anime.interactor.ReorderAnimeCategory
@@ -33,7 +31,6 @@ import kotlin.time.Duration.Companion.seconds
 
 class AnimeCategoryScreenModel(
     private val getAllCategories: GetAnimeCategories = Injekt.get(),
-    private val getVisibleCategories: GetVisibleAnimeCategories = Injekt.get(),
     private val createCategoryWithName: CreateAnimeCategoryWithName = Injekt.get(),
     private val hideCategory: HideAnimeCategory = Injekt.get(),
     private val deleteCategory: DeleteAnimeCategory = Injekt.get(),
@@ -48,25 +45,22 @@ class AnimeCategoryScreenModel(
     private val dialog = MutableStateFlow<AnimeCategoryDialog?>(null)
 
     val state: StateFlow<AnimeCategoryScreenState> = combine(
-        if (libraryPreferences.hideHiddenCategoriesSettings.get()) {
-            getVisibleCategories.subscribe()
-        } else {
-            getAllCategories.subscribe()
-        },
+        getAllCategories.subscribe(),
         dialog,
     ) { categories, dialog ->
+        val userCategories = categories.filterNot(Category::isSystemCategory)
+        val hideHidden = libraryPreferences.hideHiddenCategoriesSettings.get()
         AnimeCategoryScreenState.Success(
-            categories = categories
-                .filterNot(Category::isSystemCategory)
-                .toImmutableList(),
+            categories = userCategories.filterNot { hideHidden && it.hidden }.toImmutableList(),
+            categoryNames = userCategories.map(Category::name).toImmutableList(),
             dialog = dialog,
         )
     }
         .stateIn(screenModelScope, SharingStarted.WhileSubscribed(5.seconds), AnimeCategoryScreenState.Loading)
 
-    fun createCategory(name: String) {
+    fun createCategory(name: String, parentId: Long?) {
         screenModelScope.launch {
-            when (createCategoryWithName.await(name)) {
+            when (createCategoryWithName.await(name, parentId)) {
                 is CreateAnimeCategoryWithName.Result.InternalError -> _events.send(
                     AnimeCategoryEvent.InternalError,
                 )
@@ -100,14 +94,22 @@ class AnimeCategoryScreenModel(
         }
     }
 
-    fun changeOrder(category: Category, newIndex: Int) {
+    fun changeOrder(category: Category, sibling: Category) {
         screenModelScope.launch {
-            when (reorderCategory.await(category, newIndex)) {
+            when (reorderCategory.await(category, sibling)) {
                 is ReorderAnimeCategory.Result.InternalError -> _events.send(
                     AnimeCategoryEvent.InternalError,
                 )
 
                 else -> {}
+            }
+        }
+    }
+
+    fun moveCategory(category: Category, parentId: Long?) {
+        screenModelScope.launch {
+            if (reorderCategory.moveToParent(category, parentId) is ReorderAnimeCategory.Result.InternalError) {
+                _events.send(AnimeCategoryEvent.InternalError)
             }
         }
     }
@@ -134,7 +136,8 @@ class AnimeCategoryScreenModel(
 }
 
 sealed interface AnimeCategoryDialog {
-    data object Create : AnimeCategoryDialog
+    data class Create(val parent: Category?) : AnimeCategoryDialog
+    data class Move(val category: Category) : AnimeCategoryDialog
     data class Rename(val category: Category) : AnimeCategoryDialog
     data class Delete(val category: Category) : AnimeCategoryDialog
 }
@@ -152,10 +155,7 @@ sealed interface AnimeCategoryScreenState {
     @Immutable
     data class Success(
         val categories: ImmutableList<Category>,
+        val categoryNames: ImmutableList<String>,
         val dialog: AnimeCategoryDialog? = null,
-    ) : AnimeCategoryScreenState {
-
-        val isEmpty: Boolean
-            get() = categories.isEmpty()
-    }
+    ) : AnimeCategoryScreenState
 }

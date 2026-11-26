@@ -7,6 +7,7 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.category.manga.repository.MangaCategoryRepository
 import tachiyomi.domain.category.model.NewCategory
 import tachiyomi.domain.library.service.LibraryPreferences
+import kotlin.time.Clock
 
 @Inject
 class CreateMangaCategoryWithName(
@@ -20,9 +21,16 @@ class CreateMangaCategoryWithName(
             return sort.type.flag or sort.direction.flag
         }
 
-    suspend fun await(name: String): Result = withNonCancellableContext {
+    suspend fun await(name: String, parentId: Long? = null): Result = withNonCancellableContext {
         try {
-            categoryRepository.insertMangaCategory(NewCategory(name = name, flags = initialFlags))
+            categoryRepository.insertMangaCategory(
+                NewCategory(
+                    name = name,
+                    flags = initialFlags,
+                    parentId = parentId,
+                    parentUpdatedAt = Clock.System.now().toEpochMilliseconds(),
+                ),
+            )
             Result.Success
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)

@@ -11,7 +11,10 @@ import tachiyomi.data.Database
 import tachiyomi.data.subscribeToList
 import tachiyomi.domain.category.manga.repository.MangaCategoryRepository
 import tachiyomi.domain.category.model.Category
+import tachiyomi.domain.category.model.CategoryParentChange
+import tachiyomi.domain.category.model.CategoryTree
 import tachiyomi.domain.category.model.NewCategory
+import kotlin.time.Clock
 
 @Inject
 @SingleIn(AppScope::class)
@@ -58,8 +61,8 @@ class MangaCategoryRepositoryImpl(
 
     override suspend fun getCategoriesByMangaIds(mangaIds: List<Long>): Map<Long, List<Category>> {
         return database.categoryQueries
-            .getCategoriesByMangaIds(mangaIds) { mangaId, id, name, order, flags, hidden ->
-                mangaId to mapCategory(id, name, order, flags, hidden)
+            .getCategoriesByMangaIds(mangaIds) { mangaId, id, name, order, flags, hidden, parentId, updatedAt ->
+                mangaId to mapCategory(id, name, order, flags, hidden, parentId, updatedAt)
             }
             .awaitAsList()
             .groupBy({ it.first }, { it.second })
@@ -87,6 +90,8 @@ class MangaCategoryRepositoryImpl(
         database.categoryQueries.insert(
             name = category.name,
             flags = category.flags,
+            parentId = category.parentId,
+            parentUpdatedAt = category.parentUpdatedAt,
         )
     }
 
@@ -98,6 +103,20 @@ class MangaCategoryRepositoryImpl(
 
     override suspend fun updateMangaCategoryName(categoryId: Long, name: String) {
         database.categoryQueries.updateName(name = name, id = categoryId)
+    }
+
+    override suspend fun updateMangaCategoryParents(parents: Map<Long, CategoryParentChange>) {
+        if (parents.isEmpty()) return
+        database.transaction {
+            val changes = CategoryTree(getAllMangaCategories()).validParentChanges(parents)
+            changes.forEach { (id, change) ->
+                database.categoryQueries.updateParent(
+                    parentId = change.parentId,
+                    updatedAt = change.updatedAt,
+                    categoryId = id,
+                )
+            }
+        }
     }
 
     override suspend fun updateMangaCategoryFlags(categoryId: Long, flags: Long) {
@@ -126,7 +145,11 @@ class MangaCategoryRepositoryImpl(
     }
 
     override suspend fun deleteMangaCategory(categoryId: Long) {
-        database.categoryQueries.delete(id = categoryId)
+        database.transaction {
+            val updatedAt = Clock.System.now().toEpochMilliseconds()
+            database.categoryQueries.detachChildren(updatedAt = updatedAt, categoryId = categoryId)
+            database.categoryQueries.delete(id = categoryId)
+        }
     }
 
     private fun mapCategory(
@@ -135,6 +158,8 @@ class MangaCategoryRepositoryImpl(
         order: Long,
         flags: Long,
         hidden: Long,
+        parentId: Long?,
+        parentUpdatedAt: Long,
     ): Category {
         return Category(
             id = id,
@@ -142,6 +167,8 @@ class MangaCategoryRepositoryImpl(
             order = order,
             flags = flags,
             hidden = hidden == 1L,
+            parentId = parentId,
+            parentUpdatedAt = parentUpdatedAt,
         )
     }
 }

@@ -9,7 +9,10 @@ import kotlinx.coroutines.flow.Flow
 import tachiyomi.data.handlers.anime.AnimeDatabaseHandler
 import tachiyomi.domain.category.anime.repository.AnimeCategoryRepository
 import tachiyomi.domain.category.model.Category
+import tachiyomi.domain.category.model.CategoryParentChange
+import tachiyomi.domain.category.model.CategoryTree
 import tachiyomi.domain.category.model.NewCategory
+import kotlin.time.Clock
 
 @Inject
 @SingleIn(AppScope::class)
@@ -46,8 +49,17 @@ class AnimeCategoryRepositoryImpl(
 
     override suspend fun getCategoriesByAnimeIds(animeIds: List<Long>): Map<Long, List<Category>> {
         return handler.awaitList {
-            categoriesQueries.getCategoriesByAnimeIds(animeIds) { animeId, id, name, order, flags, hidden ->
-                animeId to mapCategory(id, name, order, flags, hidden)
+            categoriesQueries.getCategoriesByAnimeIds(animeIds) {
+                    animeId,
+                    id,
+                    name,
+                    order,
+                    flags,
+                    hidden,
+                    parentId,
+                    updatedAt,
+                ->
+                animeId to mapCategory(id, name, order, flags, hidden, parentId, updatedAt)
             }
         }
             .groupBy({ it.first }, { it.second })
@@ -76,6 +88,8 @@ class AnimeCategoryRepositoryImpl(
             categoriesQueries.insert(
                 name = category.name,
                 flags = category.flags,
+                parentId = category.parentId,
+                parentUpdatedAt = category.parentUpdatedAt,
             )
         }
     }
@@ -89,6 +103,21 @@ class AnimeCategoryRepositoryImpl(
     override suspend fun updateAnimeCategoryName(categoryId: Long, name: String) {
         handler.await {
             categoriesQueries.updateName(name = name, categoryId = categoryId)
+        }
+    }
+
+    override suspend fun updateAnimeCategoryParents(parents: Map<Long, CategoryParentChange>) {
+        if (parents.isEmpty()) return
+        handler.await(inTransaction = true) {
+            val categories = categoriesQueries.getCategories(::mapCategory).awaitAsList()
+            val changes = CategoryTree(categories).validParentChanges(parents)
+            changes.forEach { (id, change) ->
+                categoriesQueries.updateParent(
+                    parentId = change.parentId,
+                    updatedAt = change.updatedAt,
+                    categoryId = id,
+                )
+            }
         }
     }
 
@@ -124,7 +153,9 @@ class AnimeCategoryRepositoryImpl(
     }
 
     override suspend fun deleteAnimeCategory(categoryId: Long) {
-        handler.await {
+        handler.await(inTransaction = true) {
+            val updatedAt = Clock.System.now().toEpochMilliseconds()
+            categoriesQueries.detachChildren(updatedAt = updatedAt, categoryId = categoryId)
             categoriesQueries.delete(
                 categoryId = categoryId,
             )
@@ -137,6 +168,8 @@ class AnimeCategoryRepositoryImpl(
         order: Long,
         flags: Long,
         hidden: Long,
+        parentId: Long?,
+        parentUpdatedAt: Long,
     ): Category {
         return Category(
             id = id,
@@ -144,6 +177,8 @@ class AnimeCategoryRepositoryImpl(
             order = order,
             flags = flags,
             hidden = hidden == 1L,
+            parentId = parentId,
+            parentUpdatedAt = parentUpdatedAt,
         )
     }
 }

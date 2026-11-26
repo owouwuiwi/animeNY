@@ -67,6 +67,7 @@ import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.domain.category.manga.interactor.GetVisibleMangaCategories
 import tachiyomi.domain.category.manga.interactor.SetMangaCategories
 import tachiyomi.domain.category.model.Category
+import tachiyomi.domain.category.model.CategoryTree
 import tachiyomi.domain.entries.applyFilter
 import tachiyomi.domain.entries.manga.interactor.GetLibraryManga
 import tachiyomi.domain.entries.manga.model.Manga
@@ -483,7 +484,7 @@ class MangaLibraryViewModel(
                 categories
             }
 
-            displayCategories.associateWith { libraryManga[it.id].orEmpty() }
+            CategoryTree(displayCategories).inHierarchyOrder().associateWith { libraryManga[it.id].orEmpty() }
         }
     }
 

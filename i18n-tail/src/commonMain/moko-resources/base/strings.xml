@@ -1,5 +1,10 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
+    <string name="category_add_subcategory">Add subcategory</string>
+    <string name="category_add_in">Add subcategory in %1$s</string>
+    <string name="category_move_parent">Move category under</string>
+    <string name="category_top_level">Top level</string>
+    <string name="category_show">Show</string>
 
 
     <string name="app_cast_id" translatable="false">CC1AD845</string>

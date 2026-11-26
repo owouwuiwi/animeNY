@@ -3,7 +3,9 @@ CREATE TABLE categories(
     name TEXT NOT NULL,
     sort INTEGER NOT NULL,
     flags INTEGER NOT NULL,
-    hidden INTEGER NOT NULL DEFAULT 0
+    hidden INTEGER NOT NULL DEFAULT 0,
+    parent_id INTEGER REFERENCES categories(_id) ON DELETE SET NULL CHECK (parent_id > 0 AND parent_id <> _id),
+    parent_updated_at INTEGER NOT NULL DEFAULT 0
 );
 
 -- Insert system category
@@ -29,7 +31,9 @@ _id AS id,
 name,
 sort AS `order`,
 flags,
-hidden
+hidden,
+parent_id,
+parent_updated_at
 FROM categories
 ORDER BY sort;
 
@@ -39,7 +43,9 @@ _id AS id,
 name,
 sort AS `order`,
 flags,
-hidden
+hidden,
+parent_id,
+parent_updated_at
 FROM categories
 WHERE hidden = 0
 ORDER BY sort;
@@ -50,7 +56,9 @@ C._id AS id,
 C.name,
 C.sort AS `order`,
 C.flags,
-C.hidden
+C.hidden,
+C.parent_id,
+C.parent_updated_at
 FROM categories C
 JOIN animes_categories AC
 ON C._id = AC.category_id
@@ -64,7 +72,9 @@ C._id AS id,
 C.name,
 C.sort AS `order`,
 C.flags,
-C.hidden
+C.hidden,
+C.parent_id,
+C.parent_updated_at
 FROM categories C
 JOIN animes_categories AC
 ON C._id = AC.category_id
@@ -77,7 +87,9 @@ C._id AS id,
 C.name,
 C.sort AS `order`,
 C.flags,
-C.hidden
+C.hidden,
+C.parent_id,
+C.parent_updated_at
 FROM categories C
 JOIN animes_categories AC
 ON C._id = AC.category_id
@@ -85,9 +97,19 @@ WHERE AC.anime_id = :animeId AND C.hidden = 0
 ORDER BY C.sort;
 
 insert:
-INSERT INTO categories(name, sort, flags)
-SELECT :name, coalesce(max(sort), -1) + 1, :flags
+INSERT INTO categories(name, sort, flags, parent_id, parent_updated_at)
+SELECT :name, coalesce(max(sort), -1) + 1, :flags, :parentId, :parentUpdatedAt
 FROM categories;
+
+updateParent:
+UPDATE categories
+SET parent_id = :parentId, parent_updated_at = :updatedAt
+WHERE _id = :categoryId;
+
+detachChildren:
+UPDATE categories
+SET parent_id = NULL, parent_updated_at = max(parent_updated_at + 1, :updatedAt)
+WHERE parent_id = :categoryId;
 
 delete:
 DELETE FROM categories

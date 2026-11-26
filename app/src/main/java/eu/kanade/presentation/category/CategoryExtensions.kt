@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.domain.category.model.Category
+import tachiyomi.domain.category.model.CategoryTree
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 
@@ -19,3 +20,7 @@ fun Category.visualName(context: Context): String =
         isSystemCategory -> context.stringResource(MR.strings.label_default)
         else -> name
     }
+
+@Composable
+fun Category.visualPath(tree: CategoryTree): String =
+    if (isSystemCategory) visualName else tree.pathTo(id).joinToString(" / ") { it.name }.ifEmpty { name }

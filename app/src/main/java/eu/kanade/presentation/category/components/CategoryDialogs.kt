@@ -7,11 +7,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TriStateCheckbox
@@ -25,11 +28,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
 import eu.kanade.core.preference.asToggleableState
 import eu.kanade.presentation.category.visualName
+import eu.kanade.presentation.category.visualPath
 import tachiyomi.core.common.preference.CheckboxState
 import tachiyomi.domain.category.model.Category
+import tachiyomi.domain.category.model.CategoryTree
 import tachiyomi.i18n.MR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 
@@ -38,6 +46,7 @@ fun CategoryCreateDialog(
     onDismissRequest: () -> Unit,
     onCreate: (String) -> Unit,
     categories: List<String>,
+    parent: Category? = null,
 ) {
     var name by remember { mutableStateOf("") }
 
@@ -63,7 +72,13 @@ fun CategoryCreateDialog(
             }
         },
         title = {
-            Text(text = stringResource(MR.strings.action_add_category))
+            Text(
+                text = if (parent == null) {
+                    stringResource(MR.strings.action_add_category)
+                } else {
+                    stringResource(TLMR.strings.category_add_in, parent.name)
+                },
+            )
         },
         text = {
             OutlinedTextField(
@@ -91,6 +106,54 @@ fun CategoryCreateDialog(
     LaunchedEffect(focusRequester) {
         focusRequester.requestFocus()
     }
+}
+
+@Composable
+fun CategoryParentDialog(
+    onDismissRequest: () -> Unit,
+    onConfirm: (Long?) -> Unit,
+    categories: List<Category>,
+    category: Category,
+) {
+    val tree = remember(categories) { CategoryTree(categories) }
+    val possibleParents = remember(tree, category.id) { listOf(null) + tree.possibleParents(category.id) }
+    var selectedId by remember(category) { mutableStateOf(category.parentId) }
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = { Text(stringResource(TLMR.strings.category_move_parent)) },
+        confirmButton = {
+            TextButton(
+                enabled = selectedId != category.parentId,
+                onClick = {
+                    onConfirm(selectedId)
+                    onDismissRequest()
+                },
+            ) { Text(stringResource(MR.strings.action_ok)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismissRequest) { Text(stringResource(MR.strings.action_cancel)) }
+        },
+        text = {
+            Column(Modifier.selectableGroup().verticalScroll(rememberScrollState())) {
+                possibleParents.forEach { parent ->
+                    val selected = selectedId == parent?.id
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(selected, role = Role.RadioButton, onClick = { selectedId = parent?.id })
+                            .padding(vertical = MaterialTheme.padding.small),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selected, onClick = null)
+                        Text(
+                            text = parent?.visualPath(tree) ?: stringResource(TLMR.strings.category_top_level),
+                            modifier = Modifier.padding(start = MaterialTheme.padding.medium),
+                        )
+                    }
+                }
+            }
+        },
+    )
 }
 
 @Composable
@@ -214,7 +277,11 @@ fun ChangeCategoryDialog(
         )
         return
     }
-    var selection by remember { mutableStateOf(initialSelection) }
+    val tree = remember(initialSelection) { CategoryTree(initialSelection.map { it.value }) }
+    var selection by remember(initialSelection) {
+        val byId = initialSelection.associateBy { it.value.id }
+        mutableStateOf(tree.inHierarchyOrder().mapNotNull { byId[it.id] })
+    }
     AlertDialog(
         onDismissRequest = onDismissRequest,
         confirmButton = {
@@ -254,6 +321,7 @@ fun ChangeCategoryDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
                 selection.forEach { checkbox ->
+                    val depth = (tree.pathTo(checkbox.value.id).size - 1).coerceIn(0, 4)
                     val onChange: (CheckboxState<Category>) -> Unit = {
                         val index = selection.indexOf(it)
                         if (index != -1) {
@@ -265,6 +333,7 @@ fun ChangeCategoryDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .padding(start = (depth * 12).dp)
                             .clickable { onChange(checkbox) },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

@@ -2,18 +2,17 @@ package eu.kanade.tachiyomi.ui.category.manga
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.util.fastMap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
-import eu.kanade.presentation.category.MangaCategoryScreen
+import eu.kanade.presentation.category.CategoryScreen
 import eu.kanade.presentation.category.components.CategoryCreateDialog
 import eu.kanade.presentation.category.components.CategoryDeleteDialog
+import eu.kanade.presentation.category.components.CategoryParentDialog
 import eu.kanade.presentation.category.components.CategoryRenameDialog
 import eu.kanade.presentation.components.TabContent
-import kotlinx.collections.immutable.toImmutableList
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.screens.LoadingScreen
 
@@ -33,9 +32,10 @@ fun Screen.mangaCategoryTab(): TabContent {
             } else {
                 val successState = state as MangaCategoryScreenState.Success
 
-                MangaCategoryScreen(
-                    state = successState,
-                    onClickCreate = { screenModel.showDialog(MangaCategoryDialog.Create) },
+                CategoryScreen(
+                    categories = successState.categories,
+                    onClickCreate = { screenModel.showDialog(MangaCategoryDialog.Create(it)) },
+                    onClickMove = { screenModel.showDialog(MangaCategoryDialog.Move(it)) },
                     onClickRename = { screenModel.showDialog(MangaCategoryDialog.Rename(it)) },
                     onClickHide = screenModel::hideCategory,
                     onClickDelete = { screenModel.showDialog(MangaCategoryDialog.Delete(it)) },
@@ -45,11 +45,21 @@ fun Screen.mangaCategoryTab(): TabContent {
                 when (val dialog = successState.dialog) {
                     null -> {}
 
-                    MangaCategoryDialog.Create -> {
+                    is MangaCategoryDialog.Create -> {
                         CategoryCreateDialog(
                             onDismissRequest = screenModel::dismissDialog,
-                            onCreate = screenModel::createCategory,
-                            categories = successState.categories.fastMap { it.name }.toImmutableList(),
+                            onCreate = { name -> screenModel.createCategory(name, dialog.parent?.id) },
+                            categories = successState.categoryNames,
+                            parent = dialog.parent,
+                        )
+                    }
+
+                    is MangaCategoryDialog.Move -> {
+                        CategoryParentDialog(
+                            onDismissRequest = screenModel::dismissDialog,
+                            onConfirm = { parentId -> screenModel.moveCategory(dialog.category, parentId) },
+                            categories = successState.categories,
+                            category = dialog.category,
                         )
                     }
 
@@ -57,7 +67,7 @@ fun Screen.mangaCategoryTab(): TabContent {
                         CategoryRenameDialog(
                             onDismissRequest = screenModel::dismissDialog,
                             onRename = { screenModel.renameCategory(dialog.category, it) },
-                            categories = successState.categories.fastMap { it.name }.toImmutableList(),
+                            categories = successState.categoryNames,
                             category = dialog.category.name,
                         )
                     }

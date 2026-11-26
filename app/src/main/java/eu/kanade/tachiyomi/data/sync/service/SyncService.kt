@@ -12,6 +12,7 @@ import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.models.BackupPreference
 import eu.kanade.tachiyomi.data.backup.models.BackupSource
 import eu.kanade.tachiyomi.data.backup.models.BackupSourcePreferences
+import eu.kanade.tachiyomi.data.backup.models.mergeCategoryBackups
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import logcat.LogPriority
@@ -40,12 +41,12 @@ abstract class SyncService(
      */
     protected fun mergeSyncData(localSyncData: SyncData, remoteSyncData: SyncData): SyncData {
         val mergedCategoriesList =
-            mergeCategoriesLists(
+            mergeCategoryBackups(
                 localSyncData.backup?.backupCategories,
                 remoteSyncData.backup?.backupCategories,
             )
         val mergedAnimeCategoriesList =
-            mergeCategoriesLists(
+            mergeCategoryBackups(
                 localSyncData.backup?.backupAnimeCategories,
                 remoteSyncData.backup?.backupAnimeCategories,
             )
@@ -432,51 +433,6 @@ abstract class SyncService(
         logcat(LogPriority.DEBUG, logTag) { "Episode merge completed. Total merged chapters: ${mergedEpisodes.size}" }
 
         return mergedEpisodes
-    }
-
-    /**
-     * Merges two lists of SyncCategory objects, prioritizing the category with the most recent order value.
-     *
-     * @param localCategoriesList The list of local SyncCategory objects.
-     * @param remoteCategoriesList The list of remote SyncCategory objects.
-     * @return The merged list of SyncCategory objects.
-     */
-    @Suppress("ReturnCount")
-    private fun mergeCategoriesLists(
-        localCategoriesList: List<BackupCategory>?,
-        remoteCategoriesList: List<BackupCategory>?,
-    ): List<BackupCategory> {
-        if (localCategoriesList == null) return remoteCategoriesList ?: emptyList()
-        if (remoteCategoriesList == null) return localCategoriesList
-        val localCategoriesMap = localCategoriesList.associateBy { it.name }
-        val remoteCategoriesMap = remoteCategoriesList.associateBy { it.name }
-
-        val mergedCategoriesMap = mutableMapOf<String, BackupCategory>()
-
-        localCategoriesMap.forEach { (name, localCategory) ->
-            val remoteCategory = remoteCategoriesMap[name]
-            if (remoteCategory != null) {
-                // Compare and merge local and remote categories
-                val mergedCategory = if (localCategory.order > remoteCategory.order) {
-                    localCategory
-                } else {
-                    remoteCategory
-                }
-                mergedCategoriesMap[name] = mergedCategory
-            } else {
-                // If the category is only in the local list, add it to the merged list
-                mergedCategoriesMap[name] = localCategory
-            }
-        }
-
-        // Add any categories from the remote list that are not in the local list
-        remoteCategoriesMap.forEach { (name, remoteCategory) ->
-            if (!mergedCategoriesMap.containsKey(name)) {
-                mergedCategoriesMap[name] = remoteCategory
-            }
-        }
-
-        return mergedCategoriesMap.values.toList()
     }
 
     private fun mergeMangaSourcesLists(

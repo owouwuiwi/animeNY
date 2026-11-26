@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="category_add_subcategory">Aggiungi sottocategoria</string>
+    <string name="category_add_in">Aggiungi sottocategoria in %1$s</string>
+    <string name="category_move_parent">Sposta categoria in</string>
+    <string name="category_top_level">Livello principale</string>
+    <string name="category_show">Mostra</string>
   <string name="tracking_status">Stato tracciamento</string>
   <string name="tag">Etichette</string>
   <string name="ungrouped">Senza gruppo</string>
