@@ -269,10 +269,11 @@ class ExternalIntents {
     private fun standardIntentForPackage(pkgName: String, context: Context, uri: Uri, video: Video): Intent {
         return Intent(Intent.ACTION_VIEW).apply {
             if (isPackageInstalled(pkgName, context.packageManager)) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && pkgName.contains("vlc")) {
+                val activity = getComponent(pkgName)
+                if (activity == null || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && pkgName == VLC_PLAYER)) {
                     setPackage(pkgName)
                 } else {
-                    component = getComponent(pkgName)
+                    component = activity
                 }
             }
             setDataAndType(uri, "video/*")
@@ -673,3 +674,28 @@ const val NEXT_PLAYER = "dev.anilbeesetti.nextplayer"
 const val X_PLAYER = "video.player.videoplayer"
 const val WEB_VIDEO_CASTER = "com.instantbits.cast.webvideo"
 const val AMNIS = "com.amnis"
+
+internal fun externalVideoPlayers(context: Context): Map<String, String> {
+    val manager = context.packageManager
+    val videoType = "video/*"
+    val probes = listOf(
+        Intent(Intent.ACTION_VIEW).setType(videoType),
+        Intent(Intent.ACTION_VIEW).setDataAndType("content://media/external/video/media/1".toUri(), videoType),
+        Intent(Intent.ACTION_VIEW).setDataAndType("https://example.invalid/video.mp4".toUri(), videoType),
+    )
+    val handlers = probes.flatMap { manager.queryIntentActivities(it, PackageManager.MATCH_DEFAULT_ONLY) }
+        .mapNotNull { it.activityInfo }
+        .filter { it.exported && it.enabled }
+        .map { it.applicationInfo }
+    // Keep players with a dedicated integration even if they do not advertise ACTION_VIEW.
+    val dedicatedPackages = setOf(
+        MPV_PLAYER, MX_PLAYER, MX_PLAYER_FREE, MX_PLAYER_PRO, VLC_PLAYER, MPV_KT, MPV_KT_PREVIEW,
+        MPV_REMOTE, JUST_PLAYER, NEXT_PLAYER, X_PLAYER, WEB_VIDEO_CASTER, AMNIS,
+    )
+    val dedicatedPlayers = manager.getInstalledPackages(0).filter { it.packageName in dedicatedPackages }
+        .mapNotNull { it.applicationInfo }
+    return (dedicatedPlayers + handlers)
+        .filter { it.enabled && it.packageName != context.packageName }
+        .distinctBy { it.packageName }
+        .associate { it.packageName to manager.getApplicationLabel(it).toString() }
+}

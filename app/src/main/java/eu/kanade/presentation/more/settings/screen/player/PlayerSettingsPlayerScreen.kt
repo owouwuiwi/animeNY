@@ -14,20 +14,8 @@ import eu.kanade.domain.base.BasePreferences
 import eu.kanade.presentation.more.settings.Preference
 import eu.kanade.presentation.more.settings.screen.SearchableSettings
 import eu.kanade.presentation.util.Screen
-import eu.kanade.tachiyomi.ui.player.AMNIS
-import eu.kanade.tachiyomi.ui.player.JUST_PLAYER
-import eu.kanade.tachiyomi.ui.player.MPV_KT
-import eu.kanade.tachiyomi.ui.player.MPV_KT_PREVIEW
-import eu.kanade.tachiyomi.ui.player.MPV_PLAYER
-import eu.kanade.tachiyomi.ui.player.MPV_REMOTE
-import eu.kanade.tachiyomi.ui.player.MX_PLAYER
-import eu.kanade.tachiyomi.ui.player.MX_PLAYER_FREE
-import eu.kanade.tachiyomi.ui.player.MX_PLAYER_PRO
-import eu.kanade.tachiyomi.ui.player.NEXT_PLAYER
 import eu.kanade.tachiyomi.ui.player.PlayerOrientation
-import eu.kanade.tachiyomi.ui.player.VLC_PLAYER
-import eu.kanade.tachiyomi.ui.player.WEB_VIDEO_CASTER
-import eu.kanade.tachiyomi.ui.player.X_PLAYER
+import eu.kanade.tachiyomi.ui.player.externalVideoPlayers
 import eu.kanade.tachiyomi.ui.player.loader.HosterCache
 import eu.kanade.tachiyomi.ui.player.loader.HosterPriority
 import eu.kanade.tachiyomi.ui.player.settings.HOSTER_CACHE_DURATIONS
@@ -413,17 +401,7 @@ object PlayerSettingsPlayerScreen : Screen(), SearchableSettings {
         val alwaysUseExternalPlayer = playerPreferences.alwaysUseExternalPlayer()
         val externalPlayerPreference = playerPreferences.externalPlayerPreference()
 
-        val pm = basePreferences.context.packageManager
-        val installedPackages = pm.getInstalledPackages(0)
-        val supportedPlayers = installedPackages.filter { it.packageName in externalPlayers }
-
-        val packageNames = supportedPlayers.map { it.packageName }
-        val packageNamesReadable = supportedPlayers
-            .map { pm.getApplicationLabel(it.applicationInfo!!).toString() }
-
-        val packageNamesMap: Map<String, String> =
-            packageNames.zip(packageNamesReadable)
-                .toMap()
+        val packageNamesMap = externalVideoPlayers(basePreferences.context)
 
         return Preference.PreferenceGroup(
             title = stringResource(AYMR.strings.pref_category_external_player),
@@ -465,19 +443,3 @@ object PlayerSettingsPlayerScreen : Screen(), SearchableSettings {
         )
     }
 }
-
-val externalPlayers = listOf(
-    MPV_PLAYER,
-    MX_PLAYER,
-    MX_PLAYER_FREE,
-    MX_PLAYER_PRO,
-    VLC_PLAYER,
-    MPV_KT,
-    MPV_KT_PREVIEW,
-    MPV_REMOTE,
-    JUST_PLAYER,
-    NEXT_PLAYER,
-    X_PLAYER,
-    WEB_VIDEO_CASTER,
-    AMNIS,
-)
