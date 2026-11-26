@@ -52,7 +52,7 @@ fun AnimeLibraryCompactGrid(
                     lastModified = anime.coverLastModified,
                 ),
                 coverBadgeStart = {
-                    DownloadsBadge(count = libraryItem.downloadCount)
+                    DownloadsBadge(count = libraryItem.badges.downloadCount)
                     UnviewedBadge(count = libraryItem.unseenCount)
                 },
                 coverBadgeEnd = {

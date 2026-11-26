@@ -62,7 +62,7 @@ internal fun AnimeLibraryList(
                     lastModified = anime.coverLastModified,
                 ),
                 badge = {
-                    DownloadsBadge(count = libraryItem.downloadCount)
+                    DownloadsBadge(count = libraryItem.badges.downloadCount)
                     UnviewedBadge(count = libraryItem.unseenCount)
                     LanguageBadge(
                         isLocal = libraryItem.isLocal,
