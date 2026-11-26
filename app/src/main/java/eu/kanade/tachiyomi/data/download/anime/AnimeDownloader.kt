@@ -45,7 +45,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,7 +57,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.transformLatest
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -109,6 +107,8 @@ class AnimeDownloader(
      */
     private val _queueState = MutableStateFlow<List<AnimeDownload>>(emptyList())
     val queueState = _queueState.asStateFlow()
+    private val queueLock = Any()
+    private var discardInitialRestore = false
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -128,8 +128,18 @@ class AnimeDownloader(
      * Restores the queue saved by [store] when the app last ran.
      */
     private val restoreJob = scope.launch {
-        val episodes = async { store.restore() }
-        addAllToQueue(episodes.await())
+        val restored = store.restore()
+        synchronized(queueLock) {
+            if (!discardInitialRestore) {
+                val current = queueState.value
+                val freshIds = current.mapTo(mutableSetOf()) { it.episode.id }
+                val saved = restored.filter { it.episode.id !in freshIds }
+                saved.forEach { it.status = AnimeDownload.State.QUEUE }
+                val merged = saved + current
+                store.replaceAll(merged)
+                _queueState.value = merged
+            }
+        }
     }
 
     /**
@@ -974,37 +984,28 @@ class AnimeDownloader(
     }
 
     private fun addAllToQueue(downloads: List<AnimeDownload>) {
-        _queueState.update {
-            downloads.forEach { download ->
-                download.status = AnimeDownload.State.QUEUE
-            }
-            store.addAll(downloads)
-            it + downloads
+        synchronized(queueLock) {
+            val current = queueState.value
+            val ids = current.mapTo(mutableSetOf()) { it.episode.id }
+            val added = downloads.filter { ids.add(it.episode.id) }
+            if (added.isEmpty()) return
+            added.forEach { it.status = AnimeDownload.State.QUEUE }
+            store.addAll(added)
+            _queueState.value = current + added
         }
     }
 
     private fun removeFromQueue(download: AnimeDownload) {
-        _queueState.update {
-            store.remove(download)
-            if (download.status == AnimeDownload.State.DOWNLOADING || download.status == AnimeDownload.State.QUEUE) {
-                download.status = AnimeDownload.State.NOT_DOWNLOADED
-            }
-            it - download
-        }
+        removeFromQueueIf { it === download }
     }
 
     private inline fun removeFromQueueIf(predicate: (AnimeDownload) -> Boolean) {
-        _queueState.update { queue ->
-            val downloads = queue.filter { predicate(it) }
-            store.removeAll(downloads)
-            downloads.forEach { download ->
-                if (download.status == AnimeDownload.State.DOWNLOADING ||
-                    download.status == AnimeDownload.State.QUEUE
-                ) {
-                    download.status = AnimeDownload.State.NOT_DOWNLOADED
-                }
-            }
-            queue - downloads.toSet()
+        synchronized(queueLock) {
+            val (removed, remaining) = queueState.value.partition(predicate)
+            if (removed.isEmpty()) return
+            store.removeAll(removed)
+            removed.forEach(::resetQueuedItem)
+            _queueState.value = remaining
         }
     }
 
@@ -1018,36 +1019,37 @@ class AnimeDownloader(
     }
 
     private fun internalClearQueue() {
-        _queueState.update {
-            it.forEach { download ->
-                if (download.status == AnimeDownload.State.DOWNLOADING ||
-                    download.status == AnimeDownload.State.QUEUE
-                ) {
-                    download.status = AnimeDownload.State.NOT_DOWNLOADED
-                }
-            }
+        synchronized(queueLock) {
+            discardInitialRestore = true
+            queueState.value.forEach(::resetQueuedItem)
             store.clear()
-            emptyList()
+            _queueState.value = emptyList()
         }
     }
 
     fun updateQueue(downloads: List<AnimeDownload>) {
-        if (queueState.value == downloads) return
-
-        if (downloads.isEmpty()) {
-            clearQueue()
-            stop()
-            return
+        synchronized(queueLock) {
+            val current = queueState.value
+            val unique = downloads.distinctBy { it.episode.id }
+            if (current == unique) return
+            if (unique.isEmpty()) {
+                clearQueue()
+                stop()
+                return
+            }
+            val wasRunning = isRunning
+            pause()
+            current.forEach(::resetQueuedItem)
+            unique.forEach { it.status = AnimeDownload.State.QUEUE }
+            store.replaceAll(unique)
+            _queueState.value = unique
+            if (wasRunning) start()
         }
+    }
 
-        val wasRunning = isRunning
-
-        pause()
-        internalClearQueue()
-        addAllToQueue(downloads)
-
-        if (wasRunning) {
-            start()
+    private fun resetQueuedItem(download: AnimeDownload) {
+        if (download.status == AnimeDownload.State.DOWNLOADING || download.status == AnimeDownload.State.QUEUE) {
+            download.status = AnimeDownload.State.NOT_DOWNLOADED
         }
     }
 

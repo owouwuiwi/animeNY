@@ -18,7 +18,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import tachiyomi.domain.entries.anime.interactor.GetAnime
 import tachiyomi.domain.entries.anime.model.Anime
@@ -152,19 +151,40 @@ class DownloadStoreTest {
     }
 
     @Test
-    fun `downloads whose entry is gone are dropped`() = runTest {
+    fun `reordering the anime queue persists a complete snapshot in one write`() = runTest {
+        val store = animeStore()
+        store.addAll(animeDownloads(1, 2, 3))
+        val preferences = files.getValue("active_downloads_anime")
+        val writesBefore = preferences.writes
+
+        store.replaceAll(animeDownloads(3, 1, 4))
+
+        assertEquals(writesBefore + 1, preferences.writes)
+        assertEquals(setOf("3", "1", "4"), preferences.all.keys)
+        store.addAll(animeDownloads(5))
+        assertEquals(listOf(3L, 1L, 4L, 5L), animeStore().restore().episodeIds())
+    }
+
+    @Test
+    fun `restore keeps the previous snapshot until the caller saves validated entries`() = runTest {
         val store = animeStore()
         store.addAll(animeDownloads(1))
         store.addAll(listOf(AnimeDownload(animeSource, anime.copy(id = 404), Episode.create().copy(id = 2))))
 
-        assertEquals(listOf(1L), animeStore().restore().episodeIds())
-        assertTrue(files.getValue("active_downloads_anime").all.isEmpty())
+        val restored = animeStore().restore()
+        assertEquals(listOf(1L), restored.episodeIds())
+        assertEquals(setOf("1", "2"), files.getValue("active_downloads_anime").all.keys)
+        store.replaceAll(restored)
+        assertEquals(setOf("1"), files.getValue("active_downloads_anime").all.keys)
     }
 }
 
 private class FakeSharedPreferences(
     private val values: MutableMap<String, Any?> = mutableMapOf(),
 ) : SharedPreferences {
+    var writes = 0
+        private set
+
     override fun getAll(): Map<String, *> = values.toMap()
     override fun getString(key: String, defValue: String?) = values[key] as? String ?: defValue
     override fun getStringSet(key: String, defValues: Set<String>?) = defValues
@@ -195,6 +215,7 @@ private class FakeSharedPreferences(
         override fun commit(): Boolean {
             if (clear) values.clear()
             changes.forEach { (key, value) -> if (value == null) values.remove(key) else values[key] = value }
+            writes++
             return true
         }
         override fun apply() {

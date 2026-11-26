@@ -50,19 +50,19 @@ class AnimeDownloadStore(
      */
     fun addAll(downloads: List<AnimeDownload>) {
         preferences.edit {
-            downloads.forEach { putString(getKey(it), serialize(it)) }
+            downloads.forEach { putString(getKey(it), serialize(it, counter++)) }
         }
     }
 
-    /**
-     * Removes a download from the store.
-     *
-     * @param download the download to remove.
-     */
-    fun remove(download: AnimeDownload) {
+    /** Writes one complete queue without exposing an empty store during a reorder. */
+    fun replaceAll(downloads: List<AnimeDownload>) {
         preferences.edit {
-            remove(getKey(download))
+            clear()
+            downloads.forEachIndexed { order, download ->
+                putString(getKey(download), serialize(download, order))
+            }
         }
+        counter = downloads.size
     }
 
     /**
@@ -83,6 +83,7 @@ class AnimeDownloadStore(
         preferences.edit {
             clear()
         }
+        counter = 0
     }
 
     /**
@@ -119,8 +120,7 @@ class AnimeDownloadStore(
             }
         }
 
-        // Clear the store, downloads will be added again immediately.
-        clear()
+        // The caller still needs to merge downloads added while the sources were loading.
         return downloads
     }
 
@@ -129,8 +129,8 @@ class AnimeDownloadStore(
      *
      * @param download the download to serialize.
      */
-    private fun serialize(download: AnimeDownload): String {
-        val obj = AnimeDownloadObject(download.anime.id, download.episode.id, counter++)
+    private fun serialize(download: AnimeDownload, order: Int): String {
+        val obj = AnimeDownloadObject(download.anime.id, download.episode.id, order)
         return json.encodeToString(obj)
     }
 
