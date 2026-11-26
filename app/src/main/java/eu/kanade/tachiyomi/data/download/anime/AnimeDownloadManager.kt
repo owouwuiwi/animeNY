@@ -71,6 +71,7 @@ class AnimeDownloadManager(
 
     fun downloaderStart() = downloader.start()
     fun downloaderStop(reason: String? = null) = downloader.stop(reason)
+    fun pauseActiveDownloads() = downloader.pause()
 
     val isDownloaderRunning
         get() = AnimeDownloadJob.isRunningFlow(context)
@@ -80,18 +81,14 @@ class AnimeDownloadManager(
      */
     fun startDownloads() {
         if (downloader.isRunning) return
-
-        if (AnimeDownloadJob.isRunning(context)) {
-            downloader.start()
-        } else {
-            AnimeDownloadJob.start(context)
-        }
+        AnimeDownloadJob.start(context)
     }
 
     /**
      * Tells the downloader to pause downloads.
      */
     fun pauseDownloads() {
+        AnimeDownloadJob.stop(context)
         downloader.stop()
     }
 
@@ -99,6 +96,7 @@ class AnimeDownloadManager(
      * Empties the download queue.
      */
     fun clearQueue() {
+        AnimeDownloadJob.stop(context)
         downloader.clearQueue()
         downloader.stop()
     }
@@ -172,7 +170,7 @@ class AnimeDownloadManager(
             addAll(0, downloads)
             reorderQueue(this)
         }
-        if (!AnimeDownloadJob.isRunning(context)) startDownloads()
+        startDownloads()
     }
 
     /**

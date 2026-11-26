@@ -112,6 +112,7 @@ class AnimeDownloader(
     /**
      * Job object for download queue management
      */
+    @Volatile
     private var downloaderJob: Job? = null
 
     /**
@@ -147,11 +148,12 @@ class AnimeDownloader(
         }
 
         val pending = queueState.value.filter { it.status != AnimeDownload.State.DOWNLOADED }
+        if (pending.isEmpty()) return false
         pending.forEach { if (it.status != AnimeDownload.State.QUEUE) it.status = AnimeDownload.State.QUEUE }
 
         launchDownloaderJob()
 
-        return pending.isNotEmpty()
+        return true
     }
 
     /**
@@ -174,7 +176,6 @@ class AnimeDownloader(
             notifier.onComplete()
         }
 
-        AnimeDownloadJob.stop(context)
     }
 
     /**

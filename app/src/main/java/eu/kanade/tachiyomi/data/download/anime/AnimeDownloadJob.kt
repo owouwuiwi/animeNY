@@ -19,15 +19,18 @@ import eu.kanade.tachiyomi.util.system.networkStateFlow
 import eu.kanade.tachiyomi.util.system.notificationBuilder
 import eu.kanade.tachiyomi.util.system.setForegroundSafely
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combineTransform
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import mihon.app.di.AppGraph
 import mihon.core.metro.metroGraph
 import tachiyomi.domain.download.service.DownloadPreferences
 import tachiyomi.i18n.R
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * This worker is used to manage the downloader. The system can decide to stop the worker, in
@@ -61,39 +64,40 @@ class AnimeDownloadJob(context: Context, workerParams: WorkerParameters) : Corou
         )
     }
 
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result = workerMutex.withLock {
         // After the app is updated or killed, WorkManager runs this job again before the queue is
         // restored. Starting with the queue still empty would end the job and leave it paused.
         downloadManager.awaitQueueRestored()
 
-        var networkCheck = checkNetworkState(
-            applicationContext.activeNetworkState(),
-            downloadPreferences.downloadOnlyOverWifi.get(),
-        )
-        var active = networkCheck && downloadManager.downloaderStart()
-
-        if (!active) {
-            return Result.failure()
+        if (downloadManager.queueState.value.isEmpty() ||
+            !checkNetworkState(applicationContext.activeNetworkState(), downloadPreferences.downloadOnlyOverWifi.get())
+        ) {
+            return@withLock Result.success()
         }
 
+        // A download can fail immediately and stop the worker. Wait for foreground
+        // promotion before its pipeline can make a network request.
         setForegroundSafely()
+        if (!downloadManager.downloaderStart()) return@withLock Result.success()
 
-        coroutineScope {
-            combineTransform(
-                applicationContext.networkStateFlow(),
-                downloadPreferences.downloadOnlyOverWifi.changes(),
-                transform = { a, b -> emit(checkNetworkState(a, b)) },
-            )
-                .onEach { networkCheck = it }
-                .launchIn(this)
+        try {
+            coroutineScope {
+                val monitor = combine(
+                    applicationContext.networkStateFlow(),
+                    downloadPreferences.downloadOnlyOverWifi.changes(),
+                    ::checkNetworkState,
+                ).launchIn(this)
+                try {
+                    while (downloadManager.isRunning) delay(1.seconds)
+                } finally {
+                    monitor.cancel()
+                }
+            }
+        } finally {
+            downloadManager.pauseActiveDownloads()
         }
 
-        // Keep the worker running when needed
-        while (active) {
-            active = !isStopped && downloadManager.isRunning && networkCheck
-        }
-
-        return Result.success()
+        Result.success()
     }
 
     private fun checkNetworkState(state: NetworkState, requireWifi: Boolean): Boolean {
@@ -113,25 +117,20 @@ class AnimeDownloadJob(context: Context, workerParams: WorkerParameters) : Corou
 
     companion object {
         private const val TAG = "AnimeDownloader"
+        // A newly enqueued worker must wait for a cancelled one to release the downloader.
+        private val workerMutex = Mutex()
 
         fun start(context: Context) {
             val request = OneTimeWorkRequestBuilder<AnimeDownloadJob>()
                 .addTag(TAG)
                 .build()
             WorkManager.getInstance(context)
-                .enqueueUniqueWork(TAG, ExistingWorkPolicy.REPLACE, request)
+                .enqueueUniqueWork(TAG, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
         }
 
         fun stop(context: Context) {
             WorkManager.getInstance(context)
                 .cancelUniqueWork(TAG)
-        }
-
-        fun isRunning(context: Context): Boolean {
-            return WorkManager.getInstance(context)
-                .getWorkInfosForUniqueWork(TAG)
-                .get()
-                .let { list -> list.count { it.state == WorkInfo.State.RUNNING } == 1 }
         }
 
         fun isRunningFlow(context: Context): Flow<Boolean> {
