@@ -13,6 +13,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.components.AdaptiveSheet
@@ -160,13 +164,34 @@ private fun FilterItem(filter: Filter<*>, onUpdate: () -> Unit) {
             CollapsibleBox(
                 heading = filter.name,
             ) {
-                Column {
-                    filter.state
-                        .filterIsInstance<Filter<*>>()
-                        .map { FilterItem(filter = it, onUpdate = onUpdate) }
-                }
+                FilterGroupItems(filter, onUpdate)
             }
         }
+    }
+}
+
+@Composable
+private fun FilterGroupItems(group: Filter.Group<*>, onUpdate: () -> Unit) {
+    val options = group.state.filterIsInstance<Filter<*>>()
+    val searchable = options.size >= 12 && options.all { it is Filter.CheckBox || it is Filter.TriState }
+    var search by rememberSaveable(group.name) { mutableStateOf("") }
+    Column {
+        if (searchable) {
+            TextItem(label = stringResource(MR.strings.action_search), value = search) { search = it }
+        }
+        val term = search.trim()
+        val visibleOptions = if (searchable && term.isNotEmpty()) {
+            options.filter { it.name.contains(term, ignoreCase = true) }
+        } else {
+            options
+        }
+        if (searchable && visibleOptions.isEmpty()) {
+            Text(
+                text = stringResource(MR.strings.no_results_found),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+        visibleOptions.forEach { FilterItem(it, onUpdate) }
     }
 }
 
