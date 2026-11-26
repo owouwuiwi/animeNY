@@ -2,6 +2,10 @@ package eu.kanade.tachiyomi.data.track.myanimelist
 
 import android.graphics.Color
 import dev.icerock.moko.resources.StringResource
+import eu.kanade.domain.track.repeat.RemoteRepeat
+import eu.kanade.domain.track.repeat.RepeatKind
+import eu.kanade.domain.track.repeat.RepeatStatus
+import eu.kanade.domain.track.repeat.RepeatTracker
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.models.anime.AnimeTrack
 import eu.kanade.tachiyomi.data.database.models.manga.MangaTrack
@@ -30,7 +34,17 @@ class MyAnimeList(id: Long) :
     MangaTracker,
     AnimeTracker,
     DeletableMangaTracker,
-    DeletableAnimeTracker {
+    DeletableAnimeTracker,
+    RepeatTracker {
+
+    override suspend fun getRepeat(kind: RepeatKind, remoteId: Long) = api.getRepeat(kind, remoteId)
+
+    override suspend fun updateRepeat(
+        kind: RepeatKind,
+        entry: RemoteRepeat,
+        status: RepeatStatus,
+        count: Int?,
+    ) = api.updateRepeat(kind, entry, status, count)
 
     companion object {
         const val READING = 1L

@@ -157,6 +157,7 @@ fun MangaScreen(
     onInvertSelection: () -> Unit,
 
     downloadProgressProvider: (Long) -> Int = { 0 },
+    onTrackRepeat: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val onCopyTagToClipboard: (tag: String) -> Unit = {
@@ -197,6 +198,7 @@ fun MangaScreen(
             onEditCategoryClicked = onEditCategoryClicked,
             onEditIntervalClicked = onEditFetchIntervalClicked,
             onMigrateClicked = onMigrateClicked,
+            onTrackRepeat = onTrackRepeat,
             onEditNotesClicked = onEditNotesClicked,
             // SY -->
             onEditInfoClicked = onEditInfoClicked,
@@ -245,6 +247,7 @@ fun MangaScreen(
             onEditCategoryClicked = onEditCategoryClicked,
             onEditIntervalClicked = onEditFetchIntervalClicked,
             onMigrateClicked = onMigrateClicked,
+            onTrackRepeat = onTrackRepeat,
             onEditNotesClicked = onEditNotesClicked,
             // SY -->
             onEditInfoClicked = onEditInfoClicked,
@@ -333,6 +336,7 @@ private fun MangaScreenSmallImpl(
     onInvertSelection: () -> Unit,
 
     downloadProgressProvider: (Long) -> Int = { 0 },
+    onTrackRepeat: (() -> Unit)? = null,
 ) {
     val chapterListState = rememberLazyListState()
 
@@ -390,6 +394,7 @@ private fun MangaScreenSmallImpl(
                 onClickEditCategory = onEditCategoryClicked,
                 onClickRefresh = onRefresh,
                 onClickMigrate = onMigrateClicked,
+                onTrackRepeat = onTrackRepeat,
                 onClickEditNotes = onEditNotesClicked,
                 // SY -->
                 onClickEditInfo = onEditInfoClicked.takeIf { state.manga.favorite },
@@ -664,6 +669,7 @@ fun MangaScreenLargeImpl(
     onInvertSelection: () -> Unit,
 
     downloadProgressProvider: (Long) -> Int = { 0 },
+    onTrackRepeat: (() -> Unit)? = null,
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val density = LocalDensity.current
@@ -714,6 +720,7 @@ fun MangaScreenLargeImpl(
                 onClickEditCategory = onEditCategoryClicked,
                 onClickRefresh = onRefresh,
                 onClickMigrate = onMigrateClicked,
+                onTrackRepeat = onTrackRepeat,
                 onClickEditNotes = onEditNotesClicked,
                 onCancelActionMode = { onAllChapterSelected(false) },
                 // SY -->

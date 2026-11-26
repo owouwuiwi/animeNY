@@ -161,6 +161,11 @@ object SettingsTrackingScreen : SearchableSettings {
                 title = stringResource(AYMR.strings.pref_auto_update_manga_sync),
             ),
             Preference.PreferenceItem.SwitchPreference(
+                preference = trackPreferences.trackRepeats,
+                title = stringResource(TLMR.strings.pref_track_repeats),
+                subtitle = stringResource(TLMR.strings.pref_track_repeats_summary),
+            ),
+            Preference.PreferenceItem.SwitchPreference(
                 preference = trackPreferences.trackOnAddingToLibrary,
                 title = stringResource(AYMR.strings.pref_track_on_add_library),
             ),

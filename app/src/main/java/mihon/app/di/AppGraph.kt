@@ -66,6 +66,7 @@ import eu.kanade.domain.track.manga.interactor.SyncChapterProgressWithTrack
 import eu.kanade.domain.track.manga.interactor.TrackChapter
 import eu.kanade.domain.track.manga.service.DelayedMangaTrackingUpdateJob
 import eu.kanade.domain.track.manga.store.DelayedMangaTrackingStore
+import eu.kanade.domain.track.repeat.TrackRepeats
 import eu.kanade.domain.track.service.TrackPreferences
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.tachiyomi.App
@@ -353,6 +354,7 @@ interface AppGraph : ViewModelGraph {
     val resetAnimeCategoryFlags: ResetAnimeCategoryFlags
     val addMangaTracks: AddMangaTracks
     val addAnimeTracks: AddAnimeTracks
+    val trackRepeats: TrackRepeats
     val upsertMangaTrack: UpsertMangaTrack
     val insertMangaTrack: InsertMangaTrack get() = upsertMangaTrack
     val upsertAnimeTrack: UpsertAnimeTrack

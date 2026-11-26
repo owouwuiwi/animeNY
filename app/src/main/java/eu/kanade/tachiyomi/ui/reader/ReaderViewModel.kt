@@ -25,6 +25,9 @@ import eu.kanade.domain.items.chapter.model.toDbChapter
 import eu.kanade.domain.source.manga.interactor.GetMangaIncognitoState
 import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.domain.track.manga.interactor.TrackChapter
+import eu.kanade.domain.track.repeat.RepeatPlayback
+import eu.kanade.domain.track.repeat.TrackRepeats
+import eu.kanade.domain.track.repeat.repeatKey
 import eu.kanade.domain.track.service.TrackPreferences
 import eu.kanade.tachiyomi.data.cache.MangaCoverCache
 import eu.kanade.tachiyomi.data.database.models.manga.toDomainChapter
@@ -120,6 +123,7 @@ class ReaderViewModel(
     private val downloadPreferences: DownloadPreferences,
     private val trackPreferences: TrackPreferences,
     private val trackChapter: TrackChapter,
+    private val trackRepeats: TrackRepeats,
     private val getManga: GetManga,
     private val getChaptersByMangaId: GetChaptersByMangaId,
     private val getNextChapters: GetNextChapters,
@@ -304,6 +308,7 @@ class ReaderViewModel(
     }
 
     var incognitoMode: Boolean = false
+    private var repeatPlayback: RepeatPlayback? = null
         private set
     private val downloadAheadAmount = downloadPreferences.autoDownloadWhileReading.get()
 
@@ -364,6 +369,7 @@ class ReaderViewModel(
                 val manga = getManga.await(mangaId) ?: error("Requested manga of id $mangaId not found")
                 val source = sourceManager.getOrStub(manga.source)
                 incognitoMode = getMangaIncognitoState.await(manga.source)
+                repeatPlayback = if (incognitoMode) null else trackRepeats.playback(manga.repeatKey())
                 mutableState.update { it.copy(manga = manga, source = source) }
                 if (chapterId == -1L) chapterId = initialChapterId
 
@@ -668,6 +674,9 @@ class ReaderViewModel(
 
         val progressIndex = progressPage.index
         val reachedEnd = readerChapter.pages?.lastIndex == progressIndex
+        repeatPlayback?.report(viewModelScope, readerChapter.chapter.chapter_number.toDouble(), reachedEnd) {
+            progressPage.statusFlow.first { it == Page.State.READY || it == Page.State.ERROR } == Page.State.READY
+        }
         if (pendingProgressChapter != readerChapter) saveChapterProgress()
         readerChapter.chapter.read = readerChapter.chapter.read || reachedEnd
         readerChapter.chapter.last_page_read = progressIndex

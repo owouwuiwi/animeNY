@@ -67,6 +67,7 @@ fun EntryToolbar(
     modifier: Modifier = Modifier,
     onPrepareDownloadFolder: (() -> Unit)? = null,
     onImportEpisodes: (() -> Unit)? = null,
+    onTrackRepeat: (() -> Unit)? = null,
 ) {
     val navigator = LocalNavigator.current
     fun onHomeClicked() = navigator?.popUntil { screen ->
@@ -156,6 +157,15 @@ fun EntryToolbar(
                             onClick = onClickFilter,
                         ),
                     )
+                    if (onTrackRepeat != null) {
+                        val label = if (isManga) TLMR.strings.action_track_reread else TLMR.strings.action_track_rewatch
+                        add(
+                            AppBar.OverflowAction(
+                                title = stringResource(label),
+                                onClick = onTrackRepeat,
+                            ),
+                        )
+                    }
                     // SY -->
                     if (onClickEditInfo != null) {
                         add(

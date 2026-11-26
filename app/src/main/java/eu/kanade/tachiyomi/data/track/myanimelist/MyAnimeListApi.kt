@@ -2,6 +2,9 @@ package eu.kanade.tachiyomi.data.track.myanimelist
 
 import android.net.Uri
 import androidx.core.net.toUri
+import eu.kanade.domain.track.repeat.RemoteRepeat
+import eu.kanade.domain.track.repeat.RepeatKind
+import eu.kanade.domain.track.repeat.RepeatStatus
 import eu.kanade.tachiyomi.data.database.models.anime.AnimeTrack
 import eu.kanade.tachiyomi.data.database.models.manga.MangaTrack
 import eu.kanade.tachiyomi.data.track.model.AnimeTrackSearch
@@ -18,6 +21,8 @@ import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALListMangaItemStatus
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALManga
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALMangaMetadata
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALOAuth
+import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALRepeatItem
+import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALRepeatStatus
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALSearchResult
 import eu.kanade.tachiyomi.data.track.myanimelist.dto.MALUser
 import eu.kanade.tachiyomi.network.DELETE
@@ -147,6 +152,50 @@ class MyAnimeListApi(
                     .let { parseAnimeSearchItem(it) }
             }
         }
+    }
+
+    internal suspend fun getRepeat(kind: RepeatKind, remoteId: Long): RemoteRepeat? = withIOContext {
+        val mediaType = if (kind == RepeatKind.Anime) "anime" else "manga"
+        val countField = kind.repeatCountField()
+        val flag = kind.repeatFlagField()
+        val url = "$BASE_API_URL/$mediaType/$remoteId".toUri().buildUpon()
+            .appendQueryParameter("fields", "my_list_status{status,$flag,$countField}")
+            .build()
+        with(json) {
+            authClient.newCall(GET(url.toString())).awaitSuccess()
+                .parseAs<MALRepeatItem>().myListStatus?.toRemoteRepeat(kind, remoteId)
+        }
+    }
+
+    internal suspend fun updateRepeat(
+        kind: RepeatKind,
+        entry: RemoteRepeat,
+        status: RepeatStatus,
+        count: Int?,
+    ): RemoteRepeat = withIOContext {
+        val url = if (kind == RepeatKind.Anime) animeUrl(entry.entryId) else mangaUrl(entry.entryId)
+        val body = FormBody.Builder()
+        when (status) {
+            RepeatStatus.Repeating -> body.add(kind.repeatFlagField(), "true")
+            RepeatStatus.Completed -> body.add("status", "completed").add(kind.repeatFlagField(), "false")
+            RepeatStatus.Other -> error("Unexpected repeat status")
+        }
+        count?.let { body.add(kind.repeatCountField(), it.toString()) }
+        val request = Request.Builder().url(url.toString()).patch(body.build()).build()
+        with(json) {
+            authClient.newCall(request).awaitSuccess()
+                .parseAs<MALRepeatStatus>().toRemoteRepeat(kind, entry.entryId)
+        }
+    }
+
+    private fun RepeatKind.repeatFlagField() = if (this == RepeatKind.Anime) "is_rewatching" else "is_rereading"
+
+    private fun RepeatKind.repeatCountField() = if (this ==
+        RepeatKind.Anime
+    ) {
+        "num_times_rewatched"
+    } else {
+        "num_times_reread"
     }
 
     suspend fun updateItem(track: MangaTrack): MangaTrack {

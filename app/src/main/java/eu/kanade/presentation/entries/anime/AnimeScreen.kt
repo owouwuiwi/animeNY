@@ -206,6 +206,7 @@ fun AnimeScreen(
     onRelatedAnimeLongClick: (Anime) -> Unit,
     // KMK <--
     downloadProgressProvider: (Long) -> Int = { 0 },
+    onTrackRepeat: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val onCopyTagToClipboard: (tag: String) -> Unit = {
@@ -253,6 +254,7 @@ fun AnimeScreen(
             onEditCategoryClicked = onEditCategoryClicked,
             onEditIntervalClicked = onEditFetchIntervalClicked,
             onMigrateClicked = onMigrateClicked,
+            onTrackRepeat = onTrackRepeat,
             onEditNotesClicked = onEditNotesClicked,
             // SY -->
             onEditInfoClicked = onEditInfoClicked,
@@ -319,6 +321,7 @@ fun AnimeScreen(
             changeAnimeSkipIntro = changeAnimeSkipIntro,
             changeAnimeAudioLanguage = changeAnimeAudioLanguage,
             onMigrateClicked = onMigrateClicked,
+            onTrackRepeat = onTrackRepeat,
             onEditNotesClicked = onEditNotesClicked,
             // SY -->
             onEditInfoClicked = onEditInfoClicked,
@@ -431,6 +434,7 @@ private fun AnimeScreenSmallImpl(
     onRelatedAnimeLongClick: (Anime) -> Unit,
     // KMK <--
     downloadProgressProvider: (Long) -> Int = { 0 },
+    onTrackRepeat: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val offsetGridPaddingPx = with(density) { GRID_PADDING.roundToPx() }
@@ -509,6 +513,7 @@ private fun AnimeScreenSmallImpl(
                     onClickEditCategory = onEditCategoryClicked,
                     onClickRefresh = onRefresh,
                     onClickMigrate = onMigrateClicked,
+                    onTrackRepeat = onTrackRepeat,
                     onClickEditNotes = onEditNotesClicked,
                     // SY -->
                     onClickEditInfo = onEditInfoClicked.takeIf { state.anime.favorite },
@@ -909,6 +914,7 @@ fun AnimeScreenLargeImpl(
     onRelatedAnimeLongClick: (Anime) -> Unit,
     // KMK <--
     downloadProgressProvider: (Long) -> Int = { 0 },
+    onTrackRepeat: (() -> Unit)? = null,
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val density = LocalDensity.current
@@ -975,6 +981,7 @@ fun AnimeScreenLargeImpl(
                     onClickEditCategory = onEditCategoryClicked,
                     onClickRefresh = onRefresh,
                     onClickMigrate = onMigrateClicked,
+                    onTrackRepeat = onTrackRepeat,
                     onClickEditNotes = onEditNotesClicked,
                     onCancelActionMode = { onAllEpisodeSelected(false) },
                     // SY -->

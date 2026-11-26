@@ -26,6 +26,8 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import dev.zacsweers.metrox.viewmodel.assistedMetroViewModel
 import eu.kanade.domain.entries.manga.model.hasCustomCover
 import eu.kanade.domain.entries.manga.model.toSManga
+import eu.kanade.domain.track.repeat.repeatKey
+import eu.kanade.domain.track.repeat.toRepeatPart
 import eu.kanade.presentation.browse.RemoveEntryDialog
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.components.NavigatorAdaptiveSheet
@@ -34,6 +36,7 @@ import eu.kanade.presentation.entries.components.CoverUrlDialog
 import eu.kanade.presentation.entries.components.DeleteItemsDialog
 import eu.kanade.presentation.entries.components.SetDateDialog
 import eu.kanade.presentation.entries.components.SetIntervalDialog
+import eu.kanade.presentation.entries.components.repeatAction
 import eu.kanade.presentation.entries.manga.ChapterSettingsDialog
 import eu.kanade.presentation.entries.manga.DuplicateMangaDialog
 import eu.kanade.presentation.entries.manga.MangaScreen
@@ -344,6 +347,20 @@ class MangaScreen(
     ) {
         val isHttpSource = remember { successState.source is HttpSource }
         val haptic = LocalHapticFeedback.current
+        val onTrackRepeat = repeatAction(
+            key = successState.manga.repeatKey(),
+            parts = {
+                remember(successState.chapters) {
+                    buildMap {
+                        successState.chapters.forEach { (chapter) ->
+                            chapter.chapterNumber.toRepeatPart()?.let { putIfAbsent(it, chapter.id) }
+                        }
+                    }
+                }
+            },
+        ) { chapterId ->
+            context.startActivity(ReaderActivity.newIntent(context, successState.manga.id, chapterId, page = 0))
+        }
 
         MangaScreen(
             state = successState,
@@ -389,6 +406,7 @@ class MangaScreen(
             onFilterButtonClicked = viewModel::showSettingsDialog,
             onRefresh = viewModel::fetchAllFromSource,
             onContinueReading = { continueReading(context, viewModel.getNextUnreadChapter()) },
+            onTrackRepeat = onTrackRepeat,
             onSearch = { query, global -> scope.launch { performSearch(navigator, query, global) } },
             onCoverClicked = viewModel::showCoverDialog,
             onShareClicked = { shareManga(context, viewModel.manga, viewModel.source) }.takeIf { isHttpSource },

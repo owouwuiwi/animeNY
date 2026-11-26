@@ -341,6 +341,10 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
 
         val scope = ProcessLifecycleOwner.get().lifecycleScope
 
+        graph.trackRepeats.enabledFlow()
+            .onEach { enabled -> if (enabled) graph.trackRepeats.resumeSync() }
+            .launchIn(scope)
+
         // Show notification to disable Incognito Mode when it's enabled
         basePreferences.incognitoMode.changes()
             .onEach { enabled ->

@@ -1,0 +1,9 @@
+query AniListGetRepeatEntry($mediaId: Int!, $userId: Int!) {
+  Page(perPage: 1) {
+    mediaList(mediaId: $mediaId, userId: $userId) {
+      id
+      status
+      repeat
+    }
+  }
+}

@@ -1,0 +1,7 @@
+mutation AniListUpdateRepeatEntry($entryId: Int!, $status: MediaListStatus!, $count: Int) {
+  SaveMediaListEntry(id: $entryId, status: $status, repeat: $count) {
+    id
+    status
+    repeat
+  }
+}

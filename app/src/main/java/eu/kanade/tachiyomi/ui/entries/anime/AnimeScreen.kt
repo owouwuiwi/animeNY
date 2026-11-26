@@ -13,6 +13,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -32,6 +33,8 @@ import eu.kanade.core.util.ifAnimeSourcesLoaded
 import eu.kanade.domain.entries.anime.model.hasCustomBackground
 import eu.kanade.domain.entries.anime.model.hasCustomCover
 import eu.kanade.domain.entries.anime.model.toSAnime
+import eu.kanade.domain.track.repeat.repeatKey
+import eu.kanade.domain.track.repeat.toRepeatPart
 import eu.kanade.presentation.browse.RemoveEntryDialog
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.components.NavigatorAdaptiveSheet
@@ -49,6 +52,7 @@ import eu.kanade.presentation.entries.components.CoverUrlDialog
 import eu.kanade.presentation.entries.components.DeleteItemsDialog
 import eu.kanade.presentation.entries.components.SetDateDialog
 import eu.kanade.presentation.entries.components.SetIntervalDialog
+import eu.kanade.presentation.entries.components.repeatAction
 import eu.kanade.presentation.more.settings.screen.player.PlayerSettingsGesturesScreen.SkipIntroLengthDialog
 import eu.kanade.presentation.theme.CoverBasedTheme
 import eu.kanade.presentation.theme.TachiyomiTheme
@@ -90,6 +94,7 @@ import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.items.episode.model.Episode
+import tachiyomi.domain.items.episode.service.episodeTrackingNumbers
 import tachiyomi.domain.items.episode.service.seasonalEpisodeNumber
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
@@ -203,6 +208,26 @@ class AnimeScreen(
             }
         }
         val haptic = LocalHapticFeedback.current
+        val onTrackRepeat = repeatAction(
+            key = successState.anime.repeatKey(),
+            parts = {
+                remember(successState.anime, successState.episodes) {
+                    val episodes = successState.episodes.map { it.episode }
+                    buildMap {
+                        for ((episodeId, number) in episodeTrackingNumbers(successState.anime, episodes)) {
+                            number.toRepeatPart()?.let { putIfAbsent(it, episodeId) }
+                        }
+                    }
+                }
+            },
+        ) { episodeId ->
+            withIOContext {
+                if (viewModel.isTorrentEnabled() && successState.source.isSourceForTorrents()) {
+                    TorrentServerService.start()
+                }
+                MainActivity.startPlayerActivity(context, successState.anime.id, episodeId, extPlayer = false)
+            }
+        }
         AnimeScreen(
 
             state = successState,
@@ -268,6 +293,7 @@ class AnimeScreen(
                     continueWatching(context, viewModel.getNextUnseenEpisode(), extPlayer)
                 }
             },
+            onTrackRepeat = onTrackRepeat,
             onSearch = { query, global -> scope.launch { performSearch(navigator, query, global) } },
             onCoverClicked = viewModel::showImagesDialog,
             onShareClicked = {

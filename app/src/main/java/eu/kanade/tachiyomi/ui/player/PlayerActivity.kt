@@ -1219,7 +1219,7 @@ class PlayerActivity : BaseActivity() {
 
         if (viewModel.isLoadingEpisode.value) {
             viewModel.currentEpisode.value?.let { episode ->
-                val preservePos = playerPreferences.preserveWatchingPosition().get()
+                val preservePos = playerPreferences.preserveWatchingPosition().get() && !viewModel.isTrackingRepeat
                 val resumePosition = position
                     ?: if (episode.seen && !preservePos) {
                         0L

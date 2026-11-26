@@ -5,6 +5,8 @@ import androidx.core.net.toUri
 import com.apollographql.apollo.ApolloClient
 import com.apollographql.apollo.api.Optional
 import com.apollographql.apollo.network.okHttpClient
+import eu.kanade.domain.track.repeat.RemoteRepeat
+import eu.kanade.domain.track.repeat.RepeatStatus
 import eu.kanade.tachiyomi.animesource.model.Credit
 import eu.kanade.tachiyomi.data.database.models.anime.AnimeTrack
 import eu.kanade.tachiyomi.data.database.models.manga.MangaTrack
@@ -32,12 +34,15 @@ import mihon.graphql.anilist.AniListGetMangaDetailsQuery
 import mihon.graphql.anilist.AniListGetMangaMetadataQuery
 import mihon.graphql.anilist.AniListGetPopularAnimeQuery
 import mihon.graphql.anilist.AniListGetPopularMangaQuery
+import mihon.graphql.anilist.AniListGetRepeatEntryQuery
 import mihon.graphql.anilist.AniListSearchAnimeQuery
 import mihon.graphql.anilist.AniListSearchCastQuery
 import mihon.graphql.anilist.AniListSearchMangaQuery
 import mihon.graphql.anilist.AniListUpdateAnimeMutation
 import mihon.graphql.anilist.AniListUpdateMangaMutation
+import mihon.graphql.anilist.AniListUpdateRepeatEntryMutation
 import mihon.graphql.anilist.type.FuzzyDateInput
+import mihon.graphql.anilist.type.MediaListStatus
 import okhttp3.OkHttpClient
 import tachiyomi.core.common.util.system.logcat
 import kotlin.time.Duration.Companion.minutes
@@ -68,6 +73,35 @@ class AnilistApi(
             // required to log the error body in dataOrElse, which also properly closes it
             .httpExposeErrorBody(true)
             .build()
+    }
+
+    internal suspend fun getRepeat(remoteId: Long, userId: Int): RemoteRepeat? {
+        return graphQlClient.query(AniListGetRepeatEntryQuery(mediaId = remoteId.toInt(), userId = userId))
+            .execute().dataAssertNoErrors.Page?.mediaList?.firstOrNull()?.let { entry ->
+                RemoteRepeat(entry.id.toLong(), entry.status.toRepeatStatus(), entry.repeat)
+            }
+    }
+
+    internal suspend fun updateRepeat(entry: RemoteRepeat, status: RepeatStatus, count: Int?): RemoteRepeat {
+        val apiStatus = when (status) {
+            RepeatStatus.Completed -> MediaListStatus.COMPLETED
+            RepeatStatus.Repeating -> MediaListStatus.REPEATING
+            RepeatStatus.Other -> error("Unexpected repeat status")
+        }
+        val saved = graphQlClient.mutation(
+            AniListUpdateRepeatEntryMutation(
+                entryId = entry.entryId.toInt(),
+                status = apiStatus,
+                count = Optional.presentIfNotNull(count),
+            ),
+        ).execute().dataAssertNoErrors.SaveMediaListEntry ?: error("AniList did not save the repeat")
+        return RemoteRepeat(saved.id.toLong(), saved.status.toRepeatStatus(), saved.repeat)
+    }
+
+    private fun MediaListStatus?.toRepeatStatus() = when (this) {
+        MediaListStatus.COMPLETED -> RepeatStatus.Completed
+        MediaListStatus.REPEATING -> RepeatStatus.Repeating
+        else -> RepeatStatus.Other
     }
 
     suspend fun addLibManga(track: MangaTrack): MangaTrack {

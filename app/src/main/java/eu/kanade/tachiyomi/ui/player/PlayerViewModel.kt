@@ -56,6 +56,9 @@ import eu.kanade.domain.entries.anime.interactor.UpdateAnime
 import eu.kanade.domain.items.episode.model.toDbEpisode
 import eu.kanade.domain.source.anime.interactor.GetAnimeIncognitoState
 import eu.kanade.domain.track.anime.interactor.TrackEpisode
+import eu.kanade.domain.track.repeat.RepeatPlayback
+import eu.kanade.domain.track.repeat.TrackRepeats
+import eu.kanade.domain.track.repeat.repeatKey
 import eu.kanade.domain.track.service.TrackPreferences
 import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.more.settings.screen.player.custombutton.CustomButtonFetchState
@@ -190,6 +193,7 @@ class PlayerViewModel(
     private val downloadPreferences: DownloadPreferences,
     private val trackPreferences: TrackPreferences,
     private val trackEpisode: TrackEpisode,
+    private val trackRepeats: TrackRepeats,
     private val getAnime: GetAnime,
     private val getNextEpisodes: GetNextEpisodes,
     private val getEpisodesByAnimeId: GetEpisodesByAnimeId,
@@ -1295,6 +1299,9 @@ class PlayerViewModel(
     // ====== OLD ======
 
     val incognitoMode: Boolean by lazy { runBlocking { getIncognitoState.await(currentAnime.value?.source) } }
+    private var repeatPlayback: RepeatPlayback? = null
+    private var repeatEpisodes: Map<Long, Double> = emptyMap()
+    internal val isTrackingRepeat: Boolean get() = repeatPlayback != null && trackRepeats.enabled
     private val downloadAheadAmount = downloadPreferences.autoDownloadWhileWatching.get()
 
     internal val relativeTime = uiPreferences.relativeTime.get()
@@ -1473,6 +1480,18 @@ class PlayerViewModel(
                 animeTitle.update { _ -> anime.title }
                 sourceManager.isInitialized.first { it }
                 episodeId = initialEpisodeId
+                repeatPlayback = trackRepeats.playback(anime.repeatKey()).also { playback ->
+                    val currentRepeat = playback?.sessionId
+                    if (currentRepeat != null && currentRepeat != savedState.get<String>("tracked_repeat_id")) {
+                        episodePosition = null
+                    }
+                    savedState["tracked_repeat_id"] = currentRepeat
+                }
+                repeatEpisodes = if (repeatPlayback == null) {
+                    emptyMap()
+                } else {
+                    episodeTrackingNumbers(anime, getEpisodesByAnimeId.await(anime.id))
+                }
 
                 val buttons = getCustomButtons.getAll()
                 setCustomButtons(buttons)
@@ -2246,6 +2265,11 @@ class PlayerViewModel(
 
         val progress = playerPreferences.progressPreference().get()
         val shouldTrack = !incognitoMode || hasTrackers
+        if (position > 0 && !incognitoMode && !isNetworkStreamSession && isTrackingRepeat) {
+            currentEp.id?.let(repeatEpisodes::get)?.let { number ->
+                repeatPlayback?.report(viewModelScope, number, completed = seconds >= totalSeconds * progress)
+            }
+        }
         if (seconds >= totalSeconds * progress && shouldTrack) {
             viewModelScope.launchNonCancellable {
                 updateEpisodeProgressOnComplete(currentEp)

@@ -431,6 +431,12 @@
     <string name="library_update_skip_manga_extensions">Manga extensions to skip in global updates</string>
     <string name="pref_import_tracker_progress">Import progress from other trackers</string>
     <string name="pref_import_tracker_progress_summary">Mark earlier episodes and chapters as completed when linking or refreshing a tracker. Existing progress is kept.</string>
+    <string name="pref_track_repeats">Track rereads and rewatches</string>
+    <string name="pref_track_repeats_summary">Start a reread or rewatch from a completed title’s menu. AniList and MyAnimeList count it when you finish the whole title again.</string>
+    <string name="action_track_reread">Reread with tracker</string>
+    <string name="action_track_rewatch">Rewatch with tracker</string>
+    <string name="track_repeat_no_next_part">There are no more parts available to repeat.</string>
+    <string name="track_repeat_open_error">Could not open the repeated title.</string>
     <string name="pref_smart_sync_tracker">Smart sync seasons</string>
     <string name="pref_smart_sync_tracker_summary">Skip completed items and stop at entry in progress</string>
 
