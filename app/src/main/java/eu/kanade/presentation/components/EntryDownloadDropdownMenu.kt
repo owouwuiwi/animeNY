@@ -19,6 +19,7 @@ fun EntryDownloadDropdownMenu(
     isManga: Boolean,
     modifier: Modifier = Modifier,
     onPrepareDownloadFolder: (() -> Unit)? = null,
+    onImportEpisodes: (() -> Unit)? = null,
 ) {
     val downloadAmount = if (isManga) MR.plurals.download_amount else AYMR.plurals.download_amount_anime
     val downloadUnviewed = if (isManga) MR.strings.download_unread else AYMR.strings.download_unseen
@@ -53,6 +54,15 @@ fun EntryDownloadDropdownMenu(
                 onClick = {
                     onDismissRequest()
                     onPrepareDownloadFolder()
+                },
+            )
+        }
+        if (onImportEpisodes != null) {
+            DropdownMenuItem(
+                text = { Text(text = stringResource(TLMR.strings.episode_import_action)) },
+                onClick = {
+                    onDismissRequest()
+                    onImportEpisodes()
                 },
             )
         }

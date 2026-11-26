@@ -44,6 +44,7 @@ import eu.kanade.presentation.entries.anime.EpisodeSettingsDialog
 import eu.kanade.presentation.entries.anime.SeasonSettingsDialog
 import eu.kanade.presentation.entries.anime.components.AnimeImagesDialog
 import eu.kanade.presentation.entries.anime.components.EditEpisodeTitleDialog
+import eu.kanade.presentation.entries.anime.components.ImportEpisodesDialog
 import eu.kanade.presentation.entries.components.CoverUrlDialog
 import eu.kanade.presentation.entries.components.DeleteItemsDialog
 import eu.kanade.presentation.entries.components.SetDateDialog
@@ -185,6 +186,10 @@ class AnimeScreen(
         val isAnimeHttpSource = remember { successState.source is AnimeHttpSource }
         val canDownloadEpisodes =
             !successState.source.isLocalOrStub() && successState.anime.fetchType == FetchType.Episodes
+        val episodeFiles = rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenMultipleDocuments(),
+            viewModel::previewEpisodeImport,
+        )
 
         LaunchedEffect(successState.anime, viewModel.source) {
             if (isAnimeHttpSource) {
@@ -274,6 +279,11 @@ class AnimeScreen(
             }.takeIf { isAnimeHttpSource },
             onDownloadActionClicked = viewModel::runDownloadAction.takeIf { canDownloadEpisodes },
             onPrepareDownloadFolder = viewModel::prepareDownloadFolder.takeIf { canDownloadEpisodes },
+            onImportEpisodes = if (canDownloadEpisodes && !successState.isImportingEpisodes) {
+                { episodeFiles.launch(arrayOf("video/*", "application/octet-stream")) }
+            } else {
+                null
+            },
             onEditCategoryClicked = viewModel::showChangeCategoryDialog.takeIf { successState.anime.favorite },
             // SY -->
             onEditInfoClicked = viewModel::showEditAnimeInfoDialog,
@@ -404,6 +414,14 @@ class AnimeScreen(
                     initialDateMillis = dialog.episodes.firstOrNull()?.let {
                         it.dateUploadOverride.takeIf { d -> d > 0 } ?: it.dateUpload
                     } ?: 0,
+                )
+            }
+
+            is AnimeViewModel.Dialog.ImportEpisodes -> {
+                ImportEpisodesDialog(
+                    files = dialog.files,
+                    onConfirm = viewModel::confirmEpisodeImport,
+                    onDismiss = viewModel::dismissDialog,
                 )
             }
 

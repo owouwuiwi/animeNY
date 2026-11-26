@@ -41,6 +41,10 @@ class AnimeDownloadProvider(
     private val downloadPreferences: DownloadPreferences,
 ) {
 
+    private val fileCommitLock = Any()
+
+    internal fun <T> commitEpisodeFile(action: () -> T): T = synchronized(fileCommitLock, action)
+
     private val downloadsDir: UniFile?
         get() = storageManager.getDownloadsDirectory()
 

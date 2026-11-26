@@ -411,12 +411,26 @@ class AnimeDownloader(
 
             val filename = DiskUtil.buildValidFilename("${download.anime.title} - ${download.episode.name}")
             tmpDir.findFile("${filename}_tmp.mkv")?.delete()
-            val episodeDir = finalizeEpisodeDir(animeDir, tmpDir, episodeDirname)
-                ?: throw IOException("Failed to move ${tmpDir.name} to $episodeDirname")
+            val (videoLocation, downloadName) = provider.commitEpisodeFile {
+                val names = provider.getValidEpisodeDirNames(
+                    download.episode.name,
+                    download.episode.scanlator,
+                    download.episode.url,
+                )
+                val existingVideo = provider.findDownloadedEpisode(animeDir, names)?.takeIf { it.isFile }
+                if (existingVideo != null) {
+                    tmpDir.delete()
+                    existingVideo to existingVideo.name.orEmpty().substringBeforeLast('.')
+                } else {
+                    val finalized = finalizeEpisodeDir(animeDir, tmpDir, episodeDirname)
+                        ?: throw IOException("Failed to move ${tmpDir.name} to $episodeDirname")
+                    finalized to episodeDirname
+                }
+            }
 
-            cache.addEpisode(episodeDirname, animeDir, download.anime)
+            cache.addEpisode(downloadName, animeDir, download.anime)
 
-            DiskUtil.createNoMediaFile(episodeDir, context)
+            if (videoLocation.isDirectory) DiskUtil.createNoMediaFile(videoLocation, context)
 
             download.status = AnimeDownload.State.DOWNLOADED
         } catch (error: Throwable) {

@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.ui.entries.anime
 
 import android.app.Application
 import android.content.Context
+import android.net.Uri
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -64,6 +65,7 @@ import eu.kanade.tachiyomi.data.cache.AnimeBackgroundCache
 import eu.kanade.tachiyomi.data.cache.AnimeCoverCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
+import eu.kanade.tachiyomi.data.download.anime.EpisodeImportCandidate
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
 import eu.kanade.tachiyomi.data.track.EnhancedAnimeTracker
@@ -1167,6 +1169,51 @@ class AnimeViewModel(
         }
     }
 
+    fun previewEpisodeImport(files: List<Uri>) {
+        val state = successState ?: return
+        if (files.isEmpty() || state.isImportingEpisodes) return
+        viewModelScope.launchIO {
+            val preview = try {
+                downloadManager.prepareEpisodeImport(files, state.episodes.map { it.episode }, state.anime)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                snackbarHostState.showSnackbar(context.stringResource(TLMR.strings.episode_import_read_error))
+                return@launchIO
+            }
+            updateSuccessState { it.copy(dialog = Dialog.ImportEpisodes(preview)) }
+        }
+    }
+
+    fun confirmEpisodeImport() {
+        val state = successState ?: return
+        val dialog = state.dialog as? Dialog.ImportEpisodes ?: return
+        updateSuccessState { it.copy(dialog = null, isImportingEpisodes = true) }
+        viewModelScope.launchIO {
+            var imported = 0
+            try {
+                for (candidate in dialog.files) {
+                    val success = try {
+                        downloadManager.importEpisodeVideo(state.anime, state.source, candidate)
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        logcat(LogPriority.WARN, e) { "Could not import an episode" }
+                        false
+                    }
+                    if (success) imported++
+                }
+            } finally {
+                updateSuccessState { it.copy(isImportingEpisodes = false) }
+            }
+            snackbarHostState.showSnackbar(
+                context.stringResource(
+                    TLMR.strings.episode_import_result,
+                    imported,
+                    dialog.files.size - imported,
+                ),
+            )
+        }
+    }
+
     private fun cancelDownload(episodeId: Long) {
         val activeDownload = downloadManager.getQueuedDownloadOrNull(episodeId) ?: return
         downloadManager.cancelQueuedDownloads(listOf(activeDownload))
@@ -1990,6 +2037,7 @@ class AnimeViewModel(
 
         data class SetEpisodeDate(val episodes: List<Episode>) : Dialog
         data class EditEpisodeTitle(val episode: Episode) : Dialog
+        internal data class ImportEpisodes(val files: List<EpisodeImportCandidate>) : Dialog
         data object RemoveFromLibrary : Dialog
         data object ChangeAnimeSkipIntro : Dialog
         data class ChangeAnimeAudioLanguage(val originalLanguage: String?) : Dialog
@@ -2086,6 +2134,7 @@ class AnimeViewModel(
             val relatedAnime: List<AnimeRelationGroup> = emptyList(),
             val isLoadingRelatedAnime: Boolean = false,
             val isRefreshingData: Boolean = false,
+            val isImportingEpisodes: Boolean = false,
             val dialog: Dialog? = null,
             val hasPromptedToAddBefore: Boolean = false,
             val trackItems: List<AnimeTrackItem> = emptyList(),

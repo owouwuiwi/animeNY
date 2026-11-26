@@ -462,6 +462,12 @@
     <string name="pref_remember_series_stream_summary">Try the last manually selected provider and quality when opening another episode.</string>
     <string name="prepare_anime_download_folder">Create download folder</string>
     <string name="anime_download_folder_ready">Download folder ready: %1$s</string>
+    <string name="episode_import_action">Import episodes</string>
+    <string name="episode_import_confirm">Import matched files</string>
+    <string name="episode_import_unmatched">No unique episode match</string>
+    <string name="episode_import_unavailable_file">File name unavailable</string>
+    <string name="episode_import_read_error">Could not read the selected files.</string>
+    <string name="episode_import_result">Imported %1$d · Skipped %2$d</string>
     <string name="pref_anime_download_quality">Preferred anime download quality</string>
     <string name="download_source_quality">Source default</string>
     <string name="torrent_startup_buffer">Buffer before playing torrents</string>

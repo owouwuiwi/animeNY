@@ -357,6 +357,12 @@
     <string name="feed_order_source_name">Nome della fonte</string>
     <string name="feed_order_last_local_update">Ultimo aggiornamento locale</string>
     <string name="edit_episode_title">Modifica titolo episodio</string>
+    <string name="episode_import_action">Importa episodi</string>
+    <string name="episode_import_confirm">Importa i file abbinati</string>
+    <string name="episode_import_unmatched">Nessun abbinamento univoco</string>
+    <string name="episode_import_unavailable_file">Nome del file non disponibile</string>
+    <string name="episode_import_read_error">Impossibile leggere i file selezionati.</string>
+    <string name="episode_import_result">Importati %1$d · Saltati %2$d</string>
     <string name="backup_limit_to_categories">Includi solo le categorie selezionate</string>
     <string name="cover_from_url">Copertina da URL</string>
     <string name="cover_url_hint">URL immagine o pagina del tracker</string>

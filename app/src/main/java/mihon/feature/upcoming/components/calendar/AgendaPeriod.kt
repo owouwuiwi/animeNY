@@ -6,7 +6,8 @@ import java.time.temporal.TemporalAdjusters
 
 internal enum class AgendaPeriod {
     Week,
-    Month;
+    Month,
+    ;
 
     fun dates(anchor: LocalDate, firstDayOfWeek: DayOfWeek): ClosedRange<LocalDate> = when (this) {
         Week -> {

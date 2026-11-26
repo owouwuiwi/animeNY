@@ -1,6 +1,8 @@
 package eu.kanade.tachiyomi.data.download.anime
 
 import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
@@ -8,10 +10,15 @@ import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
+import eu.kanade.tachiyomi.ui.player.loader.EpisodeLoader
 import eu.kanade.tachiyomi.util.size
+import eu.kanade.tachiyomi.util.storage.DiskUtil
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.drop
@@ -40,6 +47,8 @@ import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.source.local.entries.anime.LocalAnimeSource
 import tachiyomi.source.local.io.ArchiveAnime
 import tachiyomi.source.local.io.anime.LocalAnimeSourceFileSystem
+import java.io.IOException
+import java.util.UUID
 
 /**
  * This class is used to manage episode downloads in the application. It must be instantiated once
@@ -80,6 +89,91 @@ class AnimeDownloadManager(
     fun prepareDownloadFolder(anime: Anime, source: AnimeSource): String {
         return provider.getAnimeDir(anime.title, source).displayablePath
     }
+
+    internal suspend fun prepareEpisodeImport(
+        files: List<Uri>,
+        episodes: List<Episode>,
+        anime: Anime,
+    ): List<EpisodeImportCandidate> = withContext(Dispatchers.IO) {
+        val documents = files.distinct().map { uri ->
+            val fileName = try {
+                context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+            } catch (e: SecurityException) {
+                null
+            }
+            uri to fileName.orEmpty()
+        }
+        val matches = findImportEpisodes(documents.map { it.second }, episodes, anime.usesSeasonalEpisodeNumbers)
+        documents.zip(matches) { (uri, name), episode -> EpisodeImportCandidate(uri, name, episode) }
+    }
+
+    internal suspend fun importEpisodeVideo(
+        anime: Anime,
+        source: AnimeSource,
+        candidate: EpisodeImportCandidate,
+    ): Boolean =
+        withContext(Dispatchers.IO) {
+            val episodeId = candidate.episode?.id ?: return@withContext false
+            val episode = getEpisode.await(episodeId) ?: return@withContext false
+            downloader.awaitQueueRestored()
+            if (episode.animeId != anime.id || getQueuedDownloadOrNull(episode.id) != null) return@withContext false
+            val extension = candidate.fileName.importVideoExtension() ?: return@withContext false
+            val animeDir = provider.getAnimeDir(anime.title, source)
+            val alternatives = provider.getValidEpisodeDirNames(episode.name, episode.scanlator, episode.url)
+            if (provider.findDownloadedEpisode(animeDir, alternatives) != null) return@withContext false
+
+            val baseName = provider.getEpisodeDirName(episode.name, episode.scanlator, episode.url)
+            val fileName = "$baseName.$extension"
+            val temporaryName = "episode-import-${UUID.randomUUID()}.tmp"
+            val temporary = animeDir.createFile(temporaryName) ?: return@withContext false
+            try {
+                val input = context.contentResolver.openInputStream(candidate.uri) ?: return@withContext false
+                val length = input.use {
+                    temporary.openOutputStream().use { output ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        var written = 0L
+                        while (true) {
+                            currentCoroutineContext().ensureActive()
+                            val size = input.read(buffer)
+                            if (size < 0) break
+                            output.write(buffer, 0, size)
+                            written += size
+                        }
+                        written
+                    }
+                }
+                if (length == 0L) return@withContext false
+                currentCoroutineContext().ensureActive()
+                withContext(NonCancellable) {
+                    val published = provider.commitEpisodeFile {
+                        if (getQueuedDownloadOrNull(episode.id) != null ||
+                            provider.findDownloadedEpisode(animeDir, alternatives) != null
+                        ) {
+                            return@commitEpisodeFile false
+                        }
+                        temporary.renameTo(fileName) || (
+                            animeDir.findFile(temporaryName) == null &&
+                                animeDir.findFile(fileName)?.length() == length
+                            )
+                    }
+                    if (published) {
+                        cache.addEpisode(baseName, animeDir, anime)
+                        EpisodeLoader.invalidateCache(episode, source)
+                        DiskUtil.createNoMediaFile(animeDir, context)
+                    }
+                    published
+                }
+            } catch (e: IOException) {
+                logcat(LogPriority.WARN, e) { "Episode import failed" }
+                false
+            } catch (e: SecurityException) {
+                logcat(LogPriority.WARN, e) { "Episode import permission unavailable" }
+                false
+            } finally {
+                animeDir.findFile(temporaryName)?.delete()
+            }
+        }
 
     val isDownloaderRunning
         get() = AnimeDownloadJob.isRunningFlow(context)
