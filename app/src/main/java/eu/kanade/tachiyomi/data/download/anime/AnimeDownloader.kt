@@ -72,6 +72,7 @@ import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
 import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.i18n.tail.TLMR
 import java.io.File
 import java.io.IOException
 import kotlin.coroutines.resume
@@ -576,7 +577,9 @@ class AnimeDownloader(
         filename: String,
     ) {
         val video = download.video!!
-        TorrentServerService.start()
+        if (!TorrentServerService.start()) {
+            throw IOException(context.stringResource(TLMR.strings.torrent_server_unavailable))
+        }
         if (video.videoUrl.startsWith(torrentServerApi.hostUrl)) {
             val hash = video.videoUrl.substringAfter("link=").substringBefore("&")
             val index = video.videoUrl.substringAfter("index=").substringBefore("&").toInt()

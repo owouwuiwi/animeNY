@@ -9,6 +9,7 @@ import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.network.awaitSuccess
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 import logcat.LogPriority
@@ -17,13 +18,15 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import tachiyomi.core.common.util.system.logcat
 import java.io.InputStream
+import java.net.Proxy
 
 @Inject
 @SingleIn(AppScope::class)
 class TorrentServerApi(
-    private val network: NetworkHelper,
+    network: NetworkHelper,
     private val json: Json,
 ) {
+    private val loopbackClient = network.client.newBuilder().proxy(Proxy.NO_PROXY).build()
     val hostUrl
         get() = "http://127.0.0.1:$port"
 
@@ -40,8 +43,9 @@ class TorrentServerApi(
 
     suspend fun echo(): String {
         return try {
-            network.client.newCall(GET("$hostUrl/echo")).awaitSuccess().body.string()
+            loopbackClient.newCall(GET("$hostUrl/echo")).awaitSuccess().use { it.body.string() }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             logcat(LogPriority.DEBUG, e) { "Error sending echo" }
             ""
         }
@@ -65,7 +69,7 @@ class TorrentServerApi(
                 saveToDb = save,
             ),
         )
-        val resp = network.client.newCall(
+        val resp = loopbackClient.newCall(
             POST(
                 "$hostUrl/torrents",
                 body = req.toRequestBody("application/json".toMediaTypeOrNull()),
@@ -89,7 +93,7 @@ class TorrentServerApi(
             addFormDataPart("title", title)
         }.build()
 
-        val resp = network.client.newCall(
+        val resp = loopbackClient.newCall(
             POST(
                 "$hostUrl/torrent/upload",
                 body = requestBody,

@@ -94,6 +94,7 @@ import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
 import `is`.xyz.mpv.MPV
 import `is`.xyz.mpv.MPVNode
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -116,6 +117,7 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.storage.service.StorageManager
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.i18n.tail.TLMR
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.IOException
@@ -1264,9 +1266,19 @@ class PlayerActivity : BaseActivity() {
                     video.videoUrl.endsWith("torrent")
                 )
         ) {
+            val playbackId = viewModel.playbackId
             lifecycleScope.launchIO {
-                TorrentServerService.start()
-                torrentLinkHandler(video.videoUrl, video.videoTitle, videoOptions)
+                try {
+                    if (TorrentServerService.start()) {
+                        torrentLinkHandler(video.videoUrl, video.videoTitle, videoOptions, playbackId)
+                    } else {
+                        viewModel.onPlaybackError(playbackId, stringResource(TLMR.strings.torrent_server_unavailable))
+                    }
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    logcat(LogPriority.WARN, e) { "Failed to prepare torrent playback" }
+                    viewModel.onPlaybackError(playbackId, stringResource(TLMR.strings.torrent_server_unavailable))
+                }
             }
         } else {
             lifecycleScope.launchIO {
@@ -1323,14 +1335,8 @@ class PlayerActivity : BaseActivity() {
         }
     }
 
-    private suspend fun torrentLinkHandler(videoUrl: String, title: String, videoOptions: String) {
+    private suspend fun torrentLinkHandler(videoUrl: String, title: String, videoOptions: String, playbackId: Int) {
         var index = 0
-
-        // Wait for torrent server to be ready
-        if (!TorrentServerService.wait(20)) {
-            withUIContext<Unit> { toast(MR.strings.unknown_error) }
-            return
-        }
 
         if (torrentServerApi.getPort() == 0) {
             val preferredPort = torrentPreferences.torrServerPort().get().toIntOrNull() ?: 8090
@@ -1341,6 +1347,7 @@ class PlayerActivity : BaseActivity() {
             val videoInputStream = applicationContext.contentResolver.openInputStream(videoUrl.toUri())
             val torrent = torrentServerApi.uploadTorrent(videoInputStream!!, title, false)
             val torrentUrl = torrentServerUtils.getTorrentPlayLink(torrent, 0)
+            if (viewModel.playbackId != playbackId) return
 
             mpv.command(
                 "loadfile",
@@ -1365,6 +1372,7 @@ class PlayerActivity : BaseActivity() {
 
         val currentTorrent = torrentServerApi.addTorrent(videoUrl, title, "", "", false)
         val videoTorrentUrl = torrentServerUtils.getTorrentPlayLink(currentTorrent, index)
+        if (viewModel.playbackId != playbackId) return
 
         mpv.command(
             "loadfile",

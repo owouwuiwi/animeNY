@@ -345,8 +345,7 @@ class AnimeViewModel(
             val animeSource = sourceManager.getOrStub(anime.source)
             // --> (Torrent)
             if (animeSource.isSourceForTorrents()) {
-                TorrentServerService.start()
-                TorrentServerService.wait(10)
+                TorrentServerService.start(timeout = 10)
                 torrentServerUtils.setTrackersList()
             }
             // <-- (Torrent)
@@ -882,8 +881,7 @@ class AnimeViewModel(
 
     private suspend fun startTorrentServer(source: AnimeSource?) {
         if (isTorrentEnabled() && source.isSourceForTorrents()) {
-            TorrentServerService.start()
-            TorrentServerService.wait(10)
+            TorrentServerService.start(timeout = 10)
             torrentServerUtils.setTrackersList()
         }
     }

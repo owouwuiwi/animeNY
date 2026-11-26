@@ -17,9 +17,11 @@ import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.network.NetworkPreferences
 import eu.kanade.tachiyomi.util.system.cancelNotification
 import eu.kanade.tachiyomi.util.system.notificationBuilder
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.system.logcat
@@ -149,8 +151,8 @@ class TorrentServerService : Service() {
         val applicationContext = Injekt.get<Application>()
         val api = Injekt.get<TorrentServerApi>()
 
-        suspend fun start() {
-            try {
+        suspend fun start(timeout: Int = 20): Boolean {
+            return try {
                 val preferredPort = Injekt.get<TorrentPreferences>().torrServerPort().get().toIntOrNull() ?: 8090
                 if (api.getPort() == 0) {
                     api.setPort(preferredPort)
@@ -160,10 +162,11 @@ class TorrentServerService : Service() {
                         action = ACTION_START
                     }
                 applicationContext.startService(intent)
-                wait(20)
+                wait(timeout)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 logcat(LogPriority.DEBUG, e) { "Failed to start torrent service" }
-                e.printStackTrace()
+                false
             }
         }
 
@@ -181,7 +184,6 @@ class TorrentServerService : Service() {
         }
 
         suspend fun wait(timeout: Int = -1): Boolean {
-            var count = 0
             val timeoutCount = if (timeout < 0) 20 else timeout
 
             // Ensure API has a port set before checking echo
@@ -190,14 +192,12 @@ class TorrentServerService : Service() {
                 api.setPort(preferredPort)
             }
 
-            while (api.echo() == "") {
-                delay(1.seconds)
-                count++
-                if (count > timeoutCount) {
-                    return false
+            return withTimeoutOrNull(timeoutCount.seconds) {
+                while (api.echo().isEmpty()) {
+                    delay(1.seconds)
                 }
-            }
-            return true
+                true
+            } ?: false
         }
     }
 }
