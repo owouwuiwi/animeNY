@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.core.net.toUri
 import aniyomi.core.common.torrent.TorrentPreferences
 import aniyomi.core.common.torrent.TorrentServerApi
@@ -615,6 +616,7 @@ class AnimeDownloader(
         filename: String,
     ) {
         val video = download.video!!
+        download.updateTransfer()
 
         val isSaf = videoFile.uri.scheme == "content"
         val localTmpFile = if (isSaf) {
@@ -666,10 +668,21 @@ class AnimeDownloader(
         withProgressTimeout(STALL_TIMEOUT) { onProgress ->
             var lastTime = 0.0
             var lastSize = 0L
+            var previousMetricSize = 0L
+            var previousMetricTime = SystemClock.elapsedRealtime()
             val statCallback = StatisticsCallback { s ->
                 if (s.time > lastTime || s.size > lastSize) onProgress()
                 lastTime = maxOf(lastTime, s.time)
                 lastSize = maxOf(lastSize, s.size)
+
+                val now = SystemClock.elapsedRealtime()
+                val elapsed = now - previousMetricTime
+                if (elapsed >= 1_000L && s.size >= 0L) {
+                    val rate = (s.size - previousMetricSize).coerceAtLeast(0L) * 1_000L / elapsed
+                    download.updateTransfer(s.size, rate)
+                    previousMetricSize = s.size
+                    previousMetricTime = now
+                }
 
                 val outTime = (s.time / 1000.0).toLong()
                 if (duration != 0L && outTime > 0) {

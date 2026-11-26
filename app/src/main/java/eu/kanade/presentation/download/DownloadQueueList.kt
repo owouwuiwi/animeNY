@@ -1,5 +1,6 @@
 package eu.kanade.presentation.download
 
+import android.text.format.Formatter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.gestures.ScrollScope
@@ -40,11 +41,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import eu.kanade.presentation.components.DropdownMenu
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
+import eu.kanade.tachiyomi.data.download.anime.model.AnimeTransferMetrics
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.ui.download.DownloadQueueEntry
 import eu.kanade.tachiyomi.ui.download.DownloadQueueSection
@@ -60,6 +63,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import sh.calvin.reorderable.rememberScroller
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.components.ListGroupHeader
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
@@ -374,6 +378,16 @@ private fun ReorderableCollectionItemScope.DownloadQueueItem(
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
                 )
+                progress?.transfer?.takeIf { it.bytes > 0 }?.let { transfer ->
+                    val context = LocalContext.current
+                    val size = Formatter.formatShortFileSize(context, transfer.bytes)
+                    val rate = Formatter.formatShortFileSize(context, transfer.bytesPerSecond)
+                    Text(
+                        text = stringResource(TLMR.strings.anime_download_transfer_details, size, rate),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
                 val progressModifier = Modifier
                     .fillMaxWidth()
                     .padding(top = MaterialTheme.padding.extraSmall)
@@ -495,6 +509,7 @@ private class PagesProgress(
     val downloadedPages: Int,
     val totalProgress: Int,
     val indeterminate: Boolean = false,
+    val transfer: AnimeTransferMetrics? = null,
 ) {
     val fraction = if (pageCount == 0) 0f else totalProgress / (pageCount * 100f)
 }
@@ -520,7 +535,11 @@ private fun DownloadQueueEntry.progressFlow() = when (this) {
         }
     }
 
-    is DownloadQueueEntry.Anime -> combine(download.progressFlow, download.statusFlow) { progress, status ->
+    is DownloadQueueEntry.Anime -> combine(
+        download.progressFlow,
+        download.statusFlow,
+        download.transferFlow,
+    ) { progress, status, transfer ->
         if (status == AnimeDownload.State.NOT_DOWNLOADED || status == AnimeDownload.State.QUEUE) {
             null
         } else {
@@ -529,6 +548,7 @@ private fun DownloadQueueEntry.progressFlow() = when (this) {
                 downloadedPages = 0,
                 totalProgress = progress.coerceIn(0, 100),
                 indeterminate = status == AnimeDownload.State.DOWNLOADING && progress <= 0,
+                transfer = transfer.takeIf { status == AnimeDownload.State.DOWNLOADING },
             )
         }
     }

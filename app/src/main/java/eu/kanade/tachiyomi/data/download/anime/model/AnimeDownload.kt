@@ -43,6 +43,13 @@ data class AnimeDownload(
             progressStateFlow.value = value
         }
 
+    private val transferState = MutableStateFlow(AnimeTransferMetrics(0L, 0L))
+    internal val transferFlow = transferState.asStateFlow()
+
+    internal fun updateTransfer(bytes: Long = 0L, bytesPerSecond: Long = 0L) {
+        transferState.value = AnimeTransferMetrics(bytes, bytesPerSecond)
+    }
+
     /**
      * Updates the status of the download
      *
@@ -82,3 +89,5 @@ data class AnimeDownload(
         }
     }
 }
+
+internal data class AnimeTransferMetrics(val bytes: Long, val bytesPerSecond: Long)
