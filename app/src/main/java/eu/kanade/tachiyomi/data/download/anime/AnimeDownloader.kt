@@ -726,17 +726,6 @@ class AnimeDownloader(
         val video = stagedInput?.let { original.copy(videoUrl = it.absolutePath) } ?: original
         if (stagedInput == null) download.updateTransfer()
 
-        val isSaf = videoFile.uri.scheme == "content"
-        val localTmpFile = if (isSaf) {
-            val cacheDir = File(context.externalCacheDir ?: context.cacheDir, "ffmpeg_tmp")
-            cacheDir.mkdirs()
-            File(cacheDir, "${filename}_${System.currentTimeMillis()}.tmp")
-        } else {
-            null
-        }
-
-        val ffmpegFilename = { localTmpFile?.absolutePath ?: videoFile.toFFmpegString(context, "rw") }
-
         val headers = video.headers ?: download.source.headers
         val headerOptions = headers.joinToString("", "-headers '", "'") {
             "${it.first}: ${it.second}\r\n"
@@ -749,8 +738,6 @@ class AnimeDownloader(
                     "format=duration -of default=noprint_wrappers=1:nokey=1 \"$file\"",
             )
         }
-
-        var duration = 0L
 
         val logCallback = LogCallback { log ->
             if (log.level <= Level.AV_LOG_WARNING) {
@@ -767,8 +754,7 @@ class AnimeDownloader(
         }
         val probeCommand = "$ffprobeOptions ${SourceProbe.FFPROBE_ARGS} \"${video.videoUrl}\""
         val probe = SourceProbe.parse(runFFprobe(FFmpegKitConfig.parseArguments(probeCommand)))
-        duration = probe.durationSeconds?.toLong() ?: 0L
-        val ffmpegOptions = getFFmpegOptions(video, headerOptions, ffmpegFilename(), probe.variantProgramId)
+        val duration = probe.durationSeconds?.toLong() ?: 0L
 
         // FFmpeg keeps running while a source stalls (reconnects retry, HLS skips failing segments),
         // so an attempt that writes nothing for STALL_TIMEOUT fails and is retried instead of holding
@@ -803,32 +789,41 @@ class AnimeDownloader(
                 }
             }
 
-            suspendCancellableCoroutine { continuation ->
-                val session = FFmpegKit.executeWithArgumentsAsync(
-                    ffmpegOptions,
-                    {
-                        if (it.returnCode.isValueSuccess) {
-                            if (localTmpFile != null && isSaf) {
-                                localTmpFile.inputStream().buffered().use { input ->
-                                    videoFile.openOutputStream().buffered().use { output ->
-                                        input.copyTo(output)
-                                    }
-                                }
-                                localTmpFile.delete()
-                            }
-                            continuation.resume(it)
-                        } else {
-                            localTmpFile?.delete()
-                            continuation.resumeWithException(Exception("Error in ffmpeg: ${it.failureReason()}"))
-                        }
-                    },
-                    logCallback,
-                    statCallback,
+            val localTmpFile = if (videoFile.uri.scheme == "content") {
+                val cacheDir = File(context.externalCacheDir ?: context.cacheDir, "ffmpeg_tmp")
+                cacheDir.mkdirs()
+                File.createTempFile("episode-video-", ".tmp", cacheDir)
+            } else {
+                null
+            }
+            try {
+                val outputPath = localTmpFile?.absolutePath ?: videoFile.toFFmpegString(context, "rw")
+                val ffmpegOptions = getFFmpegOptions(
+                    video,
+                    headerOptions,
+                    outputPath,
+                    probe.variantProgramId,
                 )
-                continuation.invokeOnCancellation {
-                    session.cancel()
-                    localTmpFile?.delete()
+                suspendCancellableCoroutine<Unit> { continuation ->
+                    val session = FFmpegKit.executeWithArgumentsAsync(
+                        ffmpegOptions,
+                        {
+                            if (it.returnCode?.isValueSuccess == true) {
+                                continuation.resume(Unit)
+                            } else {
+                                continuation.resumeWithException(Exception("Error in ffmpeg: ${it.failureReason()}"))
+                            }
+                        },
+                        logCallback,
+                        statCallback,
+                    )
+                    continuation.invokeOnCancellation { session.cancel() }
                 }
+                if (localTmpFile != null) {
+                    copyDownloadedEpisodeVideo(localTmpFile, videoFile::openOutputStream, onProgress)
+                }
+            } finally {
+                localTmpFile?.delete()
             }
         }
 

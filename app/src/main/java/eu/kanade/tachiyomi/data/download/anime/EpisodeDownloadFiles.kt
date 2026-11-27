@@ -2,8 +2,12 @@ package eu.kanade.tachiyomi.data.download.anime
 
 import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.util.storage.renameToOrCopy
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.runInterruptible
 import tachiyomi.core.common.storage.extension
 import java.io.File
+import java.io.OutputStream
 
 /**
  * Publishes a finished episode. An older interrupted copy may leave a directory at the final
@@ -31,4 +35,29 @@ internal fun UniFile.renameDownloadedEpisode(targetStem: String): Boolean {
     }
     val parent = parentFile ?: return false
     return parent.findFile(targetName) == null && renameTo(targetName)
+}
+
+internal suspend fun copyDownloadedEpisodeVideo(
+    source: File,
+    openDestination: () -> OutputStream,
+    onProgress: () -> Unit,
+) {
+    val context = currentCoroutineContext()
+    runInterruptible {
+        source.inputStream().use { input ->
+            openDestination().use { output ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    context.ensureActive()
+                    val size = input.read(buffer)
+                    if (size < 0) break
+                    if (size > 0) {
+                        context.ensureActive()
+                        output.write(buffer, 0, size)
+                        onProgress()
+                    }
+                }
+            }
+        }
+    }
 }
