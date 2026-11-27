@@ -62,6 +62,7 @@ import androidx.media.AudioManagerCompat
 import aniyomi.core.common.torrent.TorrentPreferences
 import aniyomi.core.common.torrent.TorrentServerApi
 import aniyomi.core.common.torrent.TorrentServerUtils
+import aniyomi.core.common.torrent.isTorrentPlaybackUrl
 import com.hippo.unifile.UniFile
 import dev.zacsweers.metro.Inject
 import eu.kanade.domain.connections.service.ConnectionsPreferences
@@ -92,7 +93,6 @@ import eu.kanade.tachiyomi.ui.player.settings.SubtitlePreferences
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
 import eu.kanade.tachiyomi.ui.player.utils.LanguageTags
-import eu.kanade.tachiyomi.ui.player.utils.isTorrentPlaybackUrl
 import eu.kanade.tachiyomi.ui.player.utils.torrentBufferOptions
 import eu.kanade.tachiyomi.ui.player.utils.torrentForwardCacheLimitMiB
 import eu.kanade.tachiyomi.util.system.powerManager

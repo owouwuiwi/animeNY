@@ -9,6 +9,7 @@ import androidx.core.net.toUri
 import aniyomi.core.common.torrent.TorrentPreferences
 import aniyomi.core.common.torrent.TorrentServerApi
 import aniyomi.core.common.torrent.TorrentServerUtils
+import aniyomi.core.common.torrent.isTorrentDownloadUrl
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.FFmpegKitConfig
 import com.arthenica.ffmpegkit.FFmpegSession
@@ -696,7 +697,7 @@ class AnimeDownloader(
 
     private fun isTorrent(video: Video?): Boolean {
         val url = video?.videoUrl ?: return false
-        return url.startsWith("magnet") || url.endsWith(".torrent") || url.startsWith(torrentServerApi.hostUrl)
+        return isTorrentDownloadUrl(url, torrentServerApi.hostUrl)
     }
 
     private suspend fun torrentDownload(

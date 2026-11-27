@@ -1,14 +1,6 @@
 package eu.kanade.tachiyomi.ui.player.utils
 
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-
 private const val MIB = 1024L * 1024
-
-internal fun isTorrentPlaybackUrl(url: String, torrentServerUrl: String): Boolean {
-    // Existing sources can also return local URIs or extensionless torrent endpoints.
-    if (url.startsWith(torrentServerUrl) || url.startsWith("magnet") || url.endsWith("torrent")) return true
-    return url.toHttpUrlOrNull()?.pathSegments?.last()?.endsWith(".torrent", ignoreCase = true) == true
-}
 
 internal fun torrentForwardCacheLimitMiB(
     is64Bit: Boolean,

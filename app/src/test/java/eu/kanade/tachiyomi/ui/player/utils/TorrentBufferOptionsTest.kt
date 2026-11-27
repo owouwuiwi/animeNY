@@ -1,5 +1,7 @@
 package eu.kanade.tachiyomi.ui.player.utils
 
+import aniyomi.core.common.torrent.isTorrentDownloadUrl
+import aniyomi.core.common.torrent.isTorrentPlaybackUrl
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -11,24 +13,49 @@ class TorrentBufferOptionsTest {
     private val serverUrl = "http://127.0.0.1:8090"
 
     @Test
-    fun `Recognizes torrent paths with a query or fragment`() {
-        assertTrue(isTorrentPlaybackUrl("https://example.test/clip.torrent?download=1", serverUrl))
-        assertTrue(isTorrentPlaybackUrl("http://example.test/clip%2ETORRENT#download", serverUrl))
+    fun `Playback and downloads recognize torrent paths with a query or fragment`() {
+        val urls = listOf(
+            "https://example.test/clip.torrent?signature=opaque%2Bvalue&download=1",
+            "http://example.test/clip%2ETORRENT#download",
+        )
+        for (url in urls) {
+            assertTrue(isTorrentPlaybackUrl(url, serverUrl), url)
+            assertTrue(isTorrentDownloadUrl(url, serverUrl), url)
+        }
     }
 
     @Test
     fun `Existing torrent links still use the torrent server`() {
-        assertTrue(isTorrentPlaybackUrl("https://example.test/download/torrent", serverUrl))
-        assertTrue(isTorrentPlaybackUrl("magnet:?xt=urn:btih:test&index=1", serverUrl))
-        assertTrue(isTorrentPlaybackUrl("$serverUrl/stream?index=1", serverUrl))
-        assertTrue(isTorrentPlaybackUrl("content://downloads/document/clip.torrent", serverUrl))
-        assertTrue(isTorrentPlaybackUrl("file:///storage/clip.torrent", serverUrl))
+        val urls = listOf(
+            "magnet:?xt=urn:btih:test&index=1",
+            "$serverUrl/stream?index=1",
+            "content://downloads/document/clip.torrent",
+            "file:///storage/clip.torrent",
+        )
+        for (url in urls) {
+            assertTrue(isTorrentPlaybackUrl(url, serverUrl), url)
+            assertTrue(isTorrentDownloadUrl(url, serverUrl), url)
+        }
+    }
+
+    @Test
+    fun `Extensionless legacy endpoints remain a player override`() {
+        val url = "https://example.test/download/torrent"
+        assertTrue(isTorrentPlaybackUrl(url, serverUrl))
+        assertFalse(isTorrentDownloadUrl(url, serverUrl))
     }
 
     @Test
     fun `Other media links do not use the torrent server`() {
-        assertFalse(isTorrentPlaybackUrl("https://example.test/clip.mp4?filename=clip.torrent&download=1", serverUrl))
-        assertFalse(isTorrentPlaybackUrl("https://example.test/clip.torrent/main.m3u8", serverUrl))
+        val urls = listOf(
+            "https://example.test/clip.mp4?filename=clip.torrent&download=1",
+            "https://example.test/clip.torrent/main.m3u8",
+            "file:///storage/clip.TORRENT",
+        )
+        for (url in urls) {
+            assertFalse(isTorrentPlaybackUrl(url, serverUrl), url)
+            assertFalse(isTorrentDownloadUrl(url, serverUrl), url)
+        }
     }
 
     @Test
