@@ -877,6 +877,7 @@
     <string name="migrationListScreen.copyActionLabel">Copia</string>
     <string name="migrationListScreen.migrateActionLabel">Migra</string>
     <string name="migrationListScreen.noMatchFoundText">Nessuna alternativa trovata</string>
+    <string name="migrationListScreen.migrationFailedText">Migrazione non riuscita. Riprova o scegli un’altra fonte.</string>
     <string name="migrationListScreen.latestChapterLabel">Ultimo: %1$s</string>
     <string name="migrationListScreen.unknownLatestChapter">Sconosciuto</string>
     <string name="migrationListScreen.searchManuallyActionLabel">Cerca manualmente</string>

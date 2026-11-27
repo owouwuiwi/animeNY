@@ -171,6 +171,7 @@ fun AnimeMigrationListItem(
     source: String,
     episodeCount: Int,
     latestEpisode: Double?,
+    migrationFailed: Boolean = false,
     onClick: () -> Unit,
 ) {
     Column(
@@ -240,6 +241,13 @@ fun AnimeMigrationListItem(
                 maxLines = 1,
                 style = MaterialTheme.typography.bodyMedium,
             )
+            if (migrationFailed) {
+                Text(
+                    text = stringResource(MR.strings.migrationListScreen_migrationFailedText),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
     }
 }
@@ -295,6 +303,7 @@ fun AnimeMigrationListItemResult(
                     source = result.source,
                     episodeCount = result.episodeCount,
                     latestEpisode = result.latestEpisode,
+                    migrationFailed = result.migrationFailed,
                     onClick = { onItemClick(result.anime) },
                 )
             }

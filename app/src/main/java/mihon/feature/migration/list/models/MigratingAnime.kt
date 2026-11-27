@@ -26,6 +26,7 @@ class MigratingAnime(
             val episodeCount: Int,
             val latestEpisode: Double?,
             val source: String,
+            val migrationFailed: Boolean = false,
         ) : SearchResult
     }
 }

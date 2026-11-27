@@ -45,27 +45,15 @@ class MigrateMangaUseCase(
 ) {
     private val enhancedServices by lazy { trackerManager.trackers.filterIsInstance<EnhancedMangaTracker>() }
 
-    suspend operator fun invoke(current: Manga, target: Manga, replace: Boolean) {
-        val targetSource = sourceManager.get(target.source) ?: return
-        val currentSource = sourceManager.get(current.source)
-        val flags = MigrationFlag.fromBit(sourcePreferences.migrationFlags.get())
+    suspend operator fun invoke(current: Manga, target: Manga, replace: Boolean): Boolean {
+        if (current.id == target.id) return false
 
-        try {
-            val chapters = try {
-                targetSource.getChapterList(target.toSManga())
-            } catch (e: Throwable) {
-                if (e is CancellationException) throw e
-                logcat(LogPriority.ERROR, e)
-                emptyList()
-            }
-
-            try {
-                syncChaptersWithSource.await(chapters, target, targetSource)
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                logcat(LogPriority.ERROR, e)
-                // Worst case, chapters won't be synced
-            }
+        return try {
+            val targetSource = sourceManager.get(target.source) ?: return false
+            val currentSource = sourceManager.get(current.source)
+            val flags = MigrationFlag.fromBit(sourcePreferences.migrationFlags.get())
+            val chapters = targetSource.getChapterList(target.toSManga())
+            syncChaptersWithSource.await(chapters, target, targetSource)
 
             // Update chapters read, bookmark and dateFetch
             if (MigrationFlag.CHAPTER in flags) {
@@ -131,16 +119,6 @@ class MigrateMangaUseCase(
                 .takeIf { it.isNotEmpty() }
                 ?.let { upsertTrack.awaitAll(it) }
 
-            // Delete downloaded
-            if (MigrationFlag.REMOVE_DOWNLOAD in flags && currentSource != null) {
-                try {
-                    downloadManager.deleteManga(current, currentSource)
-                } catch (e: Throwable) {
-                    if (e is CancellationException) throw e
-                    logcat(LogPriority.ERROR, e)
-                }
-            }
-
             // Update custom cover (recheck if custom cover exists)
             if (MigrationFlag.CUSTOM_COVER in flags && current.hasCustomCover(coverCache)) {
                 try {
@@ -162,12 +140,23 @@ class MigrateMangaUseCase(
                 if (MigrationFlag.NOTES in flags) notes = current.notes
             }
 
-            updateManga.awaitAll(listOfNotNull(currentMangaUpdate, targetMangaUpdate))
+            if (!updateManga.awaitAll(listOfNotNull(currentMangaUpdate, targetMangaUpdate))) return false
+
+            if (MigrationFlag.REMOVE_DOWNLOAD in flags && currentSource != null) {
+                try {
+                    downloadManager.deleteManga(current, currentSource)
+                } catch (e: Throwable) {
+                    if (e is CancellationException) throw e
+                    logcat(LogPriority.ERROR, e)
+                }
+            }
+            true
         } catch (e: Throwable) {
             if (e is CancellationException) {
                 throw e
             }
             logcat(LogPriority.ERROR, e)
+            false
         }
     }
 }

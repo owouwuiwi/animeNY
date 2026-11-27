@@ -240,44 +240,42 @@ class AnimeMigrationListViewModel(
     }
 
     fun migrateNow(animeId: Long, replace: Boolean) {
+        if (migrateJob?.isCompleted == false) return
         val item = items.find { it.anime.id == animeId } ?: return
-        val target = (item.searchResult.value as? SearchResult.Success)?.anime ?: return
-        viewModelScope.launchIO {
-            try {
-                migrateAnime(current = item.anime, target = target, replace = replace)
-                removeAnime(animeId)
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                logcat(LogPriority.WARN, throwable = e)
-            }
+        migrateJob = viewModelScope.launchIO {
+            migrateItem(item, replace)
         }
     }
 
     fun migrateAnimes(replace: Boolean) {
+        if (migrateJob?.isCompleted == false) return
         migrateJob = viewModelScope.launchIO {
             state.update { it.copy(dialog = Dialog.Progress(0f)) }
             val items = items
             try {
-                items.forEachIndexed { index, anime ->
-                    try {
-                        val target = (anime.searchResult.value as? SearchResult.Success)?.anime
-                        if (target != null) {
-                            migrateAnime(current = anime.anime, target = target, replace = replace)
-                        }
-                    } catch (e: Exception) {
-                        if (e is CancellationException) throw e
-                        logcat(LogPriority.WARN, throwable = e)
-                    }
+                var failed = false
+                items.forEachIndexed { index, item ->
+                    if (!migrateItem(item, replace)) failed = true
                     state.update {
-                        it.copy(dialog = Dialog.Progress((index.toFloat() / items.size).coerceAtMost(1f)))
+                        it.copy(dialog = Dialog.Progress((index + 1).toFloat() / items.size))
                     }
                 }
-                navigateBack()
+                if (!failed) navigateBack()
             } finally {
                 state.update { it.copy(dialog = null) }
-                migrateJob = null
             }
         }
+    }
+
+    private suspend fun migrateItem(item: MigratingAnime, replace: Boolean): Boolean {
+        val target = item.searchResult.value as? SearchResult.Success ?: return true
+        val migrated = migrateAnime(current = item.anime, target = target.anime, replace = replace)
+        if (migrated) {
+            removeAnime(item.anime.id)
+        } else {
+            item.searchResult.compareAndSet(target, target.copy(migrationFailed = true))
+        }
+        return migrated
     }
 
     fun removeAnime(animeId: Long) {

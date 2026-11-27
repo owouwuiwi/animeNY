@@ -183,6 +183,7 @@ fun MigrationListItem(
     source: String,
     chapterCount: Int,
     latestChapter: Double?,
+    migrationFailed: Boolean = false,
     onClick: () -> Unit,
 ) {
     Column(
@@ -252,6 +253,13 @@ fun MigrationListItem(
                 maxLines = 1,
                 style = MaterialTheme.typography.bodyMedium,
             )
+            if (migrationFailed) {
+                Text(
+                    text = stringResource(MR.strings.migrationListScreen_migrationFailedText),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
     }
 }
@@ -307,6 +315,7 @@ fun MangaMigrationListItemResult(
                     source = result.source,
                     chapterCount = result.chapterCount,
                     latestChapter = result.latestChapter,
+                    migrationFailed = result.migrationFailed,
                     onClick = { onItemClick(result.manga) },
                 )
             }

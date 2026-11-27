@@ -45,27 +45,15 @@ class MigrateAnimeUseCase(
 ) {
     private val enhancedServices by lazy { trackerManager.trackers.filterIsInstance<EnhancedAnimeTracker>() }
 
-    suspend operator fun invoke(current: Anime, target: Anime, replace: Boolean) {
-        val targetSource = sourceManager.get(target.source) ?: return
-        val currentSource = sourceManager.get(current.source)
-        val flags = MigrationFlag.fromBit(sourcePreferences.migrationFlags.get())
+    suspend operator fun invoke(current: Anime, target: Anime, replace: Boolean): Boolean {
+        if (current.id == target.id) return false
 
-        try {
-            val episodes = try {
-                targetSource.getEpisodeList(target.toSAnime())
-            } catch (e: Throwable) {
-                if (e is CancellationException) throw e
-                logcat(LogPriority.ERROR, e)
-                emptyList()
-            }
-
-            try {
-                syncEpisodesWithSource.await(episodes, target, targetSource)
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                logcat(LogPriority.ERROR, e)
-                // Worst case, episodes won't be synced
-            }
+        return try {
+            val targetSource = sourceManager.get(target.source) ?: return false
+            val currentSource = sourceManager.get(current.source)
+            val flags = MigrationFlag.fromBit(sourcePreferences.migrationFlags.get())
+            val episodes = targetSource.getEpisodeList(target.toSAnime())
+            syncEpisodesWithSource.await(episodes, target, targetSource)
 
             // Update episodes seen, bookmark and dateFetch
             if (MigrationFlag.CHAPTER in flags) {
@@ -138,16 +126,6 @@ class MigrateAnimeUseCase(
                 .takeIf { it.isNotEmpty() }
                 ?.let { upsertTrack.awaitAll(it) }
 
-            // Delete downloaded
-            if (MigrationFlag.REMOVE_DOWNLOAD in flags && currentSource != null) {
-                try {
-                    downloadManager.deleteAnime(current, currentSource)
-                } catch (e: Throwable) {
-                    if (e is CancellationException) throw e
-                    logcat(LogPriority.ERROR, e)
-                }
-            }
-
             // Update custom cover (recheck if custom cover exists)
             if (MigrationFlag.CUSTOM_COVER in flags && current.hasCustomCover(coverCache)) {
                 try {
@@ -173,12 +151,23 @@ class MigrateAnimeUseCase(
                 notes = if (MigrationFlag.NOTES in flags) current.notes else null,
             )
 
-            updateAnime.awaitAll(listOfNotNull(currentAnimeUpdate, targetAnimeUpdate))
+            if (!updateAnime.awaitAll(listOfNotNull(currentAnimeUpdate, targetAnimeUpdate))) return false
+
+            if (MigrationFlag.REMOVE_DOWNLOAD in flags && currentSource != null) {
+                try {
+                    downloadManager.deleteAnime(current, currentSource)
+                } catch (e: Throwable) {
+                    if (e is CancellationException) throw e
+                    logcat(LogPriority.ERROR, e)
+                }
+            }
+            true
         } catch (e: Throwable) {
             if (e is CancellationException) {
                 throw e
             }
             logcat(LogPriority.ERROR, e)
+            false
         }
     }
 }

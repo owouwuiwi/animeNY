@@ -1134,6 +1134,7 @@
     <string name="migrationListScreen.copyActionLabel">Copy</string>
     <string name="migrationListScreen.migrateActionLabel">Migrate</string>
     <string name="migrationListScreen.noMatchFoundText">No alternatives found</string>
+    <string name="migrationListScreen.migrationFailedText">Migration failed. Try again or choose another source.</string>
     <string name="migrationListScreen.latestChapterLabel">Latest: %1$s</string>
     <string name="migrationListScreen.unknownLatestChapter">Unknown</string>
     <string name="migrationListScreen.searchManuallyActionLabel">Search manually</string>
