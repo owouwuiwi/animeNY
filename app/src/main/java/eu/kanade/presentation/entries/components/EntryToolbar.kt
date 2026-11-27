@@ -168,14 +168,6 @@ fun EntryToolbar(
                             ),
                         )
                     }
-                    if (onMergeEntries != null) {
-                        add(
-                            AppBar.OverflowAction(
-                                title = stringResource(TLMR.strings.entry_merge_title),
-                                onClick = onMergeEntries,
-                            ),
-                        )
-                    }
                     // SY -->
                     if (onClickEditInfo != null) {
                         add(
@@ -254,6 +246,14 @@ fun EntryToolbar(
                             AppBar.OverflowAction(
                                 title = stringResource(TLMR.strings.anilist_recommendations),
                                 onClick = onTrackerRecommendations,
+                            ),
+                        )
+                    }
+                    if (onMergeEntries != null) {
+                        add(
+                            AppBar.OverflowAction(
+                                title = stringResource(TLMR.strings.entry_merge_title),
+                                onClick = onMergeEntries,
                             ),
                         )
                     }
