@@ -27,7 +27,7 @@ class AnimeExtensionStoreRepositoryImpl(
     private val preferences: SourcePreferences,
 ) : AnimeExtensionStoreRepository {
     override suspend fun insert(indexUrl: String): Result<Unit> {
-        return service.fetch(indexUrl).mapCatching { upsert(it) }
+        return service.fetch(indexUrl, validateLinkedList = true).mapCatching { upsert(it) }
     }
 
     override suspend fun insertFromPreference(indexUrl: String, name: String) {

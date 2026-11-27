@@ -29,11 +29,15 @@ class AnimeExtensionStoreService(
     private val json: Json,
     private val protoBuf: ProtoBuf,
 ) {
-    suspend fun fetch(indexUrl: String): Result<ExtensionStore> = withIOContext {
-        fetch(indexUrl, forceV2 = false)
+    suspend fun fetch(indexUrl: String, validateLinkedList: Boolean = false): Result<ExtensionStore> = withIOContext {
+        fetch(indexUrl, forceV2 = false, validateLinkedList = validateLinkedList)
     }
 
-    private suspend fun fetch(indexUrl: String, forceV2: Boolean): Result<ExtensionStore> {
+    private suspend fun fetch(
+        indexUrl: String,
+        forceV2: Boolean,
+        validateLinkedList: Boolean,
+    ): Result<ExtensionStore> {
         var updatedIndexUrl: String = indexUrl
         return try {
             val response = network.client.newCall(GET(indexUrl)).awaitSuccess()
@@ -67,13 +71,23 @@ class AnimeExtensionStoreService(
                     if (indexV2 != null) {
                         require(!forceV2) { "The version 2 index redirected to another legacy index." }
                         val v2Url = requireNotNull(responseUrl.resolve(indexV2)) { "Invalid version 2 index URL." }
-                        return fetch(v2Url.toString(), forceV2 = true)
+                        return fetch(v2Url.toString(), forceV2 = true, validateLinkedList = validateLinkedList)
                     }
                 }
 
                 val decodedStore = networkStore.toExtensionStore(updatedIndexUrl)
                 val listUrl = decodedStore.extensionListUrl?.let(responseUrl::resolveExtensionListUrl)
                 decodedStore.copy(extensionListUrl = listUrl)
+            }
+            if (validateLinkedList && store.extensionListUrl != null) {
+                try {
+                    readModernExtensions(store)
+                } catch (e: IllegalArgumentException) {
+                    throw IllegalArgumentException(
+                        "The linked extension list is invalid. Ask the repository maintainer for a working index.",
+                        e,
+                    )
+                }
             }
             Result.success(store)
         } catch (e: CancellationException) {
@@ -89,12 +103,7 @@ class AnimeExtensionStoreService(
     suspend fun getExtensions(store: ExtensionStore): Result<List<AnimeExtension.Available>> = withIOContext {
         try {
             val extensions = if (!store.isLegacy) {
-                store.readModernExtensionList<NetworkAnimeExtensionStore, NetworkAnimeExtensionStore.ExtensionList>(
-                    json,
-                    protoBuf,
-                ) {
-                    network.client.newCall(GET(it)).awaitSuccess()
-                }?.let { toAvailableExtensions(it, store) }.orEmpty()
+                readModernExtensions(store)?.let { toAvailableExtensions(it, store) }.orEmpty()
             } else {
                 val storeBaseUrl = store.indexUrl.removeSuffix("/repo.json")
                 val response = network.client.newCall(GET("$storeBaseUrl/index.min.json")).awaitSuccess()
@@ -111,6 +120,14 @@ class AnimeExtensionStoreService(
             Result.failure(e)
         }
     }
+
+    private suspend fun readModernExtensions(store: ExtensionStore) =
+        store.readModernExtensionList<NetworkAnimeExtensionStore, NetworkAnimeExtensionStore.ExtensionList>(
+            json,
+            protoBuf,
+        ) {
+            network.client.newCall(GET(it)).awaitSuccess()
+        }
 
     private fun toAvailableExtensions(
         extensionList: NetworkAnimeExtensionStore.ExtensionList,

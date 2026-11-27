@@ -1,11 +1,15 @@
 package mihon.data.extension.service
 
 import eu.kanade.tachiyomi.network.NetworkHelper
+import io.mockk.Called
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
+import mihon.data.extension.repository.AnimeExtensionStoreRepositoryImpl
+import mihon.domain.extension.anime.interactor.AddAnimeExtensionStore
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -16,6 +20,7 @@ import okio.ForwardingSource
 import okio.buffer
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import tachiyomi.data.handlers.anime.AnimeDatabaseHandler
 
 class ExtensionStoreServiceIoTest {
     private val indexUrl = "https://catalog.example/index.json"
@@ -28,7 +33,7 @@ class ExtensionStoreServiceIoTest {
     fun `anime metadata and list are consumed off the calling thread`() = runBlocking {
         withStoreNetwork { network ->
             val service = AnimeExtensionStoreService(network, json, ProtoBuf)
-            val store = service.fetch(indexUrl).getOrThrow()
+            val store = service.fetch(indexUrl, validateLinkedList = true).getOrThrow()
 
             assertEquals("Test catalogue", store.name)
             assertEquals("org.example.anime.test", service.getExtensions(store).getOrThrow().single().pkgName)
@@ -46,7 +51,25 @@ class ExtensionStoreServiceIoTest {
         }
     }
 
-    private suspend fun withStoreNetwork(test: suspend (NetworkHelper) -> Unit) {
+    @Test
+    fun `adding anime metadata with an incompatible external list fails before saving`() = runBlocking {
+        withStoreNetwork(linkedList = """{"unknown":42}""") { network ->
+            val handler = mockk<AnimeDatabaseHandler>()
+            val addStore = AddAnimeExtensionStore(
+                AnimeExtensionStoreRepositoryImpl(AnimeExtensionStoreService(network, json, ProtoBuf), handler, mockk()),
+            )
+
+            val error = addStore(indexUrl).exceptionOrNull()
+
+            assertEquals(
+                "The linked extension list is invalid. Ask the repository maintainer for a working index.",
+                error?.message,
+            )
+            verify { handler wasNot Called }
+        }
+    }
+
+    private suspend fun withStoreNetwork(linkedList: String? = null, test: suspend (NetworkHelper) -> Unit) {
         val caller = Thread.currentThread()
         val httpClient = OkHttpClient.Builder().addInterceptor { chain ->
             val request = chain.request()
@@ -61,7 +84,7 @@ class ExtensionStoreServiceIoTest {
                     }
                 """.trimIndent()
 
-                "/entries.json" -> """
+                "/entries.json" -> linkedList ?: """
                     {"extensions": [
                         ${extensionJson("org.example.anime.test")},
                         ${extensionJson("org.example.extension.test")}
