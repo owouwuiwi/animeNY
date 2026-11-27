@@ -308,6 +308,7 @@ class MangaViewModel(
             updateSuccessState { it.copy(isRefreshingData = true) }
             try {
                 refreshFromSource(fetchDetails = true, fetchChapters = true, manualFetch = manualFetch)
+                if (manualFetch) withIOContext { refreshTrackers(standardProgressOnly = true) }
             } finally {
                 updateSuccessState { it.copy(isRefreshingData = false) }
             }
@@ -983,8 +984,8 @@ class MangaViewModel(
         }
     }
 
-    private suspend fun refreshTrackers() {
-        refreshTracks.await(mangaId)
+    private suspend fun refreshTrackers(standardProgressOnly: Boolean = false) {
+        refreshTracks.await(mangaId, standardProgressOnly)
             .filter { it.first != null }
             .forEach { (track, e) ->
                 logcat(LogPriority.ERROR, e) {

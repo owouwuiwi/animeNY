@@ -127,3 +127,13 @@ interface MangaTracker {
 
     fun getStatusForManga(status: Long): StringResource?
 }
+
+interface MangaTrackProgressReader : MangaTracker {
+    /**
+     * Reads an existing remote entry without creating it or changing its progress.
+     */
+    suspend fun fetchTrackProgress(track: MangaTrack): MangaTrack?
+
+    override suspend fun refresh(track: MangaTrack): MangaTrack =
+        checkNotNull(fetchTrackProgress(track)) { "Could not find manga" }
+}

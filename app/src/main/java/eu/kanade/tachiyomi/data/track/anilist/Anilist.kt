@@ -16,7 +16,7 @@ import eu.kanade.tachiyomi.data.track.AnimeTracker
 import eu.kanade.tachiyomi.data.track.BaseTracker
 import eu.kanade.tachiyomi.data.track.DeletableAnimeTracker
 import eu.kanade.tachiyomi.data.track.DeletableMangaTracker
-import eu.kanade.tachiyomi.data.track.MangaTracker
+import eu.kanade.tachiyomi.data.track.MangaTrackProgressReader
 import eu.kanade.tachiyomi.data.track.anilist.dto.ALOAuth
 import eu.kanade.tachiyomi.data.track.model.AnimeTrackSearch
 import eu.kanade.tachiyomi.data.track.model.MangaTrackSearch
@@ -34,7 +34,7 @@ class Anilist(id: Long) :
         id,
         "AniList",
     ),
-    MangaTracker,
+    MangaTrackProgressReader,
     AnimeTracker,
     DeletableMangaTracker,
     DeletableAnimeTracker,
@@ -384,7 +384,7 @@ class Anilist(id: Long) :
         return api.getPopularManga()
     }
 
-    override suspend fun refresh(track: MangaTrack): MangaTrack {
+    override suspend fun fetchTrackProgress(track: MangaTrack): MangaTrack {
         val remoteTrack = api.findLibManga(track, getUsername().toInt()) ?: throw Exception("Could not find manga")
         track.copyPersonalFrom(remoteTrack)
         track.title = remoteTrack.title

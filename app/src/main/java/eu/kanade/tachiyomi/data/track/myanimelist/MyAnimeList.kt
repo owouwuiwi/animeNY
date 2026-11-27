@@ -13,7 +13,7 @@ import eu.kanade.tachiyomi.data.track.AnimeTracker
 import eu.kanade.tachiyomi.data.track.BaseTracker
 import eu.kanade.tachiyomi.data.track.DeletableAnimeTracker
 import eu.kanade.tachiyomi.data.track.DeletableMangaTracker
-import eu.kanade.tachiyomi.data.track.MangaTracker
+import eu.kanade.tachiyomi.data.track.MangaTrackProgressReader
 import eu.kanade.tachiyomi.data.track.model.AnimeTrackSearch
 import eu.kanade.tachiyomi.data.track.model.MangaTrackSearch
 import eu.kanade.tachiyomi.data.track.model.TrackAnimeMetadata
@@ -31,7 +31,7 @@ class MyAnimeList(id: Long) :
         id,
         "MyAnimeList",
     ),
-    MangaTracker,
+    MangaTrackProgressReader,
     AnimeTracker,
     DeletableMangaTracker,
     DeletableAnimeTracker,
@@ -252,8 +252,10 @@ class MyAnimeList(id: Long) :
     }
 
     override suspend fun refresh(track: MangaTrack): MangaTrack {
-        return api.findListItem(track) ?: add(track)
+        return fetchTrackProgress(track) ?: add(track)
     }
+
+    override suspend fun fetchTrackProgress(track: MangaTrack): MangaTrack? = api.findListItem(track)
 
     override suspend fun refresh(track: AnimeTrack): AnimeTrack {
         return api.findListItem(track) ?: add(track)

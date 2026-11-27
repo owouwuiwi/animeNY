@@ -8,7 +8,7 @@ import eu.kanade.tachiyomi.data.track.AnimeTracker
 import eu.kanade.tachiyomi.data.track.BaseTracker
 import eu.kanade.tachiyomi.data.track.DeletableAnimeTracker
 import eu.kanade.tachiyomi.data.track.DeletableMangaTracker
-import eu.kanade.tachiyomi.data.track.MangaTracker
+import eu.kanade.tachiyomi.data.track.MangaTrackProgressReader
 import eu.kanade.tachiyomi.data.track.hikka.dto.HKOAuth
 import eu.kanade.tachiyomi.data.track.model.AnimeTrackSearch
 import eu.kanade.tachiyomi.data.track.model.MangaTrackSearch
@@ -28,7 +28,7 @@ class Hikka(id: Long) :
         id,
         "Hikka",
     ),
-    MangaTracker,
+    MangaTrackProgressReader,
     AnimeTracker,
     DeletableMangaTracker,
     DeletableAnimeTracker {
@@ -245,7 +245,7 @@ class Hikka(id: Long) :
         return api.searchAnime(query)
     }
 
-    override suspend fun refresh(track: MangaTrack): MangaTrack {
+    override suspend fun fetchTrackProgress(track: MangaTrack): MangaTrack {
         val remoteTrack = api.getManga(track)
         track.copyPersonalFrom(remoteTrack)
         track.total_chapters = remoteTrack.total_chapters

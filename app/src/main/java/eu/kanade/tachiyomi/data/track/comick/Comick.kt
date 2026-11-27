@@ -6,7 +6,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.models.manga.MangaTrack
 import eu.kanade.tachiyomi.data.track.BaseTracker
 import eu.kanade.tachiyomi.data.track.DeletableMangaTracker
-import eu.kanade.tachiyomi.data.track.MangaTracker
+import eu.kanade.tachiyomi.data.track.MangaTrackProgressReader
 import eu.kanade.tachiyomi.data.track.comick.dto.ComickOAuth
 import eu.kanade.tachiyomi.data.track.model.MangaTrackSearch
 import eu.kanade.tachiyomi.data.track.model.TrackAnimeMetadata
@@ -18,7 +18,7 @@ import kotlin.time.Clock
 import tachiyomi.domain.track.anime.model.AnimeTrack as DomainAnimeTrack
 import tachiyomi.domain.track.manga.model.MangaTrack as DomainTrack
 
-class Comick(id: Long) : BaseTracker(id, "Comick"), MangaTracker, DeletableMangaTracker {
+class Comick(id: Long) : BaseTracker(id, "Comick"), MangaTrackProgressReader, DeletableMangaTracker {
 
     private val json: Json by injectLazy()
 
@@ -99,7 +99,7 @@ class Comick(id: Long) : BaseTracker(id, "Comick"), MangaTracker, DeletableManga
         return api.search(query)
     }
 
-    override suspend fun refresh(track: MangaTrack): MangaTrack {
+    override suspend fun fetchTrackProgress(track: MangaTrack): MangaTrack {
         val remoteTrack = api.findLibManga(track) ?: throw Exception("Could not find manga")
         track.copyPersonalFrom(remoteTrack)
         return track

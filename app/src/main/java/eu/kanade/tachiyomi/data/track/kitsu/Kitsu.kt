@@ -9,7 +9,7 @@ import eu.kanade.tachiyomi.data.track.AnimeTracker
 import eu.kanade.tachiyomi.data.track.BaseTracker
 import eu.kanade.tachiyomi.data.track.DeletableAnimeTracker
 import eu.kanade.tachiyomi.data.track.DeletableMangaTracker
-import eu.kanade.tachiyomi.data.track.MangaTracker
+import eu.kanade.tachiyomi.data.track.MangaTrackProgressReader
 import eu.kanade.tachiyomi.data.track.kitsu.dto.KitsuOAuth
 import eu.kanade.tachiyomi.data.track.model.AnimeTrackSearch
 import eu.kanade.tachiyomi.data.track.model.MangaTrackSearch
@@ -31,7 +31,7 @@ class Kitsu(id: Long) :
         "Kitsu",
     ),
     AnimeTracker,
-    MangaTracker,
+    MangaTrackProgressReader,
     DeletableMangaTracker,
     DeletableAnimeTracker {
 
@@ -290,7 +290,7 @@ class Kitsu(id: Long) :
         return api.getAnimeMetadata(track)
     }
 
-    override suspend fun refresh(track: MangaTrack): MangaTrack {
+    override suspend fun fetchTrackProgress(track: MangaTrack): MangaTrack {
         val remoteTrack = api.findLibManga(track) ?: throw Exception("Could not find manga")
         track.copyPersonalFrom(remoteTrack)
         track.library_id = remoteTrack.library_id

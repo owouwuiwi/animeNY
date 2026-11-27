@@ -6,7 +6,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.models.manga.MangaTrack
 import eu.kanade.tachiyomi.data.track.BaseTracker
 import eu.kanade.tachiyomi.data.track.DeletableMangaTracker
-import eu.kanade.tachiyomi.data.track.MangaTracker
+import eu.kanade.tachiyomi.data.track.MangaTrackProgressReader
 import eu.kanade.tachiyomi.data.track.mangabaka.dto.MangaBakaOAuth
 import eu.kanade.tachiyomi.data.track.model.MangaTrackSearch
 import eu.kanade.tachiyomi.data.track.model.TrackAnimeMetadata
@@ -21,7 +21,7 @@ import tachiyomi.domain.track.manga.model.MangaTrack as DomainTrack
 
 class MangaBaka(id: Long) :
     BaseTracker(id, "MangaBaka"),
-    MangaTracker,
+    MangaTrackProgressReader,
     DeletableMangaTracker {
 
     private val json: Json by injectLazy()
@@ -124,7 +124,7 @@ class MangaBaka(id: Long) :
 
     internal suspend fun getExternalTrackerIds(id: Long) = api.getExternalTrackerIds(id)
 
-    override suspend fun refresh(track: MangaTrack): MangaTrack {
+    override suspend fun fetchTrackProgress(track: MangaTrack): MangaTrack {
         val remoteTrack = api.findLibManga(track) ?: throw Exception("Could not find manga")
         track.copyPersonalFrom(remoteTrack)
         track.remote_id = remoteTrack.remote_id

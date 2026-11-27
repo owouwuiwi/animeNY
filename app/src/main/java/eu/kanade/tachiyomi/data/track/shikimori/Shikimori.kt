@@ -9,7 +9,7 @@ import eu.kanade.tachiyomi.data.track.AnimeTracker
 import eu.kanade.tachiyomi.data.track.BaseTracker
 import eu.kanade.tachiyomi.data.track.DeletableAnimeTracker
 import eu.kanade.tachiyomi.data.track.DeletableMangaTracker
-import eu.kanade.tachiyomi.data.track.MangaTracker
+import eu.kanade.tachiyomi.data.track.MangaTrackProgressReader
 import eu.kanade.tachiyomi.data.track.model.AnimeTrackSearch
 import eu.kanade.tachiyomi.data.track.model.MangaTrackSearch
 import eu.kanade.tachiyomi.data.track.model.TrackAnimeMetadata
@@ -27,7 +27,7 @@ class Shikimori(id: Long) :
         id,
         "Shikimori",
     ),
-    MangaTracker,
+    MangaTrackProgressReader,
     AnimeTracker,
     DeletableMangaTracker,
     DeletableAnimeTracker {
@@ -170,7 +170,7 @@ class Shikimori(id: Long) :
         return api.searchAnime(query)
     }
 
-    override suspend fun refresh(track: MangaTrack): MangaTrack {
+    override suspend fun fetchTrackProgress(track: MangaTrack): MangaTrack {
         val remoteTrack = api.findLibManga(track) ?: throw Exception("Could not find manga")
         track.library_id = remoteTrack.library_id
         track.copyPersonalFrom(remoteTrack)
