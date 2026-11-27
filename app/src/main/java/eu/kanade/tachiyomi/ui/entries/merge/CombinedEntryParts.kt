@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.ui.entries.merge
 import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -11,16 +12,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Done
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,6 +60,7 @@ import tachiyomi.presentation.core.screens.LoadingScreen
 @Composable
 internal fun CombinedEntryParts(
     group: EntryMerge,
+    openMember: (ownerId: Long) -> Unit,
     openPart: (ownerId: Long, partId: Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -90,6 +97,34 @@ internal fun CombinedEntryParts(
                         Text(metadata.title, style = MaterialTheme.typography.headlineSmall)
                         metadata.description?.takeIf(String::isNotBlank)?.let {
                             Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        }
+        if (data.members.isNotEmpty()) {
+            item {
+                var expanded by remember { mutableStateOf(false) }
+                Box(Modifier.padding(horizontal = 8.dp)) {
+                    TextButton(onClick = { expanded = true }) {
+                        Text(stringResource(TLMR.strings.entry_merge_source_details))
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        data.members.forEach { member ->
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(member.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        labels[member.reference]?.let { label ->
+                                            Text(label.name, style = MaterialTheme.typography.bodySmall)
+                                        }
+                                    }
+                                },
+                                onClick = {
+                                    expanded = false
+                                    openMember(member.ownerId)
+                                },
+                            )
                         }
                     }
                 }
@@ -138,6 +173,7 @@ private fun observeParts(context: Context, group: EntryMerge): Flow<CombinedPart
         MergeMedia.Anime -> observe.anime(group).map { snapshot ->
             CombinedParts(
                 metadata = snapshot.metadata?.let { MergeMetadata(it.title, it.description, it) },
+                members = snapshot.members.map { (reference, anime) -> MergeMemberRow(reference, anime.id, anime.title) },
                 hasUnavailable = snapshot.unavailableMembers.isNotEmpty(),
                 parts = snapshot.parts.map { it.toRow(it.value.seen) },
             )
@@ -146,6 +182,7 @@ private fun observeParts(context: Context, group: EntryMerge): Flow<CombinedPart
         MergeMedia.Manga -> observe.manga(group).map { snapshot ->
             CombinedParts(
                 metadata = snapshot.metadata?.let { MergeMetadata(it.title, it.description, it) },
+                members = snapshot.members.map { (reference, manga) -> MergeMemberRow(reference, manga.id, manga.title) },
                 hasUnavailable = snapshot.unavailableMembers.isNotEmpty(),
                 parts = snapshot.parts.map { it.toRow(it.value.read) },
             )
@@ -194,11 +231,13 @@ private fun MergedPart<*>.toRow(completed: Boolean) = MergePartRow(member, owner
 
 private data class CombinedParts(
     val metadata: MergeMetadata?,
+    val members: List<MergeMemberRow>,
     val hasUnavailable: Boolean,
     val parts: List<MergePartRow>,
 )
 
 private data class MergeMetadata(val title: String, val description: String?, val cover: Any)
+private data class MergeMemberRow(val reference: MergeEntryRef, val ownerId: Long, val title: String)
 private data class MergeSourceLabel(val name: String, val canDownload: Boolean)
 
 private data class MergePartRow(

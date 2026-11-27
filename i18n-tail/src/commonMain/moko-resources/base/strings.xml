@@ -452,6 +452,7 @@
     <string name="track_repeat_no_next_part">There are no more parts available to repeat.</string>
     <string name="track_repeat_open_error">Could not open the repeated title.</string>
     <string name="entry_merge_title">Combined entries</string>
+    <string name="entry_merge_source_details">Source details</string>
     <string name="entry_merge_edit">Choose entries to combine</string>
     <string name="entry_merge_priority">Source priority</string>
     <string name="entry_merge_metadata">Choose which entry supplies the title and cover.</string>

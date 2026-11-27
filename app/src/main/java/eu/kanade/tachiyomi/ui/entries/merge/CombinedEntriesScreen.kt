@@ -28,6 +28,8 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.data.torrent.service.TorrentServerService
 import eu.kanade.tachiyomi.source.anime.isSourceForTorrents
+import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
+import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.util.system.toast
@@ -131,6 +133,14 @@ data class CombinedEntriesScreen(
 
                 else -> CombinedEntryParts(
                     group = checkNotNull(group),
+                    openMember = { owner ->
+                        navigator.push(
+                            when (media) {
+                                MergeMedia.Anime -> AnimeScreen(owner)
+                                MergeMedia.Manga -> MangaScreen(owner)
+                            },
+                        )
+                    },
                     openPart = { owner, part ->
                         scope.launch { open(context, owner, part) }
                     },

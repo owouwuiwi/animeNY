@@ -379,6 +379,7 @@
   <string name="track_repeat_no_next_part">Non ci sono altre parti disponibili da rivedere.</string>
   <string name="track_repeat_open_error">Impossibile riaprire il titolo.</string>
   <string name="entry_merge_title">Opere collegate</string>
+  <string name="entry_merge_source_details">Dettagli delle fonti</string>
   <string name="entry_merge_edit">Scegli le opere da collegare</string>
   <string name="entry_merge_priority">Priorità delle fonti</string>
   <string name="entry_merge_metadata">Scegli da quale opera prendere titolo e copertina.</string>
