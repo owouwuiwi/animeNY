@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import dev.icerock.moko.resources.StringResource
 import eu.kanade.presentation.browse.anime.components.AnimeSourceIcon
 import eu.kanade.presentation.browse.components.GlobalSearchCardRow
 import eu.kanade.tachiyomi.animesource.AnimeCatalogueSource
@@ -47,8 +48,8 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.source.anime.model.AnimeSource
 import tachiyomi.domain.source.anime.model.FeedSavedSearch
-import tachiyomi.domain.source.anime.model.FeedSortOrder
 import tachiyomi.domain.source.anime.model.SavedSearch
+import tachiyomi.domain.source.model.FeedSortOrder
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.components.ScrollbarLazyColumn
@@ -117,15 +118,7 @@ fun FeedScreen(
             ) {
                 val feeds = state.items.orEmpty()
                 val displayedFeeds = remember(feeds, sortOrder) {
-                    when (sortOrder) {
-                        FeedSortOrder.MANUAL -> feeds
-
-                        FeedSortOrder.SOURCE_NAME -> feeds.sortedWith(
-                            compareBy(String.CASE_INSENSITIVE_ORDER) { it.sourceLabel },
-                        )
-
-                        FeedSortOrder.LAST_UPDATE -> feeds.sortedByDescending { it.lastLocalUpdate }
-                    }
+                    sortOrder.order(feeds, FeedItemUI::sourceLabel, FeedItemUI::lastLocalUpdate)
                 }
                 val sections = remember(displayedFeeds, groupBySource) {
                     if (groupBySource) {
@@ -192,32 +185,35 @@ fun FeedScreen(
 
 @Composable
 internal fun FeedDisplayOptionsDialog(
-    groupBySource: Boolean,
     sortOrder: FeedSortOrder,
-    onGroupBySourceChange: (Boolean) -> Unit,
     onSortOrderChange: (FeedSortOrder) -> Unit,
     onDismiss: () -> Unit,
+    manualOrderLabel: StringResource = TLMR.strings.feed_order_manual,
+    groupBySource: Boolean = false,
+    onGroupBySourceChange: ((Boolean) -> Unit)? = null,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(TLMR.strings.feed_display_options)) },
         text = {
             Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth().toggleable(
-                        value = groupBySource,
-                        role = Role.Switch,
-                        onValueChange = onGroupBySourceChange,
-                    ),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(stringResource(TLMR.strings.feed_group_by_source), Modifier.weight(1f))
-                    Switch(checked = groupBySource, onCheckedChange = null)
+                if (onGroupBySourceChange != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().toggleable(
+                            value = groupBySource,
+                            role = Role.Switch,
+                            onValueChange = onGroupBySourceChange,
+                        ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(TLMR.strings.feed_group_by_source), Modifier.weight(1f))
+                        Switch(checked = groupBySource, onCheckedChange = null)
+                    }
                 }
                 Column(Modifier.selectableGroup()) {
                     FeedSortOrder.entries.forEach { order ->
                         val label = when (order) {
-                            FeedSortOrder.MANUAL -> TLMR.strings.feed_order_manual
+                            FeedSortOrder.MANUAL -> manualOrderLabel
                             FeedSortOrder.SOURCE_NAME -> TLMR.strings.feed_order_source_name
                             FeedSortOrder.LAST_UPDATE -> TLMR.strings.feed_order_last_local_update
                         }

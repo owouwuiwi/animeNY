@@ -400,6 +400,7 @@
     <string name="feed_display_options">Visualizzazione del feed</string>
     <string name="feed_group_by_source">Raggruppa per fonte</string>
     <string name="feed_order_manual">Ordine manuale</string>
+    <string name="feed_order_added">Ordine di aggiunta</string>
     <string name="feed_order_source_name">Nome della fonte</string>
     <string name="feed_order_last_local_update">Ultimo aggiornamento locale</string>
     <string name="edit_episode_title">Modifica titolo episodio</string>

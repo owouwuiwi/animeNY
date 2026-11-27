@@ -533,6 +533,7 @@
     <string name="feed_display_options">Feed display options</string>
     <string name="feed_group_by_source">Group by source</string>
     <string name="feed_order_manual">Manual order</string>
+    <string name="feed_order_added">Order added</string>
     <string name="feed_order_source_name">Source name</string>
     <string name="feed_order_last_local_update">Latest local update</string>
     <string name="edit_episode_title">Edit episode title</string>

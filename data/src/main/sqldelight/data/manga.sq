@@ -52,6 +52,11 @@ FROM manga
 WHERE source_id = :sourceId
 AND remote_url = :remoteUrl;
 
+latestUpdateForUrls:
+SELECT coalesce(max(state_chapter_last_update), 0)
+FROM manga
+WHERE source_id = :sourceId AND remote_url IN :urls;
+
 getFavorites:
 SELECT
     id, source_id, remote_url, remote_title, remote_author, remote_artist, remote_description,

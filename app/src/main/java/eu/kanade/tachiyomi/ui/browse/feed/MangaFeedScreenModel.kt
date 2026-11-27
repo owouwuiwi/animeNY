@@ -13,7 +13,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import logcat.LogPriority
 import tachiyomi.core.common.util.lang.withIOContext
+import tachiyomi.core.common.util.system.logcat
+import tachiyomi.domain.entries.manga.interactor.GetManga
 import tachiyomi.domain.entries.manga.interactor.NetworkToLocalManga
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.source.manga.service.MangaSourceManager
@@ -24,7 +27,10 @@ internal class MangaFeedScreenModel(
     sourceManager: MangaSourceManager = Injekt.get(),
     private val sourcePreferences: SourcePreferences = Injekt.get(),
     private val networkToLocalManga: NetworkToLocalManga = Injekt.get(),
+    private val getManga: GetManga = Injekt.get(),
 ) : StateScreenModel<MangaFeedState>(MangaFeedState()) {
+
+    val sortOrder = sourcePreferences.mangaFeedSortOrder
 
     private val selectedIds = sourcePreferences.mangaFeedSourceIds
     private val requests = MutableStateFlow(RefreshRequest())
@@ -93,9 +99,18 @@ internal class MangaFeedScreenModel(
             sourcesToAdd = request.visibleSources.filterNot { it.id in nextRequests },
             rows = rows,
         )
-        rows.filter { it.result == MangaFeedResult.Loading }.forEach { row ->
+        rows.filter { it.result == MangaFeedResult.Loading || it.result is MangaFeedResult.Ready }.forEach { row ->
             launch {
-                val result = slots.withPermit { fetch(requireNotNull(row.source)) }
+                val fetched = if (row.result == MangaFeedResult.Loading) {
+                    slots.withPermit { fetch(requireNotNull(row.source)) }
+                } else {
+                    row.result
+                }
+                val result = if (fetched is MangaFeedResult.Ready) {
+                    fetched.copy(lastLocalUpdate = latestLocalUpdate(row.sourceId, fetched.titles))
+                } else {
+                    fetched
+                }
                 mutableState.update { current ->
                     current.copy(
                         rows = current.rows?.map { if (it.sourceId == row.sourceId) it.copy(result = result) else it },
@@ -116,6 +131,17 @@ internal class MangaFeedScreenModel(
             throw e
         } catch (_: Exception) {
             MangaFeedResult.Failed
+        }
+    }
+
+    private suspend fun latestLocalUpdate(sourceId: Long, titles: List<Manga>): Long {
+        return try {
+            withIOContext { getManga.latestUpdateForUrls(sourceId, titles.map { it.url }) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Failed to read the latest local manga feed update" }
+            0L
         }
     }
 
@@ -143,11 +169,13 @@ internal data class MangaFeedRow(
     val name: String,
     val source: CatalogueSource?,
     val result: MangaFeedResult,
-)
+) {
+    val lastLocalUpdate: Long get() = (result as? MangaFeedResult.Ready)?.lastLocalUpdate ?: 0L
+}
 
 internal sealed interface MangaFeedResult {
     data object Unavailable : MangaFeedResult
     data object Loading : MangaFeedResult
     data object Failed : MangaFeedResult
-    data class Ready(val titles: List<Manga>) : MangaFeedResult
+    data class Ready(val titles: List<Manga>, val lastLocalUpdate: Long = 0L) : MangaFeedResult
 }

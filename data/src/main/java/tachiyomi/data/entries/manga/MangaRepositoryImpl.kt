@@ -57,6 +57,11 @@ class MangaRepositoryImpl(
             .subscribeToOneOrNull()
     }
 
+    override suspend fun latestUpdateForUrls(sourceId: Long, urls: Collection<String>): Long {
+        if (urls.isEmpty()) return 0L
+        return database.mangaQueries.latestUpdateForUrls(sourceId, urls).awaitAsOne()
+    }
+
     override suspend fun getMangaFavorites(): List<Manga> {
         return database.mangaQueries
             .getFavorites(MangaMapper::mapManga)

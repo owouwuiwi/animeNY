@@ -28,4 +28,7 @@ class GetManga(
     fun subscribe(url: String, sourceId: Long): Flow<Manga?> {
         return mangaRepository.getMangaByUrlAndSourceIdAsFlow(url, sourceId)
     }
+
+    suspend fun latestUpdateForUrls(sourceId: Long, urls: Collection<String>): Long =
+        mangaRepository.latestUpdateForUrls(sourceId, urls)
 }

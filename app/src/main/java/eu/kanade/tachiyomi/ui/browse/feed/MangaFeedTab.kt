@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -36,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import eu.kanade.presentation.browse.FeedDisplayOptionsDialog
 import eu.kanade.presentation.browse.GlobalSearchErrorResultItem
 import eu.kanade.presentation.browse.GlobalSearchLoadingResultItem
 import eu.kanade.presentation.browse.components.EmptyResultItem
@@ -54,6 +57,7 @@ import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.entries.manga.model.asMangaCover
 import tachiyomi.domain.source.manga.interactor.GetRemoteManga
 import tachiyomi.domain.source.manga.model.Source
+import tachiyomi.domain.source.model.FeedSortOrder
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.components.ScrollbarLazyColumn
@@ -66,7 +70,9 @@ import tachiyomi.presentation.core.screens.LoadingScreen
 @Composable
 internal fun mangaFeedTab(screenModel: MangaFeedScreenModel, active: Boolean): TabContent {
     val state by screenModel.state.collectAsState()
+    val sortOrder by screenModel.sortOrder.changes().collectAsState(screenModel.sortOrder.get())
     var showAdd by rememberSaveable { mutableStateOf(false) }
+    var showFeedDisplayOptions by rememberSaveable { mutableStateOf(false) }
     var removingSource by rememberSaveable { mutableStateOf<Long?>(null) }
     val navigator = LocalNavigator.currentOrThrow
     val scope = rememberCoroutineScope()
@@ -84,10 +90,16 @@ internal fun mangaFeedTab(screenModel: MangaFeedScreenModel, active: Boolean): T
                 icon = Icons.Outlined.Add,
                 onClick = { showAdd = true },
             ),
+            AppBar.Action(
+                title = stringResource(TLMR.strings.feed_display_options),
+                icon = Icons.Outlined.Tune,
+                onClick = { showFeedDisplayOptions = true },
+            ),
         ),
         content = { contentPadding, snackbar ->
             MangaFeedContent(
                 state = state,
+                sortOrder = sortOrder,
                 contentPadding = contentPadding,
                 onOpenSource = { source ->
                     navigator.push(
@@ -127,6 +139,15 @@ internal fun mangaFeedTab(screenModel: MangaFeedScreenModel, active: Boolean): T
             }
 
             if (active) {
+                if (showFeedDisplayOptions) {
+                    FeedDisplayOptionsDialog(
+                        sortOrder = sortOrder,
+                        onSortOrderChange = screenModel.sortOrder::set,
+                        manualOrderLabel = TLMR.strings.feed_order_added,
+                        onDismiss = { showFeedDisplayOptions = false },
+                    )
+                }
+
                 removingSource?.let { sourceId ->
                     SourceFeedDeleteDialog(
                         onDismissRequest = { removingSource = null },
@@ -144,6 +165,7 @@ internal fun mangaFeedTab(screenModel: MangaFeedScreenModel, active: Boolean): T
 @Composable
 private fun MangaFeedContent(
     state: MangaFeedState,
+    sortOrder: FeedSortOrder,
     contentPadding: PaddingValues,
     onOpenSource: (CatalogueSource) -> Unit,
     onOpenTitle: (Manga) -> Unit,
@@ -159,6 +181,9 @@ private fun MangaFeedContent(
             modifier = Modifier.padding(contentPadding),
         )
         else -> {
+            val displayedRows = remember(rows, sortOrder) {
+                sortOrder.order(rows, MangaFeedRow::name, MangaFeedRow::lastLocalUpdate)
+            }
             val loading = rows.any { it.result == MangaFeedResult.Loading }
             PullRefresh(
                 refreshing = loading,
@@ -169,7 +194,7 @@ private fun MangaFeedContent(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = contentPadding,
                 ) {
-                    items(rows, key = { it.sourceId }) { row ->
+                    items(displayedRows, key = { it.sourceId }) { row ->
                         MangaFeedSourceSection(
                             row = row,
                             onOpenSource = onOpenSource,
