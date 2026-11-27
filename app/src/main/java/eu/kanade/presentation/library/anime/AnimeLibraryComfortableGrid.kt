@@ -52,11 +52,11 @@ internal fun AnimeLibraryComfortableGrid(
                 ),
                 coverBadgeStart = {
                     DownloadsBadge(count = libraryItem.badges.downloadCount)
-                    UnviewedBadge(count = libraryItem.unseenCount)
+                    UnviewedBadge(count = libraryItem.badges.unseenCount)
                 },
                 coverBadgeEnd = {
                     LanguageBadge(
-                        isLocal = libraryItem.isLocal,
+                        isLocal = libraryItem.badges.isLocal,
                         sourceLanguage = libraryItem.badges.sourceLanguage,
                     )
                 },
