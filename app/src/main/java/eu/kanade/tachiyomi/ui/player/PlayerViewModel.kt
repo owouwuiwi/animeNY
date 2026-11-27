@@ -596,7 +596,7 @@ class PlayerViewModel(
         val count = mpv.getPropertyInt("chapter-list/count") ?: 0
         for (i in 0 until count) {
             val title = mpv.getPropertyString("chapter-list/$i/title") ?: ""
-            val time = mpv.getPropertyInt("chapter-list/$i/time") ?: 0
+            val time = mpv.getPropertyDouble("chapter-list/$i/time") ?: 0.0
             chapters.add(
                 IndexedSegment(
                     name = title,
@@ -1129,11 +1129,22 @@ class PlayerViewModel(
     private val preciseSeek = gesturePreferences.playerSmoothSeek().get()
     private val showSeekBar = gesturePreferences.showSeekBar().get()
 
-    private fun seekToWithText(seekValue: Int, text: String?) {
+    private fun seekToWithText(seekValue: Int, text: String?) = seekWithText(seekValue, text) {
+        seekTo(seekValue, preciseSeek)
+    }
+
+    private fun seekToChapterWithText(position: Float, text: String) {
+        if (position.toDouble() !in 0.0..(mpv.getPropertyDouble("duration") ?: 0.0)) return
+        seekWithText(position.toInt(), text) {
+            mpv.command("seek", position.toString(), "absolute+exact")
+        }
+    }
+
+    private inline fun seekWithText(seekValue: Int, text: String?, seek: () -> Unit) {
         _isSeekingForwards.value = seekValue > 0
         _doubleTapSeekAmount.value = seekValue - pos.value.toInt()
         _seekText.update { _ -> text }
-        seekTo(seekValue, preciseSeek)
+        seek()
         if (showSeekBar) showSeekBar()
     }
 
@@ -2722,8 +2733,8 @@ class PlayerViewModel(
                     showSkipIntroButton(chapter, nextChapterPos, waitingSkipIntro)
                     waitingSkipIntro--
                 } else if (autoSkip) {
-                    seekToWithText(
-                        seekValue = nextChapterPos.toInt(),
+                    seekToChapterWithText(
+                        position = nextChapterPos,
                         text = context.stringResource(AYMR.strings.player_intro_skipped, chapter.name),
                     )
                 } else {
@@ -2751,8 +2762,8 @@ class PlayerViewModel(
             if (waitingTime > 0) {
                 _skipIntroText.update { _ -> context.stringResource(AYMR.strings.player_aniskip_dontskip) }
             } else {
-                seekToWithText(
-                    seekValue = nextChapterPos.toInt(),
+                seekToChapterWithText(
+                    position = nextChapterPos,
                     text = context.stringResource(AYMR.strings.player_aniskip_skip, chapter.name),
                 )
             }
@@ -2772,8 +2783,8 @@ class PlayerViewModel(
 
             val nextChapterPos = chapters.value.getOrNull(chapterIndex + 1)?.start ?: pos.value
 
-            seekToWithText(
-                seekValue = nextChapterPos.toInt(),
+            seekToChapterWithText(
+                position = nextChapterPos,
                 text = context.stringResource(AYMR.strings.player_aniskip_skip, chapter.name),
             )
         }
