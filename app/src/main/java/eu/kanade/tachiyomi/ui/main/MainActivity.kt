@@ -5,6 +5,7 @@ import android.app.Activity
 import android.app.Application
 import android.app.SearchManager
 import android.app.assist.AssistContent
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -877,7 +878,11 @@ class MainActivity : BaseActivity() {
                     withUIContext { context.toast(e.message) }
                     null
                 } ?: return
-                externalPlayerResult?.launch(intent) ?: return
+                try {
+                    externalPlayerResult?.launch(intent)
+                } catch (_: ActivityNotFoundException) {
+                    withUIContext { context.toast(AYMR.strings.external_player_unavailable) }
+                }
             } else {
                 context.startActivity(
                     PlayerActivity.newIntent(

@@ -55,6 +55,7 @@
     <string name="pref_category_external_player">Player esterno</string>
     <string name="pref_always_use_external_player">Usa sempre un player esterno</string>
     <string name="pref_external_player_preference">Player esterno scelto</string>
+    <string name="external_player_unavailable">Nessun player esterno compatibile ha potuto aprire il video. Scegli un altro player nelle impostazioni.</string>
     <string name="pref_player_gestures">Gesti</string>
     <string name="pref_player_gestures_summary">Scorrimento, doppio tocco, controlli multimediali</string>
     <string name="pref_category_player_sliders">Cursori</string>
