@@ -19,6 +19,7 @@ import androidx.paging.compose.LazyPagingItems
 import eu.kanade.presentation.browse.anime.components.BrowseAnimeSourceComfortableGrid
 import eu.kanade.presentation.browse.anime.components.BrowseAnimeSourceCompactGrid
 import eu.kanade.presentation.browse.anime.components.BrowseAnimeSourceList
+import eu.kanade.presentation.browse.anime.components.SourceResultsViewport
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.util.formattedMessage
 import eu.kanade.tachiyomi.animesource.AnimeSource
@@ -42,7 +43,6 @@ fun BrowseAnimeSourceContent(
     animeList: LazyPagingItems<StateFlow<Anime>>,
     columns: GridCells,
     entries: Int = 0,
-    topBarHeight: Int = 0,
     displayMode: LibraryDisplayMode,
     snackbarHostState: SnackbarHostState,
     contentPadding: PaddingValues,
@@ -119,52 +119,40 @@ fun BrowseAnimeSourceContent(
         return
     }
 
-    when (displayMode) {
-        LibraryDisplayMode.ComfortableGrid -> {
-            BrowseAnimeSourceComfortableGrid(
-                animeList = animeList,
-                columns = columns,
-                contentPadding = contentPadding,
-                onAnimeClick = onAnimeClick,
-                onAnimeLongClick = onAnimeLongClick,
-                selectedIds = selectedIds,
-            )
-        }
+    SourceResultsViewport(contentPadding) { resultsPadding ->
+        when (displayMode) {
+            LibraryDisplayMode.ComfortableGrid, LibraryDisplayMode.ComfortableGridPanorama -> {
+                BrowseAnimeSourceComfortableGrid(
+                    animeList = animeList,
+                    columns = columns,
+                    contentPadding = resultsPadding,
+                    onAnimeClick = onAnimeClick,
+                    onAnimeLongClick = onAnimeLongClick,
+                    selectedIds = selectedIds,
+                )
+            }
 
-        // KMK -->
-        LibraryDisplayMode.ComfortableGridPanorama -> {
-            BrowseAnimeSourceComfortableGrid(
-                animeList = animeList,
-                columns = columns,
-                contentPadding = contentPadding,
-                onAnimeClick = onAnimeClick,
-                onAnimeLongClick = onAnimeLongClick,
-                selectedIds = selectedIds,
-            )
-        }
+            LibraryDisplayMode.List -> {
+                BrowseAnimeSourceList(
+                    animeList = animeList,
+                    entries = entries,
+                    contentPadding = resultsPadding,
+                    onAnimeClick = onAnimeClick,
+                    onAnimeLongClick = onAnimeLongClick,
+                    selectedIds = selectedIds,
+                )
+            }
 
-        // KMK <--
-        LibraryDisplayMode.List -> {
-            BrowseAnimeSourceList(
-                animeList = animeList,
-                entries = entries,
-                topBarHeight = topBarHeight,
-                contentPadding = contentPadding,
-                onAnimeClick = onAnimeClick,
-                onAnimeLongClick = onAnimeLongClick,
-                selectedIds = selectedIds,
-            )
-        }
-
-        LibraryDisplayMode.CompactGrid, LibraryDisplayMode.CoverOnlyGrid -> {
-            BrowseAnimeSourceCompactGrid(
-                animeList = animeList,
-                columns = columns,
-                contentPadding = contentPadding,
-                onAnimeClick = onAnimeClick,
-                onAnimeLongClick = onAnimeLongClick,
-                selectedIds = selectedIds,
-            )
+            LibraryDisplayMode.CompactGrid, LibraryDisplayMode.CoverOnlyGrid -> {
+                BrowseAnimeSourceCompactGrid(
+                    animeList = animeList,
+                    columns = columns,
+                    contentPadding = resultsPadding,
+                    onAnimeClick = onAnimeClick,
+                    onAnimeLongClick = onAnimeLongClick,
+                    selectedIds = selectedIds,
+                )
+            }
         }
     }
 }

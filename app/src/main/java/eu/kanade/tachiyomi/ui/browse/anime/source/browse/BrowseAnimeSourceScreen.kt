@@ -25,13 +25,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -165,13 +163,10 @@ data class BrowseAnimeSourceScreen(
             assistUrl = (viewModel.source as? AnimeHttpSource)?.getHomeUrl()
         }
 
-        var topBarHeight by remember { mutableIntStateOf(0) }
         Scaffold(
             topBar = {
                 Column(
-                    modifier = Modifier
-                        .background(MaterialTheme.colorScheme.surface)
-                        .onSizeChanged { topBarHeight = it.height },
+                    modifier = Modifier.background(MaterialTheme.colorScheme.surface),
                 ) {
                     if (bulkSelection != null) {
                         BulkSelectionToolbar(
@@ -301,7 +296,6 @@ data class BrowseAnimeSourceScreen(
                 animeList = animeList,
                 columns = viewModel.getColumnsPreference(LocalConfiguration.current.orientation),
                 entries = viewModel.getColumnsPreferenceForCurrentOrientation(LocalConfiguration.current.orientation),
-                topBarHeight = topBarHeight,
                 displayMode = viewModel.displayMode,
                 snackbarHostState = snackbarHostState,
                 contentPadding = paddingValues,

@@ -10,6 +10,7 @@ import eu.kanade.presentation.browse.GlobalSearchLoadingResultItem
 import eu.kanade.presentation.browse.GlobalSearchResultItem
 import eu.kanade.presentation.browse.anime.components.GlobalAnimeSearchCardRow
 import eu.kanade.presentation.browse.anime.components.GlobalAnimeSearchToolbar
+import eu.kanade.presentation.browse.anime.components.SourceResultsViewport
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.AnimeSearchItemResult
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.AnimeSearchViewModel
@@ -69,35 +70,35 @@ internal fun GlobalSearchContent(
     onLongClickItem: (Anime) -> Unit,
     fromSourceId: Long? = null,
 ) {
-    LazyColumn(
-        contentPadding = contentPadding,
-    ) {
-        items.forEach { (source, result) ->
-            item(key = source.id) {
-                GlobalSearchResultItem(
-                    title = fromSourceId?.let {
-                        "▶ ${source.name}".takeIf { source.id == fromSourceId }
-                    } ?: source.name,
-                    subtitle = LocaleHelper.getLocalizedDisplayName(source.lang),
-                    onClick = { onClickSource(source) },
-                    modifier = Modifier.animateItem(),
-                ) {
-                    when (result) {
-                        AnimeSearchItemResult.Loading -> {
-                            GlobalSearchLoadingResultItem()
-                        }
+    SourceResultsViewport(contentPadding) { resultsPadding ->
+        LazyColumn(contentPadding = resultsPadding) {
+            items.forEach { (source, result) ->
+                item(key = source.id) {
+                    GlobalSearchResultItem(
+                        title = fromSourceId?.let {
+                            "▶ ${source.name}".takeIf { source.id == fromSourceId }
+                        } ?: source.name,
+                        subtitle = LocaleHelper.getLocalizedDisplayName(source.lang),
+                        onClick = { onClickSource(source) },
+                        modifier = Modifier.animateItem(),
+                    ) {
+                        when (result) {
+                            AnimeSearchItemResult.Loading -> {
+                                GlobalSearchLoadingResultItem()
+                            }
 
-                        is AnimeSearchItemResult.Success -> {
-                            GlobalAnimeSearchCardRow(
-                                titles = result.result,
-                                getAnime = getAnime,
-                                onClick = onClickItem,
-                                onLongClick = onLongClickItem,
-                            )
-                        }
+                            is AnimeSearchItemResult.Success -> {
+                                GlobalAnimeSearchCardRow(
+                                    titles = result.result,
+                                    getAnime = getAnime,
+                                    onClick = onClickItem,
+                                    onLongClick = onLongClickItem,
+                                )
+                            }
 
-                        is AnimeSearchItemResult.Error -> {
-                            GlobalSearchErrorResultItem(message = result.throwable.message)
+                            is AnimeSearchItemResult.Error -> {
+                                GlobalSearchErrorResultItem(message = result.throwable.message)
+                            }
                         }
                     }
                 }

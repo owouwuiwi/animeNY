@@ -25,7 +25,6 @@ import tachiyomi.presentation.core.util.plus
 fun BrowseAnimeSourceList(
     animeList: LazyPagingItems<StateFlow<Anime>>,
     entries: Int,
-    topBarHeight: Int,
     contentPadding: PaddingValues,
     onAnimeClick: (Anime) -> Unit,
     onAnimeLongClick: (Anime) -> Unit,
@@ -55,7 +54,7 @@ fun BrowseAnimeSourceList(
                     onLongClick = { onAnimeLongClick(anime) },
                     isSelected = anime.id in selectedIds,
                     entries = entries,
-                    containerHeight = containerHeightPx - topBarHeight,
+                    containerHeight = containerHeightPx,
                 )
             }
 
