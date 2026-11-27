@@ -15,6 +15,7 @@ import androidx.work.WorkerParameters
 import dev.zacsweers.metro.Inject
 import eu.kanade.domain.sync.SyncPreferences
 import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreJob
+import eu.kanade.tachiyomi.data.backup.restore.SYNC_RESTORE_FILE_PREFIX
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.util.system.cancelNotification
 import eu.kanade.tachiyomi.util.system.isRunning
@@ -56,11 +57,11 @@ class SyncDataJob(private val context: Context, workerParams: WorkerParameters) 
 
         return try {
             cloudSyncLock.withLock {
-                if (BackupRestoreJob.hasUnfinished(context.workManager) || !syncManager.syncData()) {
-                    Result.retry()
-                } else {
-                    Result.success()
-                }
+                if (BackupRestoreJob.hasUnfinished(context.workManager)) return@withLock Result.retry()
+                // A cancelled queued restore may never enter its worker to clean up its staging file.
+                context.cacheDir.listFiles { file -> file.isFile && file.name.startsWith(SYNC_RESTORE_FILE_PREFIX) }
+                    ?.forEach { it.delete() }
+                if (syncManager.syncData()) Result.success() else Result.retry()
             }
         } catch (e: CancellationException) {
             throw e

@@ -6,6 +6,7 @@ import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
 import com.sun.net.httpserver.HttpServer
+import eu.kanade.domain.sync.SyncPreferences
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -48,12 +49,15 @@ class GoogleDriveSyncServiceTest {
     fun `Token refresh errors reach the worker error handler`() {
         val rejection = IOException("Refresh token expired")
         val driveService = mockk<GoogleDriveService> {
-            coEvery { refreshToken() } throws rejection
+            coEvery { refreshToken("test-refresh-token") } throws rejection
         }
         val context = mockk<Context> {
             every { resources.getString(any()) } returns "Backup test"
         }
-        val service = GoogleDriveSyncService(context, Json, mockk(), driveService, ProtoBuf)
+        val preferences = mockk<SyncPreferences> {
+            every { googleDriveRefreshToken().get() } returns "test-refresh-token"
+        }
+        val service = GoogleDriveSyncService(context, Json, preferences, driveService, ProtoBuf)
 
         val thrown = assertThrows<IOException> {
             runBlocking { service.doSync(SyncData()) }

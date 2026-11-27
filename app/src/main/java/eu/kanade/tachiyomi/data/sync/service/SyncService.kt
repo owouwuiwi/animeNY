@@ -17,6 +17,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import logcat.LogPriority
 import logcat.logcat
+import java.security.MessageDigest
 
 @Serializable
 data class SyncData(
@@ -24,18 +25,35 @@ data class SyncData(
     val backup: Backup? = null,
 )
 
-data class SyncUpload(val backup: Backup, val receipt: SyncReceipt?)
+data class SyncUpload(val backup: Backup, val receipt: SyncReceipt)
 
-data class SyncReceipt(val provider: Provider, val revision: String) {
-    enum class Provider { SYNCYOMI, DRIVE }
+data class SyncReceipt(val provider: Provider, val accountScope: String, val revision: String) {
+    enum class Provider {
+        SYNCYOMI,
+        DRIVE,
+        ;
 
-    fun acknowledge(preferences: SyncPreferences) {
-        when (provider) {
-            Provider.SYNCYOMI -> preferences.appliedSyncYomiRevision()
-            Provider.DRIVE -> preferences.appliedDriveRevision()
-        }.set(revision)
+        fun appliedRevision(preferences: SyncPreferences, accountScope: String): String {
+            val prefix = "$accountScope:"
+            val applied = revisionPreference(preferences).get()
+            return applied.takeIf { it.startsWith(prefix) }?.removePrefix(prefix).orEmpty()
+        }
+
+        internal fun revisionPreference(preferences: SyncPreferences) = when (this) {
+            SYNCYOMI -> preferences.appliedSyncYomiRevision()
+            DRIVE -> preferences.appliedDriveRevision()
+        }
     }
+
+    fun acknowledge(preferences: SyncPreferences) =
+        provider.revisionPreference(preferences).set("$accountScope:$revision")
 }
+
+internal fun syncAccountScope(vararg credentials: String): String = MessageDigest.getInstance("SHA-256")
+    .digest(credentials.joinToString("\n").encodeToByteArray())
+    .toHexString()
+
+internal fun SyncPreferences.syncYomiEndpoint(): String = "${clientHost().get()}/api/sync/content"
 
 @Suppress("TooManyFunctions")
 abstract class SyncService(

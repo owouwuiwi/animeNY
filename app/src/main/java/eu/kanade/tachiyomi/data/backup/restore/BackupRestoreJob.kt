@@ -9,6 +9,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.await
@@ -18,6 +19,7 @@ import eu.kanade.domain.sync.SyncPreferences
 import eu.kanade.tachiyomi.data.backup.BackupNotifier
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.sync.cloudSyncLock
+import eu.kanade.tachiyomi.data.sync.matchesAccount
 import eu.kanade.tachiyomi.data.sync.service.SyncReceipt
 import eu.kanade.tachiyomi.util.system.cancelNotification
 import eu.kanade.tachiyomi.util.system.isRunning
@@ -28,6 +30,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import logcat.LogPriority
@@ -60,19 +63,34 @@ class BackupRestoreJob(private val context: Context, workerParams: WorkerParamet
         val isSync = inputData.getBoolean(SYNC_KEY, false)
 
         return try {
-            try {
-                setForeground(getForegroundInfo())
-            } catch (e: IllegalStateException) {
-                logcat(LogPriority.ERROR, e) { "Not allowed to run on foreground service" }
-            }
-            val complete = backupRestorerFactory.create(notifier = notifier, isSync = isSync).restore(uri, options)
             if (isSync) {
-                val receipt = inputData.getString(SYNC_REVISION_KEY)?.let { revision ->
-                    inputData.getString(SYNC_PROVIDER_KEY)?.let {
-                        SyncReceipt(SyncReceipt.Provider.valueOf(it), revision)
-                    }
+                val provider = SyncReceipt.Provider.entries.firstOrNull {
+                    it.name == inputData.getString(SYNC_PROVIDER_KEY)
                 }
-                if (!finishCloudRestore(complete, graph.syncPreferences, receipt)) return Result.failure()
+                val scope = inputData.getString(SYNC_SCOPE_KEY)
+                val revision = inputData.getString(SYNC_REVISION_KEY)
+                val receipt = if (provider != null && scope != null && revision != null) {
+                    SyncReceipt(provider, scope, revision)
+                } else {
+                    null
+                }
+                val stagedFile = uri.path?.takeIf { uri.scheme == "file" }?.let(::File)?.takeIf {
+                    it.parentFile == context.cacheDir && it.name.startsWith(SYNC_RESTORE_FILE_PREFIX)
+                }
+                val complete = restoreStagedCloudBackup(
+                    preferences = graph.syncPreferences,
+                    receipt = receipt,
+                    stagedFile = stagedFile,
+                    cancelledByApp = {
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                            stopReason == WorkInfo.STOP_REASON_CANCELLED_BY_APP
+                    },
+                    prepare = ::showForegroundProgress,
+                ) { backupRestorerFactory.create(notifier = notifier, isSync = true).restore(uri, options) }
+                if (!complete) return Result.failure()
+            } else {
+                showForegroundProgress()
+                backupRestorerFactory.create(notifier = notifier, isSync = false).restore(uri, options)
             }
             Result.success()
         } catch (e: Exception) {
@@ -87,11 +105,14 @@ class BackupRestoreJob(private val context: Context, workerParams: WorkerParamet
             }
         } finally {
             context.cancelNotification(Notifications.ID_RESTORE_PROGRESS)
-            if (isSync && uri.scheme == "file") {
-                uri.path?.let(::File)
-                    ?.takeIf { it.parentFile == context.cacheDir && it.name.startsWith(SYNC_RESTORE_FILE_PREFIX) }
-                    ?.delete()
-            }
+        }
+    }
+
+    private suspend fun showForegroundProgress() {
+        try {
+            setForeground(getForegroundInfo())
+        } catch (e: IllegalStateException) {
+            logcat(LogPriority.ERROR, e) { "Not allowed to run on foreground service" }
         }
     }
 
@@ -141,7 +162,7 @@ class BackupRestoreJob(private val context: Context, workerParams: WorkerParamet
             manager: WorkManager,
             uri: Uri,
             options: RestoreOptions,
-            receipt: SyncReceipt?,
+            receipt: SyncReceipt,
         ): Boolean {
             val request = request(uri, options, sync = true, receipt = receipt)
             // KEEP succeeds even if rejected. Persist the queue decision before releasing the sync lock.
@@ -160,6 +181,7 @@ class BackupRestoreJob(private val context: Context, workerParams: WorkerParamet
                         SYNC_KEY to sync,
                         OPTIONS_KEY to options.asBooleanArray(),
                         SYNC_PROVIDER_KEY to receipt?.provider?.name,
+                        SYNC_SCOPE_KEY to receipt?.accountScope,
                         SYNC_REVISION_KEY to receipt?.revision,
                     ),
                 )
@@ -171,11 +193,42 @@ class BackupRestoreJob(private val context: Context, workerParams: WorkerParamet
     }
 }
 
-internal suspend fun finishCloudRestore(complete: Boolean, preferences: SyncPreferences, receipt: SyncReceipt?): Boolean {
+internal suspend fun restoreStagedCloudBackup(
+    preferences: SyncPreferences,
+    receipt: SyncReceipt?,
+    stagedFile: File?,
+    cancelledByApp: () -> Boolean,
+    prepare: suspend () -> Unit = {},
+    restore: suspend () -> Boolean,
+): Boolean {
+    val context = currentCoroutineContext()
+    var interrupted = false
+    try {
+        context.ensureActive()
+        if (receipt == null || !receipt.matchesAccount(preferences)) return false
+        prepare()
+        context.ensureActive()
+        if (!receipt.matchesAccount(preferences)) return false
+        return finishCloudRestore(restore(), preferences, receipt)
+    } catch (e: CancellationException) {
+        interrupted = true
+        throw e
+    } finally {
+        // A system stop can re-enqueue this WorkRequest with the same staged URI.
+        if (stagedFile != null && ((!interrupted && context.isActive) || cancelledByApp())) stagedFile.delete()
+    }
+}
+
+internal suspend fun finishCloudRestore(
+    complete: Boolean,
+    preferences: SyncPreferences,
+    receipt: SyncReceipt,
+): Boolean {
     if (!complete) return false
     cloudSyncLock.withLock {
         currentCoroutineContext().ensureActive()
-        receipt?.acknowledge(preferences)
+        if (!receipt.matchesAccount(preferences)) return false
+        receipt.acknowledge(preferences)
         preferences.lastSyncTimestamp().set(System.currentTimeMillis())
     }
     return true
@@ -189,5 +242,6 @@ private const val SYNC_KEY = "sync" // Boolean
 private const val OPTIONS_KEY = "options" // BooleanArray
 
 private const val SYNC_PROVIDER_KEY = "sync_provider"
+private const val SYNC_SCOPE_KEY = "sync_account_scope"
 private const val SYNC_REVISION_KEY = "sync_revision"
 internal const val SYNC_RESTORE_FILE_PREFIX = "Animetail_sync_"

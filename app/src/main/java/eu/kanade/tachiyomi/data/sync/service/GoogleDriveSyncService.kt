@@ -66,7 +66,11 @@ class GoogleDriveSyncService(
 
     @Suppress("TooGenericExceptionCaught")
     override suspend fun doSync(syncData: SyncData): SyncUpload? {
-        googleDriveService.refreshToken()
+        val refreshToken = syncPreferences.googleDriveRefreshToken().get()
+        googleDriveService.refreshToken(refreshToken)
+        val scope = syncAccountScope(refreshToken)
+        val provider = SyncReceipt.Provider.DRIVE
+        val appliedRevision = provider.appliedRevision(syncPreferences, scope)
         return try {
             withIOContext {
                 val drive = googleDriveService.driveService
@@ -74,19 +78,16 @@ class GoogleDriveSyncService(
                 val remoteFile = drive.listSyncBackups(remoteFileName).firstOrNull()
                 val updated = remoteFile?.let { file ->
                     val remoteData = pullSyncData(drive, file)
-                    if (file.needsDriveMerge(syncData.deviceId, syncPreferences.appliedDriveRevision().get())) {
+                    if (file.needsDriveMerge(syncData.deviceId, appliedRevision)) {
                         mergeSyncData(syncData, remoteData)
                     } else {
                         syncData
                     }
                 } ?: syncData
                 val backup = updated.backup ?: return@withIOContext null
-                val receipt = if (updated !== syncData) {
-                    SyncReceipt(SyncReceipt.Provider.DRIVE, UUID.randomUUID().toString())
-                } else {
-                    null
-                }
-                pushSyncData(drive, remoteFile, backup, updated.deviceId, receipt?.revision)
+                val revision = if (updated === syncData) DRIVE_LOCAL_WRITE else UUID.randomUUID().toString()
+                val receipt = SyncReceipt(provider, scope, revision)
+                pushSyncData(drive, remoteFile, backup, updated.deviceId, revision)
                 SyncUpload(backup, receipt)
             }
         } catch (e: CancellationException) {
@@ -106,14 +107,14 @@ class GoogleDriveSyncService(
         }
     }
 
-    private fun pushSyncData(drive: Drive, remoteFile: File?, backup: Backup, deviceId: String, revision: String?) {
+    private fun pushSyncData(drive: Drive, remoteFile: File?, backup: Backup, deviceId: String, revision: String) {
         val byteArray = protoBuf.encodeToByteArray(Backup.serializer(), backup)
         check(byteArray.isNotEmpty()) { context.stringResource(MR.strings.empty_backup_error) }
 
         val metadata = File().apply {
             name = remoteFileName
             mimeType = DRIVE_SYNC_MIME_TYPE
-            appProperties = mapOf("deviceId" to deviceId, DRIVE_MERGE_REVISION to (revision ?: DRIVE_LOCAL_WRITE))
+            appProperties = mapOf("deviceId" to deviceId, DRIVE_MERGE_REVISION to revision)
         }
         withDriveBackupContent(context.cacheDir, byteArray) { content ->
             if (remoteFile == null) {
@@ -273,9 +274,9 @@ class GoogleDriveService(private val context: Context) {
     }
 
     @Suppress("TooGenericExceptionThrown")
-    internal suspend fun refreshToken() = withIOContext {
-        val refreshToken = syncPreferences.googleDriveRefreshToken().get()
-
+    internal suspend fun refreshToken(
+        refreshToken: String = syncPreferences.googleDriveRefreshToken().get(),
+    ) = withIOContext {
         val jsonFactory: JsonFactory = JacksonFactory.getDefaultInstance()
         val secrets = GoogleClientSecrets.load(
             jsonFactory,

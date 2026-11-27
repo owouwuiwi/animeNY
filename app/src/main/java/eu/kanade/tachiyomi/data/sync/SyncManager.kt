@@ -21,7 +21,10 @@ import eu.kanade.tachiyomi.data.backup.restore.restorers.AnimeRestorer
 import eu.kanade.tachiyomi.data.backup.restore.restorers.MangaRestorer
 import eu.kanade.tachiyomi.data.sync.service.GoogleDriveSyncService
 import eu.kanade.tachiyomi.data.sync.service.SyncData
+import eu.kanade.tachiyomi.data.sync.service.SyncReceipt
 import eu.kanade.tachiyomi.data.sync.service.SyncYomiSyncService
+import eu.kanade.tachiyomi.data.sync.service.syncAccountScope
+import eu.kanade.tachiyomi.data.sync.service.syncYomiEndpoint
 import eu.kanade.tachiyomi.util.system.workManager
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
@@ -157,10 +160,12 @@ class SyncManager(
             logcat(LogPriority.DEBUG) { "Skip restore due to network issues" }
             return true
         }
+        val receipt = uploaded.receipt
+        if (!receipt.matchesAccount(syncPreferences)) return true
 
         val remoteBackup = uploaded.backup
         if (remoteBackup === syncData.backup) {
-            uploaded.receipt?.acknowledge(syncPreferences)
+            receipt.acknowledge(syncPreferences)
             syncPreferences.lastSyncTimestamp().set(Date().time)
             notifier.showSyncSuccess("Sync completed successfully")
             return true
@@ -184,8 +189,10 @@ class SyncManager(
 
         val (mangaFilteredFavorites, mangaNonFavorites) = mangaFilterFavoritesAndNonFavorites(remoteBackup)
         val (animeFilteredFavorites, animeNonFavorites) = aniFilterFavoritesAndNonFavorites(remoteBackup)
+        if (!receipt.matchesAccount(syncPreferences)) return true
         mangaUpdateNonFavorites(mangaNonFavorites)
         animeUpdateNonFavorites(animeNonFavorites)
+        if (!receipt.matchesAccount(syncPreferences)) return true
 
         val newSyncData = backup.copy(
             backupManga = mangaFilteredFavorites,
@@ -200,7 +207,7 @@ class SyncManager(
 
         val originalMetadata = backup.copy(backupManga = emptyList(), backupAnime = emptyList())
         if (mangaFilteredFavorites.isEmpty() && animeFilteredFavorites.isEmpty() && originalMetadata == newSyncData) {
-            uploaded.receipt?.acknowledge(syncPreferences)
+            receipt.acknowledge(syncPreferences)
             syncPreferences.lastSyncTimestamp().set(Date().time)
             notifier.showSyncSuccess("Sync completed successfully")
             return true
@@ -211,7 +218,7 @@ class SyncManager(
             context.workManager,
             Uri.fromFile(stagedBackup),
             options = RestoreOptions(),
-            receipt = uploaded.receipt,
+            receipt = receipt,
         )
         if (!accepted) {
             stagedBackup.delete()
@@ -501,3 +508,16 @@ class SyncManager(
         }
     }
 }
+
+internal fun SyncReceipt.matchesAccount(preferences: SyncPreferences): Boolean =
+    when (SyncManager.SyncService.fromInt(preferences.syncService().get())) {
+        SyncManager.SyncService.SYNCYOMI ->
+            provider == SyncReceipt.Provider.SYNCYOMI &&
+                accountScope == syncAccountScope(preferences.syncYomiEndpoint(), preferences.clientAPIKey().get())
+
+        SyncManager.SyncService.GOOGLE_DRIVE ->
+            provider == SyncReceipt.Provider.DRIVE &&
+                accountScope == syncAccountScope(preferences.googleDriveRefreshToken().get())
+
+        SyncManager.SyncService.NONE -> false
+    }

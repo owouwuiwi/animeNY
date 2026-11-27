@@ -22,7 +22,6 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
-import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 class SyncYomiSyncService(
@@ -39,12 +38,11 @@ class SyncYomiSyncService(
     @Suppress("TooGenericExceptionCaught")
     override suspend fun doSync(syncData: SyncData): SyncUpload? {
         return try {
-            val url = "${syncPreferences.clientHost().get()}/api/sync/content"
+            val url = syncPreferences.syncYomiEndpoint()
             val apiKey = syncPreferences.clientAPIKey().get()
-            val scope = MessageDigest.getInstance("SHA-256").digest("$url\n$apiKey".encodeToByteArray()).toHexString()
-            val prefix = "$scope:"
-            val applied = syncPreferences.appliedSyncYomiRevision().get()
-            val lastETag = applied.takeIf { it.startsWith(prefix) }?.removePrefix(prefix).orEmpty()
+            val scope = syncAccountScope(url, apiKey)
+            val provider = SyncReceipt.Provider.SYNCYOMI
+            val lastETag = provider.appliedRevision(syncPreferences, scope)
             val (remoteData, etag) = pullSyncData(url, apiKey, lastETag)
 
             val finalSyncData = if (remoteData != null) {
@@ -62,7 +60,7 @@ class SyncYomiSyncService(
             }
             val backup = finalSyncData.backup ?: return null
             pushSyncData(url, apiKey, backup, etag)?.let {
-                SyncUpload(backup, SyncReceipt(SyncReceipt.Provider.SYNCYOMI, "$prefix$it"))
+                SyncUpload(backup, SyncReceipt(provider, scope, it))
             }
         } catch (e: CancellationException) {
             throw e
