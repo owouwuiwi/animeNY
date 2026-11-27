@@ -15,6 +15,7 @@ fun PreferenceScaffold(
     itemsProvider: @Composable () -> List<Preference>,
 ) {
     Scaffold(
+        contentBelowTopBar = true,
         topBar = {
             AppBar(
                 title = stringResource(titleRes),

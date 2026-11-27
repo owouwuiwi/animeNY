@@ -38,6 +38,7 @@ fun Scaffold(
     containerColor: Color = MaterialTheme.colorScheme.background,
     contentColor: Color = contentColorFor(containerColor),
     contentWindowInsets: WindowInsets = ScaffoldDefaults.contentWindowInsets,
+    contentBelowTopBar: Boolean = false,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     var fabHeight by remember { mutableIntStateOf(0) }
@@ -63,7 +64,11 @@ fun Scaffold(
                 if (fabHeight == 0) 0.dp else with(density) { fabHeight.toDp() } + FabSpacing
             }
         }
-        content(paddingValues)
+        if (contentBelowTopBar) {
+            ScaffoldContentBelowTopBar(paddingValues, content)
+        } else {
+            content(paddingValues)
+        }
     }
 }
 

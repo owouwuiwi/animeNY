@@ -45,6 +45,7 @@ fun CustomButtonScreen(
 ) {
     val lazyListState = rememberLazyListState()
     Scaffold(
+        contentBelowTopBar = true,
         topBar = { scrollBehavior ->
             AppBar(
                 title = stringResource(AYMR.strings.pref_player_custom_button_header),

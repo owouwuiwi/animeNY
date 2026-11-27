@@ -2,6 +2,7 @@ package eu.kanade.presentation.more.settings.screen
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -85,9 +86,10 @@ class SettingsSearchScreen(
             }
         }
 
-        // Hide keyboard on outside text field is touched
-        LaunchedEffect(listState.isScrollInProgress) {
-            if (listState.isScrollInProgress) {
+        // Dismiss the keyboard when the results are dragged, preserving focus during D-pad scrolling.
+        val isDragging by listState.interactionSource.collectIsDraggedAsState()
+        LaunchedEffect(isDragging) {
+            if (isDragging) {
                 focusManager.clearFocus()
             }
         }
@@ -99,6 +101,7 @@ class SettingsSearchScreen(
 
         val textFieldState = rememberTextFieldState()
         Scaffold(
+            contentBelowTopBar = true,
             topBar = {
                 Column {
                     TopAppBar(

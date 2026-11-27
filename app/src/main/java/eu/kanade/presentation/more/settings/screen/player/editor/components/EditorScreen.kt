@@ -49,6 +49,7 @@ fun EditorScreen(
 ) {
     val lazyListState = rememberLazyListState()
     Scaffold(
+        contentBelowTopBar = true,
         topBar = { scrollBehavior ->
             AppBar(
                 navigateUp = navigateUp,

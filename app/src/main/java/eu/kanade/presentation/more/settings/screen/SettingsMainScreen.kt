@@ -85,6 +85,7 @@ object SettingsMainScreen : Screen() {
         val topBarState = rememberTopAppBarState()
 
         Scaffold(
+            contentBelowTopBar = true,
             topBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(topBarState),
             topBar = { scrollBehavior ->
                 AppBar(

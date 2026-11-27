@@ -78,6 +78,7 @@ object AboutScreen : Screen() {
         val is24HourSystem = rememberIs24HourSystem()
 
         Scaffold(
+            contentBelowTopBar = true,
             topBar = { scrollBehavior ->
                 AppBar(
                     title = stringResource(MR.strings.pref_category_about),

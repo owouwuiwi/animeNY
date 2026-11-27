@@ -1,4 +1,4 @@
-package eu.kanade.presentation.browse.anime.components
+package tachiyomi.presentation.core.components.material
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -9,13 +9,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 
+/**
+ * Positions the content viewport below the app bar so directional focus can enter the content.
+ * The remaining scaffold padding is still available for insets inside the viewport.
+ */
 @Composable
-internal fun SourceResultsViewport(
+fun ScaffoldContentBelowTopBar(
     scaffoldPadding: PaddingValues,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val layoutDirection = LocalLayoutDirection.current
-    // Give the lazy focus group bounds below the toolbar so D-pad Down can enter it.
     Box(Modifier.padding(top = scaffoldPadding.calculateTopPadding())) {
         content(
             PaddingValues(

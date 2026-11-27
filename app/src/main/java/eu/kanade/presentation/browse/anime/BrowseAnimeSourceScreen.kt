@@ -19,7 +19,6 @@ import androidx.paging.compose.LazyPagingItems
 import eu.kanade.presentation.browse.anime.components.BrowseAnimeSourceComfortableGrid
 import eu.kanade.presentation.browse.anime.components.BrowseAnimeSourceCompactGrid
 import eu.kanade.presentation.browse.anime.components.BrowseAnimeSourceList
-import eu.kanade.presentation.browse.anime.components.SourceResultsViewport
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.util.formattedMessage
 import eu.kanade.tachiyomi.animesource.AnimeSource
@@ -31,6 +30,7 @@ import tachiyomi.domain.library.model.LibraryDisplayMode
 import tachiyomi.domain.source.anime.model.StubAnimeSource
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
+import tachiyomi.presentation.core.components.material.ScaffoldContentBelowTopBar
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.screens.EmptyScreenAction
@@ -119,7 +119,7 @@ fun BrowseAnimeSourceContent(
         return
     }
 
-    SourceResultsViewport(contentPadding) { resultsPadding ->
+    ScaffoldContentBelowTopBar(contentPadding) { resultsPadding ->
         when (displayMode) {
             LibraryDisplayMode.ComfortableGrid, LibraryDisplayMode.ComfortableGridPanorama -> {
                 BrowseAnimeSourceComfortableGrid(

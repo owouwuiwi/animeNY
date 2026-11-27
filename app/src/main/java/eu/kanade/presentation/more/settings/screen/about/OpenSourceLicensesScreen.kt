@@ -24,6 +24,7 @@ class OpenSourceLicensesScreen : Screen() {
         val navigator = LocalNavigator.currentOrThrow
         val context = LocalContext.current
         Scaffold(
+            contentBelowTopBar = true,
             topBar = { scrollBehavior ->
                 AppBar(
                     title = stringResource(MR.strings.licenses),

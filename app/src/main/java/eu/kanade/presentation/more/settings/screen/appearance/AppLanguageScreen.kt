@@ -55,6 +55,7 @@ class AppLanguageScreen : Screen() {
         }
 
         Scaffold(
+            contentBelowTopBar = true,
             topBar = { scrollBehavior ->
                 AppBar(
                     title = stringResource(MR.strings.pref_app_language),

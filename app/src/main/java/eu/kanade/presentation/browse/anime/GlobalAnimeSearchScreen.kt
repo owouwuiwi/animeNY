@@ -10,7 +10,6 @@ import eu.kanade.presentation.browse.GlobalSearchLoadingResultItem
 import eu.kanade.presentation.browse.GlobalSearchResultItem
 import eu.kanade.presentation.browse.anime.components.GlobalAnimeSearchCardRow
 import eu.kanade.presentation.browse.anime.components.GlobalAnimeSearchToolbar
-import eu.kanade.presentation.browse.anime.components.SourceResultsViewport
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.AnimeSearchItemResult
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.AnimeSearchViewModel
@@ -18,6 +17,7 @@ import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.AnimeSourceFilter
 import eu.kanade.tachiyomi.util.system.LocaleHelper
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.presentation.core.components.material.Scaffold
+import tachiyomi.presentation.core.components.material.ScaffoldContentBelowTopBar
 
 @Composable
 fun GlobalAnimeSearchScreen(
@@ -70,7 +70,7 @@ internal fun GlobalSearchContent(
     onLongClickItem: (Anime) -> Unit,
     fromSourceId: Long? = null,
 ) {
-    SourceResultsViewport(contentPadding) { resultsPadding ->
+    ScaffoldContentBelowTopBar(contentPadding) { resultsPadding ->
         LazyColumn(contentPadding = resultsPadding) {
             items.forEach { (source, result) ->
                 item(key = source.id) {
