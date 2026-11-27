@@ -21,6 +21,7 @@ import eu.kanade.tachiyomi.data.backup.create.creators.MangaCategoriesBackupCrea
 import eu.kanade.tachiyomi.data.backup.create.creators.MangaExtensionStoresBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.MangaSourcesBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.PreferenceBackupCreator
+import eu.kanade.tachiyomi.data.backup.includeLinkedBackupEntries
 import eu.kanade.tachiyomi.data.backup.models.Backup
 import eu.kanade.tachiyomi.data.backup.models.BackupAnime
 import eu.kanade.tachiyomi.data.backup.models.BackupAnimeSource
@@ -102,22 +103,37 @@ class BackupCreator(
                 throw IllegalStateException(context.stringResource(MR.strings.create_backup_file_error))
             }
 
+            val groups = if (options.libraryEntries) entryMergeBackup.snapshot() else emptyList()
+            val groupsByMedia = groups.groupBy { it.media }
+            val completeGroups = if (options.categoryFilter == null) groupsByMedia else emptyMap()
+            val mergeMembers = groupsByMedia.mapValues { (_, related) ->
+                related.flatMapTo(hashSetOf()) { it.members }
+            }
             val includeNonFavorites = options.readEntries && options.categoryFilter == null
             val nonFavoriteAnime = if (includeNonFavorites) {
                 animeRepository.getWatchedAnimeNotInLibrary()
             } else {
                 emptyList()
             }
-            val backupAnime = backupAnimes(getAnimeFavorites.await() + nonFavoriteAnime, options)
+            val anime = includeLinkedBackupEntries(
+                getAnimeFavorites.await() + nonFavoriteAnime,
+                completeGroups[MergeMedia.Anime].orEmpty(),
+                { entry -> entry.url.takeIf(String::isNotBlank)?.let { MergeEntryRef(entry.source, it) } },
+                { animeRepository.getAnimeByUrlAndSourceId(it.url, it.sourceId) },
+            )
             val nonFavoriteManga = if (includeNonFavorites) {
                 mangaRepository.getReadMangaNotInLibrary()
             } else {
                 emptyList()
             }
-            val backupManga = backupMangas(getMangaFavorites.await() + nonFavoriteManga, options)
-            val groups = if (options.libraryEntries) entryMergeBackup.snapshot() else emptyList()
-            val mergeMembers = groups.groupBy { it.media }
-                .mapValues { (_, related) -> related.flatMapTo(hashSetOf()) { it.members } }
+            val manga = includeLinkedBackupEntries(
+                getMangaFavorites.await() + nonFavoriteManga,
+                completeGroups[MergeMedia.Manga].orEmpty(),
+                { entry -> entry.url.takeIf(String::isNotBlank)?.let { MergeEntryRef(entry.source, it) } },
+                { mangaRepository.getMangaByUrlAndSourceId(it.url, it.sourceId) },
+            )
+            val backupAnime = backupAnimes(anime, options)
+            val backupManga = backupMangas(manga, options)
 
             file.openOutputStream()
                 .also {

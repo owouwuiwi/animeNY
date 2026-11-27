@@ -9,6 +9,7 @@ import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.entries.anime.interactor.GetAnimeByUrlAndSourceId
 import tachiyomi.domain.entries.manga.interactor.GetMangaByUrlAndSourceId
 import tachiyomi.domain.entries.merge.model.EntryMerge
+import tachiyomi.domain.entries.merge.model.MergeEntryRef
 import tachiyomi.domain.entries.merge.model.MergeMedia
 import tachiyomi.domain.entries.merge.repository.EntryMergeRepository
 
@@ -41,4 +42,20 @@ class EntryMergeBackup(
         }
         return groups.save(merge, replaceExisting = false)
     }
+}
+
+internal suspend fun <T : Any> includeLinkedBackupEntries(
+    entries: List<T>,
+    groups: List<EntryMerge>,
+    reference: (T) -> MergeEntryRef?,
+    resolve: suspend (MergeEntryRef) -> T?,
+): List<T> {
+    if (groups.isEmpty()) return entries
+    val exported = entries.mapNotNullTo(hashSetOf(), reference)
+    val links = groups.flatMap { group ->
+        // A link may bring along its sources only when the export already includes part of that title.
+        if (group.members.none(exported::contains)) return@flatMap emptyList()
+        group.members.filterNot(exported::contains).map { resolve(it) ?: return@flatMap emptyList() }
+    }
+    return entries + links
 }

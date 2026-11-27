@@ -4,8 +4,10 @@ import eu.kanade.tachiyomi.data.backup.models.Backup
 import eu.kanade.tachiyomi.data.backup.models.BackupAnimeSource
 import eu.kanade.tachiyomi.data.backup.models.BackupCategory
 import eu.kanade.tachiyomi.data.backup.models.BackupEntryMerge
+import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.models.LegacyBackup
 import eu.kanade.tachiyomi.data.backup.models.backupEntryMerges
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -80,6 +82,46 @@ class BackupEntryMergeTest {
         assertEquals(emptyList<BackupEntryMerge>(), backupEntryMerges(groups, setOf(first), setOf(second)))
         val entries = backupEntryMerges(groups, setOf(first, second), emptySet())
         assertEquals(listOf(group), entries.map(BackupEntryMerge::toDomain))
+    }
+
+    @Test
+    fun `a library export includes the other source of a linked title without favoriting it`() = runTest {
+        val library = BackupManga(first.sourceId, first.url, favorite = true)
+        val linked = BackupManga(second.sourceId, second.url, favorite = false)
+        val outside = group.copy(
+            id = "outside",
+            metadata = MergeEntryRef(3, "/outside"),
+            members = listOf(MergeEntryRef(3, "/outside"), MergeEntryRef(4, "/other")),
+        )
+        val groups = listOf(group, outside)
+        val reference = { entry: BackupManga -> MergeEntryRef(entry.source, entry.url) }
+        val selected = includeLinkedBackupEntries(listOf(library), groups, reference) { member ->
+            assertEquals(second, member)
+            linked
+        }
+        val exported = backupEntryMerges(groups, selected.map(reference).toSet(), emptySet())
+        val encoded = Buffer()
+        val writer = BackupWriter(encoded, ProtoBuf)
+        selected.forEach(writer::writeMangaEntry)
+        writer.writeMetadata(Backup(isLegacy = false, backupEntryMerges = exported))
+        val reader = BackupReader(encoded, ProtoBuf)
+        val restored = buildList {
+            while (reader.nextEntry()) add(reader.readMangaEntry())
+        }
+
+        assertEquals(listOf(first to true, second to false), restored.map { reference(it) to it.favorite })
+        assertEquals(listOf(group), reader.readMetadata().backupEntryMerges.map(BackupEntryMerge::toDomain))
+    }
+
+    @Test
+    fun `a missing linked source does not pull other dependencies into the export`() = runTest {
+        val missing = MergeEntryRef(3, "/missing")
+        val partial = group.copy(members = listOf(first, second, missing))
+        val selected = includeLinkedBackupEntries(listOf(first), listOf(partial), { it }) {
+            it.takeUnless { member -> member == missing }
+        }
+
+        assertEquals(listOf(first), selected)
     }
 
     @Test
