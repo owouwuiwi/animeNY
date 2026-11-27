@@ -55,7 +55,7 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet?) : BaseMPVView(
     var currentVideoAspect: () -> VideoAspect = { playerPreferences.aspectState().get() }
 
     private val optionNameRegex = Regex("""^[ \t]*(?:--)?([\w-]+)[ \t]*(?:=|#|$)""", RegexOption.MULTILINE)
-    private val mpvOptionNames = optionNameRegex.findAll(advancedPreferences.mpvConf().get()).map {
+    internal val mpvOptionNames = optionNameRegex.findAll(advancedPreferences.mpvConf().get()).map {
         it.groupValues[1].removePrefix("no-")
     }.toSet()
 

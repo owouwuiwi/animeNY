@@ -22,6 +22,7 @@
 package eu.kanade.tachiyomi.ui.player
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.app.PictureInPictureParams
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -38,6 +39,7 @@ import android.media.session.PlaybackState
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
 import android.util.Rational
 import android.view.KeyEvent
 import android.view.View
@@ -92,6 +94,7 @@ import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
 import eu.kanade.tachiyomi.ui.player.utils.LanguageTags
 import eu.kanade.tachiyomi.ui.player.utils.isTorrentPlaybackUrl
 import eu.kanade.tachiyomi.ui.player.utils.torrentBufferOptions
+import eu.kanade.tachiyomi.ui.player.utils.torrentForwardCacheLimitMiB
 import eu.kanade.tachiyomi.util.system.powerManager
 import eu.kanade.tachiyomi.util.system.toShareIntent
 import eu.kanade.tachiyomi.util.system.toast
@@ -1223,8 +1226,18 @@ class PlayerActivity : BaseActivity() {
 
         val useTorrentServer = torrentPreferences.torrServerEnable().get() &&
             isTorrentPlaybackUrl(video.videoUrl, torrentServerApi.hostUrl)
-        val options = if (useTorrentServer) {
-            torrentBufferOptions(video.mpvArgs, torrentPreferences.startupBufferSeconds().get())
+        val startupBufferSeconds = if (useTorrentServer) torrentPreferences.startupBufferSeconds().get() else 0
+        val options = if (startupBufferSeconds > 0) {
+            val memory = ActivityManager.MemoryInfo()
+            getSystemService(ActivityManager::class.java)?.getMemoryInfo(memory)
+            val cacheLimit = torrentForwardCacheLimitMiB(
+                is64Bit = Process.is64Bit(),
+                lowMemory = memory.lowMemory,
+                totalMemoryBytes = memory.totalMem,
+                availableMemoryBytes = memory.availMem,
+                lowMemoryThresholdBytes = memory.threshold,
+            )
+            torrentBufferOptions(video.mpvArgs, startupBufferSeconds, cacheLimit, player.mpvOptionNames)
         } else {
             video.mpvArgs
         }
