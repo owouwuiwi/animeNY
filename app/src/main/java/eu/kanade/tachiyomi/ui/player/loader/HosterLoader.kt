@@ -117,24 +117,36 @@ class HosterLoader {
          * @param isExcluded skips videos that already failed, e.g. in a previous download attempt.
          * It receives the video before it's resolved.
          * @param preferVideo tries matching videos before other available streams when supplied.
+         * @param preferredStream tries one unambiguous series match before the normal order.
          */
-        suspend fun getBestHosterVideo(
+        internal suspend fun getBestHosterVideo(
             source: AnimeSource,
             hosterList: List<Hoster>,
             preferVideo: ((Hoster, Video) -> Boolean)? = null,
+            preferredStream: PreferredSeriesStream? = null,
             isExcluded: (Hoster, Video) -> Boolean = { _, _ -> false },
         ): Pair<Hoster, Video>? {
+            val rememberedHoster = preferredStream?.let { stream ->
+                hosterList.singleOrNull { !it.lazy && stream.matchesHoster(it) }
+            }
+            val rememberedCandidates = rememberedHoster?.let {
+                loadCandidates(source, it, isExcluded)
+            }.orEmpty()
+            val rememberedIndex = preferredStream?.selectVideo(rememberedCandidates)
+            if (rememberedHoster != null && rememberedIndex != null) {
+                val candidate = rememberedCandidates.first { it.index == rememberedIndex }.value
+                val resolved = getResolvedVideo(source, candidate)
+                if (resolved?.videoUrl?.isNotEmpty() == true) return rememberedHoster to resolved
+            }
+
             val fallback = mutableListOf<Pair<Hoster, Video>>()
             hosterList.forEach { hoster ->
-                val hosterState = EpisodeLoader.loadHosterVideos(source, hoster)
-                    .markExcluded { isExcluded(hoster, it) }
-                if (hosterState !is HosterState.Ready) return@forEach
-
-                val candidates = hosterState.videoList.indices
-                    .filter { hosterState.videoState[it] == Video.State.QUEUE }
-                    .sortedByDescending { hosterState.videoList[it].preferred }
-                candidates.forEach { videoIdx ->
-                    val candidate = hosterState.videoList[videoIdx]
+                val candidates = if (hoster === rememberedHoster) {
+                    rememberedCandidates.filterNot { it.index == rememberedIndex }
+                } else {
+                    loadCandidates(source, hoster, isExcluded)
+                }
+                candidates.forEach { (_, candidate) ->
                     if (preferVideo != null && !preferVideo(hoster, candidate)) {
                         fallback.add(hoster to candidate)
                     } else {
@@ -149,13 +161,15 @@ class HosterLoader {
             }
         }
 
-        private fun HosterState.markExcluded(isExcluded: (Video) -> Boolean): HosterState {
-            if (this !is HosterState.Ready) return this
-            return copy(
-                videoState = videoState.mapIndexed { idx, state ->
-                    if (isExcluded(videoList[idx])) Video.State.ERROR else state
-                },
-            )
+        private suspend fun loadCandidates(
+            source: AnimeSource,
+            hoster: Hoster,
+            isExcluded: (Hoster, Video) -> Boolean,
+        ): List<IndexedValue<Video>> {
+            val state = EpisodeLoader.loadHosterVideos(source, hoster) as? HosterState.Ready ?: return emptyList()
+            return state.videoList.withIndex()
+                .filter { (idx, video) -> state.videoState[idx] == Video.State.QUEUE && !isExcluded(hoster, video) }
+                .sortedByDescending { it.value.preferred }
         }
 
         suspend fun getResolvedVideo(source: AnimeSource?, video: Video): Video? {

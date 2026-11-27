@@ -1,10 +1,13 @@
 package eu.kanade.tachiyomi.ui.player.loader
 
+import eu.kanade.tachiyomi.animesource.model.Hoster
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.HosterState
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import tachiyomi.domain.source.anime.model.StubAnimeSource
 
 class HosterLoaderTest {
 
@@ -58,6 +61,45 @@ class HosterLoaderTest {
         )
 
         assertEquals(-1 to -1, HosterLoader.selectNextInOrder(states))
+    }
+
+    @Test
+    fun `automatic downloads try the remembered release before the source default`() = runTest {
+        val source = StubAnimeSource(1, "en", "Source")
+        val default = video("default", preferred = true)
+        val preferred = Video(videoUrl = "magnet:?wanted", videoTitle = "[Group] Series 02 (1080p)")
+        val stream = PreferredSeriesStream.from(
+            "Torrents",
+            Video(videoUrl = "magnet:?previous", videoTitle = "[Group] Series 01 (1080p)"),
+        )!!
+        val hosters = listOf(
+            Hoster(hosterName = "Default", videoList = listOf(default)),
+            Hoster(hosterName = "Torrents", videoList = listOf(preferred)),
+        )
+
+        val match = HosterLoader.getBestHosterVideo(source, hosters, preferredStream = stream)
+        assertEquals(preferred.videoUrl, match?.second?.videoUrl)
+
+        val fallback = HosterLoader.getBestHosterVideo(source, hosters, preferredStream = stream) { _, video ->
+            video.videoUrl == preferred.videoUrl
+        }
+        assertEquals(default.videoUrl, fallback?.second?.videoUrl)
+    }
+
+    @Test
+    fun `ambiguous and disabled remembered providers keep the original download order`() = runTest {
+        val source = StubAnimeSource(1, "en", "Source")
+        val default = video("default")
+        val preferred = video("wanted")
+        val stream = PreferredSeriesStream.from("Torrents", preferred)!!
+        val first = Hoster(hosterName = "Default", videoList = listOf(default))
+        val wanted = Hoster(hosterName = "Torrents", videoList = listOf(preferred))
+        val ambiguous = wanted.copy(videoList = listOf(preferred, preferred.copy(videoUrl = "magnet:?other")))
+
+        for (second in listOf(ambiguous, wanted.copy(lazy = true))) {
+            val match = HosterLoader.getBestHosterVideo(source, listOf(first, second), preferredStream = stream)
+            assertEquals(default.videoUrl, match?.second?.videoUrl)
+        }
     }
 
     private fun video(url: String, preferred: Boolean = false) =

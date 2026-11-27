@@ -35,7 +35,9 @@ import eu.kanade.tachiyomi.network.HttpException
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.player.loader.EpisodeLoader
 import eu.kanade.tachiyomi.ui.player.loader.HosterLoader
+import eu.kanade.tachiyomi.ui.player.loader.PreferredSeriesStream
 import eu.kanade.tachiyomi.ui.player.loader.videoQualityHeight
+import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.util.storage.DiskUtil
 import eu.kanade.tachiyomi.util.storage.renameToOrCopy
 import eu.kanade.tachiyomi.util.storage.toFFmpegString
@@ -105,6 +107,7 @@ class AnimeDownloader(
     private val store: AnimeDownloadStore,
     private val notifier: AnimeDownloadNotifier,
     private val preferences: DownloadPreferences,
+    private val playerPreferences: PlayerPreferences,
 ) {
     /**
      * Queue where active downloads are kept.
@@ -466,7 +469,17 @@ class AnimeDownloader(
         } else {
             null
         }
-        return HosterLoader.getBestHosterVideo(download.source, hosters, preferVideo) { hoster, video ->
+        val rememberedStream = if (height == 0 && playerPreferences.rememberSeriesStream().get()) {
+            PreferredSeriesStream.decode(playerPreferences.preferredSeriesStream(download.anime.id).get())
+        } else {
+            null
+        }
+        return HosterLoader.getBestHosterVideo(
+            source = download.source,
+            hosterList = hosters,
+            preferVideo = preferVideo,
+            preferredStream = rememberedStream,
+        ) { hoster, video ->
             (hoster.hosterName to video.videoTitle) in failedVideos
         } ?: throw Exception(context.stringResource(AYMR.strings.video_list_empty_error))
     }
