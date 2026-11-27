@@ -1,6 +1,8 @@
 package eu.kanade.presentation.library
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -9,10 +11,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import dev.icerock.moko.resources.StringResource
 import tachiyomi.core.common.preference.CheckboxState
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.components.LabeledCheckbox
 import tachiyomi.presentation.core.i18n.stringResource
 
@@ -22,6 +27,7 @@ fun DeleteLibraryEntryDialog(
     onDismissRequest: () -> Unit,
     onConfirm: (Boolean, Boolean) -> Unit,
     isManga: Boolean,
+    expandedEntryCount: Int? = null,
 ) {
     var list by remember {
         mutableStateOf(
@@ -61,6 +67,17 @@ fun DeleteLibraryEntryDialog(
         },
         text = {
             Column {
+                if (expandedEntryCount != null) {
+                    Column(
+                        modifier = Modifier.padding(bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(stringResource(TLMR.strings.entry_merge_remove_scope, expandedEntryCount))
+                        if (!containsLocalEntry) {
+                            Text(stringResource(TLMR.strings.entry_merge_remove_download_scope))
+                        }
+                    }
+                }
                 list.forEach { state ->
                     LabeledCheckbox(
                         label = stringResource(state.value),

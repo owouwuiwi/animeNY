@@ -345,6 +345,7 @@ data object MangaLibraryTab : Tab {
                         viewModel.clearSelection()
                     },
                     isManga = true,
+                    expandedEntryCount = dialog.expandedEntryCount,
                 )
             }
 

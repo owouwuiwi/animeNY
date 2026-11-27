@@ -380,6 +380,8 @@
   <string name="track_repeat_open_error">Impossibile riaprire il titolo.</string>
   <string name="entry_merge_title">Opere collegate</string>
   <string name="entry_merge_source_details">Dettagli delle fonti</string>
+  <string name="entry_merge_remove_scope">Questa selezione riguarda %1$d voci di libreria in tutte le categorie in cui compaiono.</string>
+  <string name="entry_merge_remove_download_scope">Se scegli di rimuovere i download, verranno eliminati tutti quelli delle voci coinvolte.</string>
   <string name="entry_merge_edit">Scegli le opere da collegare</string>
   <string name="entry_merge_priority">Priorità delle fonti</string>
   <string name="entry_merge_metadata">Scegli da quale opera prendere titolo e copertina.</string>

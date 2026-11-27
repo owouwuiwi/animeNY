@@ -977,8 +977,10 @@ class MangaLibraryViewModel(
     }
 
     fun openDeleteMangaDialog() {
-        val mangaList = state.value.selectedEntries
-        state.update { it.copy(dialog = Dialog.DeleteManga(mangaList)) }
+        val snapshot = state.value
+        val entries = snapshot.selectedEntries
+        val expandedEntryCount = entries.size.takeIf { it > snapshot.selection.size }
+        state.update { it.copy(dialog = Dialog.DeleteManga(entries, expandedEntryCount)) }
     }
 
     fun closeDialog() {
@@ -991,7 +993,7 @@ class MangaLibraryViewModel(
             val manga: List<Manga>,
             val initialSelection: ImmutableList<CheckboxState<Category>>,
         ) : Dialog
-        data class DeleteManga(val manga: List<Manga>) : Dialog
+        data class DeleteManga(val manga: List<Manga>, val expandedEntryCount: Int?) : Dialog
     }
 
     // SY -->

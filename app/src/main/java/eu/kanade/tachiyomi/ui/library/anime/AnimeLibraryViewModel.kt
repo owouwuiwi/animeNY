@@ -1003,8 +1003,10 @@ class AnimeLibraryViewModel(
     }
 
     fun openDeleteAnimeDialog() {
-        val nimeList = state.value.selectedEntries
-        state.update { it.copy(dialog = Dialog.DeleteAnime(nimeList)) }
+        val snapshot = state.value
+        val entries = snapshot.selectedEntries
+        val expandedEntryCount = entries.size.takeIf { it > snapshot.selection.size }
+        state.update { it.copy(dialog = Dialog.DeleteAnime(entries, expandedEntryCount)) }
     }
 
     fun closeDialog() {
@@ -1017,7 +1019,7 @@ class AnimeLibraryViewModel(
             val anime: List<Anime>,
             val initialSelection: ImmutableList<CheckboxState<Category>>,
         ) : Dialog
-        data class DeleteAnime(val anime: List<Anime>) : Dialog
+        data class DeleteAnime(val anime: List<Anime>, val expandedEntryCount: Int?) : Dialog
     }
 
     // SY -->

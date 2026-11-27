@@ -340,6 +340,7 @@ data object AnimeLibraryTab : Tab {
                         viewModel.clearSelection()
                     },
                     isManga = false,
+                    expandedEntryCount = dialog.expandedEntryCount,
                 )
             }
 
