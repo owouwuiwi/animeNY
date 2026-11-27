@@ -17,6 +17,7 @@ import mihon.data.extension.model.NetworkLegacyExtension
 import mihon.data.extension.model.NetworkLegacyExtensionRepo
 import mihon.domain.extension.model.ExtensionStore
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import tachiyomi.core.common.util.lang.withIOContext
 import tachiyomi.core.common.util.system.logcat
 import kotlin.coroutines.cancellation.CancellationException
 import mihon.domain.extension.model.ContentWarning as DomainContentWarning
@@ -28,8 +29,8 @@ class MangaExtensionStoreService(
     private val json: Json,
     private val protoBuf: ProtoBuf,
 ) {
-    suspend fun fetch(indexUrl: String): Result<ExtensionStore> {
-        return fetch(indexUrl, forceV2 = false)
+    suspend fun fetch(indexUrl: String): Result<ExtensionStore> = withIOContext {
+        fetch(indexUrl, forceV2 = false)
     }
 
     private suspend fun fetch(indexUrl: String, forceV2: Boolean): Result<ExtensionStore> {
@@ -85,10 +86,13 @@ class MangaExtensionStoreService(
         }
     }
 
-    suspend fun getExtensions(store: ExtensionStore): Result<List<MangaExtension.Available>> {
-        return try {
+    suspend fun getExtensions(store: ExtensionStore): Result<List<MangaExtension.Available>> = withIOContext {
+        try {
             val extensions = if (!store.isLegacy) {
-                store.readModernExtensionList<NetworkExtensionStore, NetworkExtensionStore.ExtensionList>(json, protoBuf) {
+                store.readModernExtensionList<NetworkExtensionStore, NetworkExtensionStore.ExtensionList>(
+                    json,
+                    protoBuf,
+                ) {
                     network.client.newCall(GET(it)).awaitSuccess()
                 }?.let { toAvailableExtensions(it, store) }.orEmpty()
             } else {
