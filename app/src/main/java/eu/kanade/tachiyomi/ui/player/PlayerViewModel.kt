@@ -220,6 +220,7 @@ class PlayerViewModel(
     private val localAnimeBackgroundManager: LocalAnimeBackgroundManager,
     private val localEpisodeThumbnailManager: LocalEpisodeThumbnailManager,
     private val trackerManager: TrackerManager,
+    mpvConfig: MpvConfig,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -236,9 +237,9 @@ class PlayerViewModel(
     val cachePath: String = context.cacheDir.path
 
     val mpv = MPV(context.applicationContext) {
-        val mpvDir = context.filesDir.resolve(PlayerActivity.MPV_DIR)
+        // Native initialization reads mpv.conf and input.conf as soon as this callback returns.
+        val mpvDir = mpvConfig.preparePlayerDirectory()
         val fontsDir = mpvDir.resolve(MpvConfig.MPV_FONTS_DIR)
-        MpvConfig.setupFontsConf(context.applicationContext)
         it.setOptionString("config", "yes")
         it.setOptionString("config-dir", mpvDir.toString())
         it.setOptionString("sub-fonts-dir", fontsDir.toString())

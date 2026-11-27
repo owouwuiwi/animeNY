@@ -83,7 +83,6 @@ import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
 import eu.kanade.tachiyomi.ui.player.cast.createPlayerCastController
 import eu.kanade.tachiyomi.ui.player.controls.PlayerControls
 import eu.kanade.tachiyomi.ui.player.network.NetworkStreamRequest
-import eu.kanade.tachiyomi.ui.player.settings.AdvancedPlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
@@ -147,7 +146,6 @@ class PlayerActivity : BaseActivity() {
 
     @Inject private lateinit var audioPreferences: AudioPreferences
 
-    @Inject private lateinit var advancedPlayerPreferences: AdvancedPlayerPreferences
 
     @Inject private lateinit var networkPreferences: NetworkPreferences
 
@@ -580,21 +578,9 @@ class PlayerActivity : BaseActivity() {
         }
     }
 
-    private fun UniFile.writeText(text: String) {
-        this.openOutputStream().use {
-            it.write(text.toByteArray())
-        }
-    }
-
     private fun setupPlayerMPV(isRecreated: Boolean) {
         player.currentVideoAspect = { viewModel.videoAspect.value }
         val mpvDir = UniFile.fromFile(applicationContext.filesDir)!!.createDirectory(MPV_DIR)!!
-
-        val mpvConfFile = mpvDir.createFile("mpv.conf")!!
-        advancedPlayerPreferences.mpvConf().get().let { mpvConfFile.writeText(it) }
-        val mpvInputFile = mpvDir.createFile("input.conf")!!
-        advancedPlayerPreferences.mpvInput().get().let { mpvInputFile.writeText(it) }
-
         copyAssets(mpvDir)
 
         val showBlackBars = if (subtitlePreferences.subtitleBlackBars().get()) "yes" else "no"

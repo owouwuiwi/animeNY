@@ -30,6 +30,14 @@ class MpvConfig(
     private val scope = CoroutineScope(Dispatchers.IO)
     private var copyJob: Job? = null
 
+    internal fun preparePlayerDirectory(): File {
+        val directory = context.filesDir.resolve(MPV_DIR).apply { mkdirs() }
+        directory.resolve("mpv.conf").writeText(advancedPlayerPreferences.mpvConf().get())
+        directory.resolve("input.conf").writeText(advancedPlayerPreferences.mpvInput().get())
+        setupFontsConf(context)
+        return directory
+    }
+
     fun copyFiles() {
         if (copyJob?.isActive == true) return
 
