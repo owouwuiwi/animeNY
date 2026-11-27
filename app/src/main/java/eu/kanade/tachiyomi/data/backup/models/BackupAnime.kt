@@ -40,7 +40,7 @@ data class BackupAnime(
     @ProtoNumber(100) var favorite: Boolean = true,
     @ProtoNumber(101) var episodeFlags: Int = 0,
     // @ProtoNumber(102) var brokenHistory, legacy history model with non-compliant proto number
-    @ProtoNumber(103) var viewer_flags: Int = 0,
+    @ProtoNumber(103) var viewer_flags: Long = 0L,
     @ProtoNumber(104) var history: List<BackupAnimeHistory> = emptyList(),
     @ProtoNumber(105) var updateStrategy: AnimeUpdateStrategy = AnimeUpdateStrategy.ALWAYS_UPDATE,
     @ProtoNumber(106) var lastModifiedAt: Long = 0,
@@ -89,7 +89,7 @@ data class BackupAnime(
             favorite = this@BackupAnime.favorite,
             source = this@BackupAnime.source,
             dateAdded = this@BackupAnime.dateAdded,
-            viewerFlags = this@BackupAnime.viewer_flags.toLong(),
+            viewerFlags = this@BackupAnime.viewer_flags.toBackupAnimeViewerFlags(),
             episodeFlags = this@BackupAnime.episodeFlags.toLong(),
             updateStrategy = this@BackupAnime.updateStrategy,
             lastModifiedAt = this@BackupAnime.lastModifiedAt,
@@ -129,4 +129,11 @@ data class BackupAnime(
         return null
     }
     // SY <--
+}
+
+internal fun Long.toBackupAnimeViewerFlags(): Long {
+    // A legacy archive only contained an Int, whose sign bit could synthesize other viewer flags.
+    val viewerFlags = if (this == toInt().toLong()) toUInt().toLong() else this
+    val airingCacheMask = Anime.ANIME_AIRING_EPISODE_MASK or Anime.ANIME_AIRING_TIME_MASK
+    return viewerFlags and airingCacheMask.inv()
 }

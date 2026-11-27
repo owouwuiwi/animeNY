@@ -5,6 +5,7 @@ import eu.kanade.tachiyomi.data.backup.create.BackupOptions
 import eu.kanade.tachiyomi.data.backup.create.includesBackupCategory
 import eu.kanade.tachiyomi.data.backup.models.BackupAnime
 import eu.kanade.tachiyomi.data.backup.models.BackupAnimeHistory
+import eu.kanade.tachiyomi.data.backup.models.toBackupAnimeViewerFlags
 import eu.kanade.tachiyomi.data.backup.models.toBackupEpisode
 import eu.kanade.tachiyomi.data.backup.models.toBackupTracking
 import kotlinx.coroutines.flow.Flow
@@ -110,7 +111,7 @@ private fun Anime.toBackupAnime() =
         favorite = this.favorite,
         source = this.source,
         dateAdded = this.dateAdded,
-        viewer_flags = this.viewerFlags.toInt(),
+        viewer_flags = this.viewerFlags.toBackupAnimeViewerFlags(),
         episodeFlags = this.episodeFlags.toInt(),
         updateStrategy = this.updateStrategy,
         lastModifiedAt = this.lastModifiedAt,
