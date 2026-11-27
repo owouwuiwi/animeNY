@@ -423,7 +423,7 @@ class AnimeDownloader(
                 )
                 val existingVideo = provider.findDownloadedEpisode(animeDir, names)?.takeIf { it.isFile }
                 if (existingVideo != null) {
-                    tmpDir.delete()
+                    // The existing video may be incomplete. Keep the finished staging available.
                     existingVideo to existingVideo.name.orEmpty().substringBeforeLast('.')
                 } else {
                     val finalized = finalizeEpisodeDir(animeDir, tmpDir, episodeDirname)
@@ -1185,23 +1185,6 @@ private val RANGE_INCOMPATIBLE_HEADERS = setOf(
  */
 internal fun UniFile.hasSingleFinishedVideo(): Boolean {
     return listFiles().orEmpty().count { it.extension != "tmp" } == 1
-}
-
-/**
- * Moves the finished temporary episode directory [tmpDir] to [dirname] in [animeDir], copying it
- * where the document provider rejects renames (see [renameToOrCopy]).
- *
- * A move that failed halfway, for example a copy that failed and could not be cleaned up, leaves a
- * [dirname] behind, and every retry would then fail on it. [tmpDir] holds the finished video, so it
- * replaces that directory.
- *
- * @return the episode directory, or null if it could not be moved; [tmpDir] is then kept.
- */
-internal fun finalizeEpisodeDir(animeDir: UniFile, tmpDir: UniFile, dirname: String): UniFile? {
-    animeDir.findFile(dirname)?.let { leftover ->
-        if (!leftover.delete()) return null
-    }
-    return tmpDir.renameToOrCopy(dirname)
 }
 
 // libavformat has no network read timeout by default, so a server that stops sending blocks FFmpeg

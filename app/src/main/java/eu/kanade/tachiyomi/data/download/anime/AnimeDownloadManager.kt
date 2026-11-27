@@ -31,7 +31,6 @@ import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.storage.displayablePath
-import tachiyomi.core.common.storage.extension
 import tachiyomi.core.common.storage.nameWithoutExtension
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.system.logcat
@@ -524,29 +523,32 @@ class AnimeDownloadManager(
      */
     suspend fun renameEpisode(source: AnimeSource, anime: Anime, oldEpisode: Episode, newEpisode: Episode) {
         withContext(Dispatchers.IO) {
-            val animeDir = provider.findAnimeDir(anime.title, source) ?: return@withContext
             val oldNames = provider.getValidEpisodeDirNames(oldEpisode.name, oldEpisode.scanlator, oldEpisode.url)
-            val oldFile = provider.findDownloadedEpisode(animeDir, oldNames) ?: return@withContext
             val newNames = provider.getValidEpisodeDirNames(newEpisode.name, newEpisode.scanlator, newEpisode.url)
-            if (provider.findDownloadedEpisode(animeDir, newNames) != null) return@withContext
-
             val newName = provider.getEpisodeDirName(newEpisode.name, newEpisode.scanlator, newEpisode.url)
-            val oldName = if (oldFile.isFile) oldFile.nameWithoutExtension else oldFile.name
-            val newFileName = if (oldFile.isFile) "$newName.${oldFile.extension}" else newName
 
-            val renamed = try {
-                oldFile.renameTo(newFileName)
-            } catch (e: Exception) {
-                if (e is CancellationException) throw e
-                logcat(LogPriority.ERROR, e) { "Could not move downloaded episode" }
-                false
-            }
+            val (animeDir, oldName) = provider.commitEpisodeFile {
+                val directory = provider.findAnimeDir(anime.title, source) ?: return@commitEpisodeFile null
+                val oldFile = provider.findDownloadedEpisode(directory, oldNames) ?: return@commitEpisodeFile null
+                if (provider.findDownloadedEpisode(directory, newNames) != null) return@commitEpisodeFile null
 
-            if (renamed) {
-                cache.addEpisode(newName, animeDir, anime, previousName = oldName)
-            } else {
-                logcat(LogPriority.ERROR) { "Could not rename downloaded episode: ${oldNames.joinToString()}" }
-            }
+                val previousName = if (oldFile.isFile) oldFile.nameWithoutExtension else oldFile.name
+                val moved = try {
+                    oldFile.renameDownloadedEpisode(newName)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    logcat(LogPriority.ERROR, e) { "Could not move downloaded episode" }
+                    false
+                }
+                if (moved) {
+                    directory to previousName
+                } else {
+                    logcat(LogPriority.ERROR) { "Could not rename downloaded episode: ${oldNames.joinToString()}" }
+                    null
+                }
+            } ?: return@withContext
+
+            cache.addEpisode(newName, animeDir, anime, previousName = oldName)
         }
     }
 
