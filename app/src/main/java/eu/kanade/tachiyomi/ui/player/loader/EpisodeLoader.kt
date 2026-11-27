@@ -24,7 +24,7 @@ import uy.kohesive.injekt.api.get
 class EpisodeLoader {
     companion object {
 
-        private val hosterCache = HosterCache.shared
+        private val hosterCache: HosterCache get() = HosterCache.shared
 
         /**
          * Returns a list of hosters of an [episode] based on the type of [source] used.
