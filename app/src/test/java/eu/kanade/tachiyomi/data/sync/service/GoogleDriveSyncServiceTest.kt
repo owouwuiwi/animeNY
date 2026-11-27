@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.services.drive.Drive
+import com.google.api.services.drive.model.File
 import com.sun.net.httpserver.HttpServer
 import io.mockk.coEvery
 import io.mockk.every
@@ -14,6 +15,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -28,6 +30,20 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.zip.GZIPInputStream
 
 class GoogleDriveSyncServiceTest {
+    @Test
+    fun `Same device can replace only local or acknowledged merged revisions`() {
+        val legacy = File().setAppProperties(mapOf("deviceId" to "same"))
+        val local = File().setAppProperties(mapOf("deviceId" to "same", "mergeRevision" to "local"))
+        val merged = File().setAppProperties(mapOf("deviceId" to "same", "mergeRevision" to "new"))
+
+        assertFalse(legacy.needsDriveMerge("same", ""))
+        assertFalse(local.needsDriveMerge("same", "old"))
+        assertTrue(merged.needsDriveMerge("same", ""))
+        assertTrue(merged.needsDriveMerge("same", "old"))
+        assertFalse(merged.needsDriveMerge("same", "new"))
+        assertTrue(merged.needsDriveMerge("other", "new"))
+    }
+
     @Test
     fun `Token refresh errors reach the worker error handler`() {
         val rejection = IOException("Refresh token expired")

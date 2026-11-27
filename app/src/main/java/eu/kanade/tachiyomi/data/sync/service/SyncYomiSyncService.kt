@@ -22,6 +22,7 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 class SyncYomiSyncService(
@@ -36,9 +37,15 @@ class SyncYomiSyncService(
     private class SyncYomiException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
     @Suppress("TooGenericExceptionCaught")
-    override suspend fun doSync(syncData: SyncData): Backup? {
-        try {
-            val (remoteData, etag) = pullSyncData()
+    override suspend fun doSync(syncData: SyncData): SyncUpload? {
+        return try {
+            val url = "${syncPreferences.clientHost().get()}/api/sync/content"
+            val apiKey = syncPreferences.clientAPIKey().get()
+            val scope = MessageDigest.getInstance("SHA-256").digest("$url\n$apiKey".encodeToByteArray()).toHexString()
+            val prefix = "$scope:"
+            val applied = syncPreferences.appliedSyncYomiRevision().get()
+            val lastETag = applied.takeIf { it.startsWith(prefix) }?.removePrefix(prefix).orEmpty()
+            val (remoteData, etag) = pullSyncData(url, apiKey, lastETag)
 
             val finalSyncData = if (remoteData != null) {
                 assert(etag.isNotEmpty()) { "ETag should never be empty if remote data is not null" }
@@ -53,38 +60,36 @@ class SyncYomiSyncService(
                 }
                 syncData
             }
-            return if (pushSyncData(finalSyncData, etag)) finalSyncData.backup else null
+            val backup = finalSyncData.backup ?: return null
+            pushSyncData(url, apiKey, backup, etag)?.let {
+                SyncUpload(backup, SyncReceipt(SyncReceipt.Provider.SYNCYOMI, "$prefix$it"))
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             logcat(LogPriority.ERROR) { "Error syncing: ${e.message}" }
             notifier.showSyncError(e.message)
-            return null
+            null
         }
     }
 
     @Suppress("ReturnCount")
-    private suspend fun pullSyncData(): Pair<SyncData?, String> {
-        val host = syncPreferences.clientHost().get()
-        val apiKey = syncPreferences.clientAPIKey().get()
-        val downloadUrl = "$host/api/sync/content"
-
+    private suspend fun pullSyncData(url: String, apiKey: String, lastETag: String): Pair<SyncData?, String> {
         val headersBuilder = Headers.Builder().add("X-API-Token", apiKey)
-        val lastETag = syncPreferences.lastSyncEtag().get()
         if (lastETag != "") {
             headersBuilder.add("If-None-Match", lastETag)
         }
         val headers = headersBuilder.build()
 
         val downloadRequest = GET(
-            url = downloadUrl,
+            url = url,
             headers = headers,
         )
 
         val client = OkHttpClient()
         client.newCall(downloadRequest).await().use { response ->
             if (response.code == HttpStatus.SC_NOT_MODIFIED) {
-                assert(lastETag.isNotEmpty())
+                if (lastETag.isEmpty()) throw SyncYomiException("Received an unexpected HTTP 304")
                 logcat(LogPriority.INFO) { "Remote server not modified" }
                 return Pair(null, lastETag)
             } else if (response.code == HttpStatus.SC_NOT_FOUND) {
@@ -106,12 +111,7 @@ class SyncYomiSyncService(
     }
 
     @Suppress("MagicNumber")
-    private suspend fun pushSyncData(syncData: SyncData, eTag: String): Boolean {
-        val backup = syncData.backup ?: return false
-
-        val host = syncPreferences.clientHost().get()
-        val apiKey = syncPreferences.clientAPIKey().get()
-        val uploadUrl = "$host/api/sync/content"
+    private suspend fun pushSyncData(url: String, apiKey: String, backup: Backup, eTag: String): String? {
         val timeout = 30L
 
         val headersBuilder = Headers.Builder().add("X-API-Token", apiKey)
@@ -134,7 +134,7 @@ class SyncYomiSyncService(
         val body = byteArray.toRequestBody("application/octet-stream".toMediaType())
 
         val uploadRequest = PUT(
-            url = uploadUrl,
+            url = url,
             headers = headers,
             body = body,
         )
@@ -142,16 +142,15 @@ class SyncYomiSyncService(
         client.newCall(uploadRequest).await().use { response ->
             if (response.code == HttpStatus.SC_PRECONDITION_FAILED) {
                 logcat(LogPriority.DEBUG) { "Remote backup changed during sync; will try again on the next sync" }
-                return false
+                return null
             }
             if (!response.isSuccessful) {
                 throw SyncYomiException("Failed to upload sync data: HTTP ${response.code}")
             }
             val newETag = response.headers["ETag"]
                 .takeIf { it?.isNotEmpty() == true } ?: throw SyncYomiException("Missing ETag")
-            syncPreferences.lastSyncEtag().set(newETag)
             logcat(LogPriority.DEBUG) { "SyncYomi sync completed" }
-            return true
+            return newETag
         }
     }
 }

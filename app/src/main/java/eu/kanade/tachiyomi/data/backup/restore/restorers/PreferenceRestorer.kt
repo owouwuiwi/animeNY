@@ -35,11 +35,13 @@ class PreferenceRestorer(
     suspend fun restoreApp(
         preferences: List<BackupPreference>,
         backupCategories: List<BackupCategory>?,
+        failOnError: Boolean = false,
     ) {
         restorePreferences(
             preferences,
             preferenceStore,
             backupCategories,
+            failOnError,
         )
 
         AnimeLibraryUpdateJob.setupTask(context)
@@ -47,10 +49,10 @@ class PreferenceRestorer(
         BackupCreateJob.setupTask(context)
     }
 
-    suspend fun restoreSource(preferences: List<BackupSourcePreferences>) {
+    suspend fun restoreSource(preferences: List<BackupSourcePreferences>, failOnError: Boolean = false) {
         preferences.forEach {
             val sourcePrefs = AndroidPreferenceStore(sourcePreferences(it.sourceKey))
-            restorePreferences(it.prefs, sourcePrefs)
+            restorePreferences(it.prefs, sourcePrefs, failOnError = failOnError)
         }
     }
 
@@ -58,6 +60,7 @@ class PreferenceRestorer(
         toRestore: List<BackupPreference>,
         preferenceStore: PreferenceStore,
         backupCategories: List<BackupCategory>? = null,
+        failOnError: Boolean,
     ) {
         val allMangaCategories = if (backupCategories != null) getMangaCategories.await() else emptyList()
         val allAnimeCategories = if (backupCategories != null) getAnimeCategories.await() else emptyList()
@@ -125,6 +128,7 @@ class PreferenceRestorer(
                     }
                 }
             } catch (e: Exception) {
+                if (failOnError) throw e
                 Log.e("PreferenceRestorer", "Failed to restore preference <$key>", e)
             }
         }

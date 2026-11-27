@@ -32,6 +32,7 @@ import tachiyomi.i18n.tail.TLMR
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.IOException
+import java.util.UUID
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 import java.io.File as LocalFile
@@ -64,21 +65,29 @@ class GoogleDriveSyncService(
     private val remoteFileName = "${appName}_sync.proto.gz"
 
     @Suppress("TooGenericExceptionCaught")
-    override suspend fun doSync(syncData: SyncData): Backup? {
+    override suspend fun doSync(syncData: SyncData): SyncUpload? {
         googleDriveService.refreshToken()
         return try {
             withIOContext {
                 val drive = googleDriveService.driveService
                     ?: throw IOException(context.stringResource(TLMR.strings.google_drive_not_signed_in))
                 val remoteFile = drive.listSyncBackups(remoteFileName).firstOrNull()
-                val remoteData = remoteFile?.let { pullSyncData(drive, it) }
-                val updated = if (remoteData != null && remoteData.deviceId != syncData.deviceId) {
-                    mergeSyncData(syncData, remoteData)
+                val updated = remoteFile?.let { file ->
+                    val remoteData = pullSyncData(drive, file)
+                    if (file.needsDriveMerge(syncData.deviceId, syncPreferences.appliedDriveRevision().get())) {
+                        mergeSyncData(syncData, remoteData)
+                    } else {
+                        syncData
+                    }
+                } ?: syncData
+                val backup = updated.backup ?: return@withIOContext null
+                val receipt = if (updated !== syncData) {
+                    SyncReceipt(SyncReceipt.Provider.DRIVE, UUID.randomUUID().toString())
                 } else {
-                    syncData
+                    null
                 }
-                pushSyncData(drive, remoteFile, updated)
-                updated.backup
+                pushSyncData(drive, remoteFile, backup, updated.deviceId, receipt?.revision)
+                SyncUpload(backup, receipt)
             }
         } catch (e: CancellationException) {
             throw e
@@ -97,15 +106,14 @@ class GoogleDriveSyncService(
         }
     }
 
-    private fun pushSyncData(drive: Drive, remoteFile: File?, syncData: SyncData) {
-        val backup = syncData.backup ?: return
+    private fun pushSyncData(drive: Drive, remoteFile: File?, backup: Backup, deviceId: String, revision: String?) {
         val byteArray = protoBuf.encodeToByteArray(Backup.serializer(), backup)
         check(byteArray.isNotEmpty()) { context.stringResource(MR.strings.empty_backup_error) }
 
         val metadata = File().apply {
             name = remoteFileName
             mimeType = DRIVE_SYNC_MIME_TYPE
-            appProperties = mapOf("deviceId" to syncData.deviceId)
+            appProperties = mapOf("deviceId" to deviceId, DRIVE_MERGE_REVISION to (revision ?: DRIVE_LOCAL_WRITE))
         }
         withDriveBackupContent(context.cacheDir, byteArray) { content ->
             if (remoteFile == null) {
@@ -157,6 +165,14 @@ class GoogleDriveSyncService(
 }
 
 private const val DRIVE_SYNC_MIME_TYPE = "application/x-gzip"
+private const val DRIVE_MERGE_REVISION = "mergeRevision"
+private const val DRIVE_LOCAL_WRITE = "local"
+
+internal fun File.needsDriveMerge(deviceId: String, appliedRevision: String): Boolean {
+    if (appProperties?.get("deviceId") != deviceId) return true
+    val revision = appProperties?.get(DRIVE_MERGE_REVISION) ?: return false
+    return revision != DRIVE_LOCAL_WRITE && revision != appliedRevision
+}
 
 internal fun Drive.listSyncBackups(name: String): List<File> {
     val escapedName = name.replace("\\", "\\\\").replace("'", "\\'")

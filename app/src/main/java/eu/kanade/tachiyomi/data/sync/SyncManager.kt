@@ -16,11 +16,13 @@ import eu.kanade.tachiyomi.data.backup.models.BackupEpisode
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreJob
 import eu.kanade.tachiyomi.data.backup.restore.RestoreOptions
+import eu.kanade.tachiyomi.data.backup.restore.SYNC_RESTORE_FILE_PREFIX
 import eu.kanade.tachiyomi.data.backup.restore.restorers.AnimeRestorer
 import eu.kanade.tachiyomi.data.backup.restore.restorers.MangaRestorer
 import eu.kanade.tachiyomi.data.sync.service.GoogleDriveSyncService
 import eu.kanade.tachiyomi.data.sync.service.SyncData
 import eu.kanade.tachiyomi.data.sync.service.SyncYomiSyncService
+import eu.kanade.tachiyomi.util.system.workManager
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -83,9 +85,10 @@ class SyncManager(
      *
      * This function retrieves local data (favorites, manga, extensions, and categories)
      * from the database using the BackupManager, then synchronizes the data with a sync service.
+     * Returns false if scheduling a local restore must be retried.
      */
     @Suppress("ReturnCount", "LongMethod")
-    suspend fun syncData() {
+    suspend fun syncData(): Boolean {
         // Reset isSyncing in case it was left over or failed syncing during restore.
         animeHandler.await(inTransaction = true) {
             animesQueries.resetIsSyncing()
@@ -149,35 +152,34 @@ class SyncManager(
             }
         }
 
-        val remoteBackup = syncService?.doSync(syncData)
-
-        if (remoteBackup == null) {
+        val uploaded = syncService?.doSync(syncData)
+        if (uploaded == null) {
             logcat(LogPriority.DEBUG) { "Skip restore due to network issues" }
-            // should we call showSyncError?
-            return
+            return true
         }
 
+        val remoteBackup = uploaded.backup
         if (remoteBackup === syncData.backup) {
-            // nothing changed
+            uploaded.receipt?.acknowledge(syncPreferences)
             syncPreferences.lastSyncTimestamp().set(Date().time)
             notifier.showSyncSuccess("Sync completed successfully")
-            return
+            return true
         }
 
         // Stop the sync early if the remote backup is null or empty
         if (remoteBackup.backupManga.size == 0 && remoteBackup.backupAnime.size == 0) {
             notifier.showSyncError("No data found on remote server.")
-            return
+            return true
         }
 
         // Check if it's first sync based on lastSyncTimestamp
         if (syncPreferences.lastSyncTimestamp().get() == 0L &&
             (databaseManga.isNotEmpty() && databaseAnime.isNotEmpty())
         ) {
-            // It's first sync no need to restore data. (just update remote data)
+            // First sync publishes the merged remote backup without applying it locally.
             syncPreferences.lastSyncTimestamp().set(Date().time)
             notifier.showSyncSuccess("Updated remote data successfully")
-            return
+            return true
         }
 
         val (mangaFilteredFavorites, mangaNonFavorites) = mangaFilterFavoritesAndNonFavorites(remoteBackup)
@@ -196,44 +198,38 @@ class SyncManager(
             backupSourcePreferences = remoteBackup.backupSourcePreferences,
         )
 
-        // It's local sync no need to restore data. (just update remote data)
-        if (mangaFilteredFavorites.isEmpty() && animeFilteredFavorites.isEmpty()) {
-            // update the sync timestamp
-
+        val originalMetadata = backup.copy(backupManga = emptyList(), backupAnime = emptyList())
+        if (mangaFilteredFavorites.isEmpty() && animeFilteredFavorites.isEmpty() && originalMetadata == newSyncData) {
+            uploaded.receipt?.acknowledge(syncPreferences)
             syncPreferences.lastSyncTimestamp().set(Date().time)
             notifier.showSyncSuccess("Sync completed successfully")
-            return
+            return true
         }
 
-        val backupUri = writeSyncDataToCache(context, newSyncData)
-        logcat(LogPriority.DEBUG) { "Got Backup Uri: $backupUri" }
-        if (backupUri != null) {
-            BackupRestoreJob.start(
-                context,
-                backupUri,
-                sync = true,
-                options = RestoreOptions(
-                    appSettings = true,
-                    sourceSettings = true,
-                    libraryEntries = true, // Correct parameter name
-                ),
-            )
-
-            // update the sync timestamp
-            syncPreferences.lastSyncTimestamp().set(Date().time)
-        } else {
-            logcat(LogPriority.ERROR) { "Failed to write sync data to file" }
+        val stagedBackup = writeSyncDataToCache(newSyncData) ?: return false
+        val accepted = BackupRestoreJob.startSync(
+            context.workManager,
+            Uri.fromFile(stagedBackup),
+            options = RestoreOptions(),
+            receipt = uploaded.receipt,
+        )
+        if (!accepted) {
+            stagedBackup.delete()
         }
+        return accepted
     }
 
-    private fun writeSyncDataToCache(context: Context, backup: Backup): Uri? {
-        val cacheFile = File(context.cacheDir, "Animetail_sync_data.proto.gz")
+    private fun writeSyncDataToCache(backup: Backup): File? {
+        var cacheFile: File? = null
         return try {
-            cacheFile.outputStream().use { output ->
-                output.write(ProtoBuf.encodeToByteArray(Backup.serializer(), backup))
-                Uri.fromFile(cacheFile)
+            File.createTempFile(SYNC_RESTORE_FILE_PREFIX, ".proto", context.cacheDir).also { file ->
+                cacheFile = file
+                file.outputStream().use { output ->
+                    output.write(ProtoBuf.encodeToByteArray(Backup.serializer(), backup))
+                }
             }
         } catch (e: IOException) {
+            cacheFile?.delete()
             logcat(LogPriority.ERROR, throwable = e) { "Failed to write sync data to cache" }
             null
         }

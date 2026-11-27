@@ -24,13 +24,26 @@ data class SyncData(
     val backup: Backup? = null,
 )
 
+data class SyncUpload(val backup: Backup, val receipt: SyncReceipt?)
+
+data class SyncReceipt(val provider: Provider, val revision: String) {
+    enum class Provider { SYNCYOMI, DRIVE }
+
+    fun acknowledge(preferences: SyncPreferences) {
+        when (provider) {
+            Provider.SYNCYOMI -> preferences.appliedSyncYomiRevision()
+            Provider.DRIVE -> preferences.appliedDriveRevision()
+        }.set(revision)
+    }
+}
+
 @Suppress("TooManyFunctions")
 abstract class SyncService(
     val context: Context,
     val json: Json,
     val syncPreferences: SyncPreferences,
 ) {
-    abstract suspend fun doSync(syncData: SyncData): Backup?
+    abstract suspend fun doSync(syncData: SyncData): SyncUpload?
 
     /**
      * Merges the local and remote sync data into a single JSON string.

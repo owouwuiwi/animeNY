@@ -97,7 +97,7 @@ class BackupRestorer(
     private var animeSourceMapping: Map<Long, String> = emptyMap()
     private var mangaSourceMapping: Map<Long, String> = emptyMap()
 
-    suspend fun restore(uri: Uri, options: RestoreOptions) {
+    suspend fun restore(uri: Uri, options: RestoreOptions): Boolean {
         val startTime = System.currentTimeMillis()
 
         restoreFromFile(uri, options)
@@ -123,6 +123,7 @@ class BackupRestorer(
             logFile.name,
             isSync,
         )
+        return errors.isEmpty()
     }
 
     private suspend fun restoreFromFile(uri: Uri, options: RestoreOptions) {
@@ -386,6 +387,7 @@ class BackupRestorer(
         preferenceRestorer.restoreApp(
             preferences,
             categories,
+            failOnError = isSync,
         )
 
         val progress = restoreProgress.incrementAndGet()
@@ -399,7 +401,7 @@ class BackupRestorer(
 
     private fun CoroutineScope.restoreSourcePreferences(preferences: List<BackupSourcePreferences>) = launch {
         ensureActive()
-        preferenceRestorer.restoreSource(preferences)
+        preferenceRestorer.restoreSource(preferences, failOnError = isSync)
 
         val progress = restoreProgress.incrementAndGet()
         notifier.showRestoreProgress(
