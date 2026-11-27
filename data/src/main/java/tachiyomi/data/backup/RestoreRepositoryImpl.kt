@@ -145,15 +145,25 @@ class RestoreRepositoryImpl(
                         read = kept.read || other.read,
                         bookmark = kept.bookmark || other.bookmark,
                         lastPageRead = max(kept.lastPageRead, other.lastPageRead),
+                        dateUploadOverride = when {
+                            kept.dateUploadOverride == 0L -> other.dateUploadOverride
+                            other.dateUploadOverride == 0L -> kept.dateUploadOverride
+                            else -> max(kept.dateUploadOverride, other.dateUploadOverride)
+                        },
                     )
                 }
             }
-            .mapNotNull {
-                val chapter = it.copy(mangaId = manga.id)
+            .mapNotNull { restored ->
+                val dbChapter = dbChaptersByUrl[restored.url]
+                val chapter = restored.copy(
+                    mangaId = manga.id,
+                    // A missing archive field decodes to zero, so it cannot tell us to reset a local override.
+                    dateUploadOverride = restored.dateUploadOverride.takeUnless { it == 0L }
+                        ?: dbChapter?.dateUploadOverride
+                        ?: 0L,
+                )
 
-                val dbChapter = dbChaptersByUrl[chapter.url]
-                    ?: // New chapter
-                    return@mapNotNull chapter
+                if (dbChapter == null) return@mapNotNull chapter
 
                 if (chapter.forComparison() == dbChapter.forComparison()) {
                     // Same state; skip
@@ -169,7 +179,6 @@ class RestoreRepositoryImpl(
                         lastPageRead = max(chapter.lastPageRead, dbChapter.lastPageRead),
                         dateFetch = dbChapter.dateFetch,
                         sourceOrder = dbChapter.sourceOrder,
-                        dateUploadOverride = chapter.dateUploadOverride,
                         // Merge both backup and local data with local winning
                         memo = JsonObject(chapter.memo + dbChapter.memo),
                     )
