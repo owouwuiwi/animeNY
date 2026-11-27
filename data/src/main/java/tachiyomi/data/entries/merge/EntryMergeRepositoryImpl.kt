@@ -24,9 +24,12 @@ class EntryMergeRepositoryImpl(preferences: PreferenceStore, private val json: J
 
     override fun observeAll() = state.changes().map(::decode).distinctUntilChanged()
 
-    override suspend fun save(merge: EntryMerge): Boolean = withIOContext {
+    override suspend fun save(merge: EntryMerge, replaceExisting: Boolean): Boolean = withIOContext {
         writeLock.withLock {
             val groups = decode(state.get())
+            val prior = groups.firstOrNull { it.id == merge.id }
+            if (prior == merge) return@withLock true
+            if (prior != null && (!replaceExisting || prior.media != merge.media)) return@withLock false
             val conflict = groups.any { existing ->
                 existing.id != merge.id && existing.media == merge.media && existing.members.any { it in merge.members }
             }

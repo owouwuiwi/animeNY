@@ -394,6 +394,7 @@
   <string name="entry_merge_unavailable">Alcune opere collegate non sono disponibili.</string>
   <string name="entry_merge_empty">Apri le opere originali per caricare episodi o capitoli.</string>
   <string name="entry_merge_completed_part">Completato</string>
+  <string name="entry_merge_restore_skipped">Non è stato possibile ripristinare un gruppo di opere collegate.</string>
   <string name="pref_smart_sync_tracker">Stagione di sincronizzazione intelligente</string>
   <string name="pref_smart_sync_tracker_summary">Salta gli elementi completati e ferma alla voce in corso</string>
     <string name="feed_display_options">Visualizzazione del feed</string>

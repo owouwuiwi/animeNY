@@ -467,6 +467,7 @@
     <string name="entry_merge_unavailable">Some linked entries are unavailable.</string>
     <string name="entry_merge_empty">Open the original entries to load their episodes or chapters.</string>
     <string name="entry_merge_completed_part">Completed</string>
+    <string name="entry_merge_restore_skipped">A group of linked entries could not be restored.</string>
     <string name="pref_smart_sync_tracker">Smart sync seasons</string>
     <string name="pref_smart_sync_tracker_summary">Skip completed items and stop at entry in progress</string>
 
