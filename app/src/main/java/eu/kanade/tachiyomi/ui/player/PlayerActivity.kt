@@ -90,6 +90,7 @@ import eu.kanade.tachiyomi.ui.player.settings.SubtitlePreferences
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
 import eu.kanade.tachiyomi.ui.player.utils.LanguageTags
+import eu.kanade.tachiyomi.ui.player.utils.isTorrentPlaybackUrl
 import eu.kanade.tachiyomi.ui.player.utils.torrentBufferOptions
 import eu.kanade.tachiyomi.util.system.powerManager
 import eu.kanade.tachiyomi.util.system.toShareIntent
@@ -1221,11 +1222,7 @@ class PlayerActivity : BaseActivity() {
         }
 
         val useTorrentServer = torrentPreferences.torrServerEnable().get() &&
-            (
-                video.videoUrl.startsWith(torrentServerApi.hostUrl) ||
-                    video.videoUrl.startsWith("magnet") ||
-                    video.videoUrl.endsWith("torrent")
-                )
+            isTorrentPlaybackUrl(video.videoUrl, torrentServerApi.hostUrl)
         val options = if (useTorrentServer) {
             torrentBufferOptions(video.mpvArgs, torrentPreferences.startupBufferSeconds().get())
         } else {
