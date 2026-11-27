@@ -1,5 +1,14 @@
 package mihon.data.extension.service
 
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.okio.decodeFromBufferedSource
+import kotlinx.serialization.protobuf.ProtoBuf
+import mihon.data.extension.model.ModernNetworkExtensionStore
+import mihon.domain.extension.model.ExtensionStore
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Response
 import okio.BufferedSource
 import okio.ByteString.Companion.toByteString
@@ -27,6 +36,46 @@ internal inline fun <T> Response.readExtensionIndex(read: (BufferedSource, Exten
         }
     }
     source.use { read(it, it.extensionIndexFormat(jsonHint)) }
+}
+
+internal inline fun <reified T> BufferedSource.decodeExtensionIndexObject(
+    format: ExtensionIndexFormat,
+    json: Json,
+    protoBuf: ProtoBuf,
+): T = try {
+    when (format) {
+        ExtensionIndexFormat.JSON_OBJECT -> json.decodeFromBufferedSource<T>(this)
+        ExtensionIndexFormat.PROTOBUF -> protoBuf.decodeFromByteArray<T>(readByteArray())
+        ExtensionIndexFormat.JSON_ARRAY -> throw IllegalArgumentException("The extension index must be an object.")
+    }
+} catch (error: SerializationException) {
+    throw IllegalArgumentException(
+        "The extension repository returned an unsupported index. Use the repository's direct index URL.",
+        error,
+    )
+}
+
+internal fun HttpUrl.resolveExtensionListUrl(url: String): String =
+    requireNotNull(resolve(url)) { "The extension repository contains an invalid extension list URL." }.toString()
+
+internal suspend inline fun <reified Index : ModernNetworkExtensionStore<Entries>, reified Entries>
+    ExtensionStore.readModernExtensionList(
+        json: Json,
+        protoBuf: ProtoBuf,
+        fetch: (String) -> Response,
+    ): Entries? {
+    val listUrl = extensionListUrl?.let(indexUrl.toHttpUrl()::resolveExtensionListUrl) ?: run {
+        val response = fetch(indexUrl)
+        val responseUrl = response.request.url
+        val index = response.readExtensionIndex { source, format ->
+            source.decodeExtensionIndexObject<Index>(format, json, protoBuf)
+        }
+        responseUrl.resolveExtensionListUrl(index.extensionListUrl ?: return index.extensionList)
+    }
+
+    return fetch(listUrl).readExtensionIndex { source, format ->
+        source.decodeExtensionIndexObject<Entries>(format, json, protoBuf)
+    }
 }
 
 internal fun BufferedSource.extensionIndexFormat(jsonHint: Boolean): ExtensionIndexFormat {

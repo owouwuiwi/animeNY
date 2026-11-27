@@ -7,7 +7,7 @@ import eu.kanade.tachiyomi.extension.anime.model.AnimeExtension
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.awaitSuccess
-import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.okio.decodeFromBufferedSource
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -53,13 +53,12 @@ class AnimeExtensionStoreService(
 
                     ExtensionIndexFormat.JSON_OBJECT -> try {
                         source.peek().use { json.decodeFromBufferedSource<NetworkLegacyExtensionRepo>(it) }
-                    } catch (_: Exception) {
-                        json.decodeFromBufferedSource<NetworkAnimeExtensionStore>(source)
+                    } catch (_: SerializationException) {
+                        source.decodeExtensionIndexObject<NetworkAnimeExtensionStore>(format, json, protoBuf)
                     }
 
-                    ExtensionIndexFormat.PROTOBUF -> protoBuf.decodeFromByteArray<NetworkAnimeExtensionStore>(
-                        source.readByteArray(),
-                    )
+                    ExtensionIndexFormat.PROTOBUF ->
+                        source.decodeExtensionIndexObject<NetworkAnimeExtensionStore>(format, json, protoBuf)
                 }
 
                 if (networkStore is NetworkLegacyExtensionRepo) {
@@ -71,7 +70,9 @@ class AnimeExtensionStoreService(
                     }
                 }
 
-                networkStore.toExtensionStore(updatedIndexUrl)
+                val decodedStore = networkStore.toExtensionStore(updatedIndexUrl)
+                val listUrl = decodedStore.extensionListUrl?.let(responseUrl::resolveExtensionListUrl)
+                decodedStore.copy(extensionListUrl = listUrl)
             }
             Result.success(store)
         } catch (e: CancellationException) {
@@ -86,49 +87,10 @@ class AnimeExtensionStoreService(
 
     suspend fun getExtensions(store: ExtensionStore): Result<List<AnimeExtension.Available>> {
         return try {
-            val extensions = if (store.extensionListUrl != null) {
-                val response = network.client.newCall(GET(store.extensionListUrl!!)).awaitSuccess()
-                response.readExtensionIndex { source, format ->
-                    when (format) {
-                        ExtensionIndexFormat.JSON_OBJECT -> {
-                            json.decodeFromBufferedSource<NetworkAnimeExtensionStore.ExtensionList>(source)
-                        }
-
-                        ExtensionIndexFormat.PROTOBUF -> {
-                            protoBuf.decodeFromByteArray<NetworkAnimeExtensionStore.ExtensionList>(
-                                source.readByteArray(),
-                            )
-                        }
-
-                        ExtensionIndexFormat.JSON_ARRAY -> throw IllegalArgumentException(
-                            "Expected an extension list object.",
-                        )
-                    }
-                        .let { toAvailableExtensions(it, store) }
-                }
-            } else if (!store.isLegacy) {
-                val response = network.client.newCall(GET(store.indexUrl)).awaitSuccess()
-                response.readExtensionIndex { source, format ->
-                    val netStore = when (format) {
-                        ExtensionIndexFormat.JSON_OBJECT -> json.decodeFromBufferedSource<NetworkAnimeExtensionStore>(
-                            source,
-                        )
-
-                        ExtensionIndexFormat.PROTOBUF -> protoBuf.decodeFromByteArray<NetworkAnimeExtensionStore>(
-                            source.readByteArray(),
-                        )
-
-                        ExtensionIndexFormat.JSON_ARRAY -> throw IllegalArgumentException(
-                            "Expected an extension catalog object.",
-                        )
-                    }
-                    val extensionList = netStore.extensionList
-                    if (extensionList != null) {
-                        toAvailableExtensions(extensionList, store)
-                    } else {
-                        emptyList()
-                    }
-                }
+            val extensions = if (!store.isLegacy) {
+                store.readModernExtensionList<NetworkAnimeExtensionStore, NetworkAnimeExtensionStore.ExtensionList>(json, protoBuf) {
+                    network.client.newCall(GET(it)).awaitSuccess()
+                }?.let { toAvailableExtensions(it, store) }.orEmpty()
             } else {
                 val storeBaseUrl = store.indexUrl.removeSuffix("/repo.json")
                 val response = network.client.newCall(GET("$storeBaseUrl/index.min.json")).awaitSuccess()
