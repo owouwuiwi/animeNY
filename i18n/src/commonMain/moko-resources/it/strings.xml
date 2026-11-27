@@ -516,6 +516,7 @@
     <string name="enhanced_tracking_info">Offrono funzioni migliorate per fonti specifiche. Le voci sono tracciate automaticamente quando aggiunte alla libreria.</string>
     <string name="enhanced_services">Servizi di tracking migliorati</string>
     <string name="pref_category_appearance">Aspetto</string>
+    <string name="pref_show_home_tab">Mostra la scheda Home</string>
     <string name="action_track">Traccia</string>
     <string name="getting_started_guide">Guida introduttiva</string>
     <string name="pref_tablet_ui_mode">Interfaccia tablet</string>
