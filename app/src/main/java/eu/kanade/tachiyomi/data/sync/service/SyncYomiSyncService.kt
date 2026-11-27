@@ -7,6 +7,7 @@ import eu.kanade.tachiyomi.data.sync.SyncNotifier
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.PUT
 import eu.kanade.tachiyomi.network.await
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -32,7 +33,7 @@ class SyncYomiSyncService(
     private val protoBuf: ProtoBuf = Injekt.get(),
 ) : SyncService(context, json, syncPreferences) {
 
-    private class SyncYomiException(message: String?) : Exception(message)
+    private class SyncYomiException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
     @Suppress("TooGenericExceptionCaught")
     override suspend fun doSync(syncData: SyncData): Backup? {
@@ -52,8 +53,9 @@ class SyncYomiSyncService(
                 }
                 syncData
             }
-            pushSyncData(finalSyncData, etag)
-            return finalSyncData.backup
+            return if (pushSyncData(finalSyncData, etag)) finalSyncData.backup else null
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             logcat(LogPriority.ERROR) { "Error syncing: ${e.message}" }
             notifier.showSyncError(e.message)
@@ -80,53 +82,32 @@ class SyncYomiSyncService(
         )
 
         val client = OkHttpClient()
-        val response = client.newCall(downloadRequest).await()
-
-        if (response.code == HttpStatus.SC_NOT_MODIFIED) {
-            // not modified
-            assert(lastETag.isNotEmpty())
-            logcat(LogPriority.INFO) {
-                "Remote server not modified"
+        client.newCall(downloadRequest).await().use { response ->
+            if (response.code == HttpStatus.SC_NOT_MODIFIED) {
+                assert(lastETag.isNotEmpty())
+                logcat(LogPriority.INFO) { "Remote server not modified" }
+                return Pair(null, lastETag)
+            } else if (response.code == HttpStatus.SC_NOT_FOUND) {
+                return Pair(null, "")
             }
-            return Pair(null, lastETag)
-        } else if (response.code == HttpStatus.SC_NOT_FOUND) {
-            // maybe got deleted from remote
-            return Pair(null, "")
-        }
 
-        if (response.isSuccessful) {
+            if (!response.isSuccessful) {
+                throw SyncYomiException("Failed to download sync data: HTTP ${response.code}")
+            }
             val newETag = response.headers["ETag"]
                 .takeIf { it?.isNotEmpty() == true } ?: throw SyncYomiException("Missing ETag")
-
-            val byteArray = response.body.byteStream().use {
-                return@use it.readBytes()
-            }
-
-            return try {
-                val backup = protoBuf.decodeFromByteArray(Backup.serializer(), byteArray)
+            try {
+                val backup = protoBuf.decodeFromByteArray(Backup.serializer(), response.body.bytes())
                 return Pair(SyncData(backup = backup), newETag)
-            } catch (_: SerializationException) {
-                logcat(LogPriority.INFO) {
-                    "Bad content responsed from server"
-                }
-                // the body is invalid
-                // return default value so we can overwrite it
-                Pair(null, "")
+            } catch (e: SerializationException) {
+                throw SyncYomiException("The remote backup could not be read", e)
             }
-        } else {
-            val responseBody = response.body.string()
-            notifier.showSyncError("Failed to download sync data: $responseBody")
-            logcat(LogPriority.ERROR) { "SyncError: $responseBody" }
-            throw SyncYomiException("Failed to download sync data: $responseBody")
         }
     }
 
-    /**
-     * Return true if update success
-     */
     @Suppress("MagicNumber")
-    private suspend fun pushSyncData(syncData: SyncData, eTag: String) {
-        val backup = syncData.backup ?: return
+    private suspend fun pushSyncData(syncData: SyncData, eTag: String): Boolean {
+        val backup = syncData.backup ?: return false
 
         val host = syncPreferences.clientHost().get()
         val apiKey = syncPreferences.clientAPIKey().get()
@@ -158,20 +139,19 @@ class SyncYomiSyncService(
             body = body,
         )
 
-        val response = client.newCall(uploadRequest).await()
-
-        if (response.isSuccessful) {
+        client.newCall(uploadRequest).await().use { response ->
+            if (response.code == HttpStatus.SC_PRECONDITION_FAILED) {
+                logcat(LogPriority.DEBUG) { "Remote backup changed during sync; will try again on the next sync" }
+                return false
+            }
+            if (!response.isSuccessful) {
+                throw SyncYomiException("Failed to upload sync data: HTTP ${response.code}")
+            }
             val newETag = response.headers["ETag"]
                 .takeIf { it?.isNotEmpty() == true } ?: throw SyncYomiException("Missing ETag")
             syncPreferences.lastSyncEtag().set(newETag)
             logcat(LogPriority.DEBUG) { "SyncYomi sync completed" }
-        } else if (response.code == HttpStatus.SC_PRECONDITION_FAILED) {
-            // other clients updated remote data, will try next time
-            logcat(LogPriority.DEBUG) { "SyncYomi sync failed with 412" }
-        } else {
-            val responseBody = response.body.string()
-            notifier.showSyncError("Failed to upload sync data: $responseBody")
-            logcat(LogPriority.ERROR) { "SyncError: $responseBody" }
+            return true
         }
     }
 }
