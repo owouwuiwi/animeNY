@@ -80,9 +80,6 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet?) : BaseMPVView(
         }
     }
 
-    private val videoOutput: String
-        get() = if (decoderPreferences.gpuNext().get()) "gpu-next" else "gpu"
-
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         super.surfaceChanged(holder, format, width, height)
         // The surface is resized by folding, rotating and the tabletop split; Stretch has to follow it.
@@ -95,6 +92,9 @@ class AniyomiMPVView(context: Context, attributes: AttributeSet?) : BaseMPVView(
             mpv.command("seek", "0", "relative+exact")
         }
     }
+
+    private val videoOutput: String
+        get() = if (decoderPreferences.gpuNext().get()) "gpu-next" else "gpu"
 
     fun init(mpvInst: MPV) {
         this.mpv = mpvInst
