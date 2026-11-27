@@ -47,6 +47,7 @@ import eu.kanade.tachiyomi.data.sync.SyncDataJob
 import eu.kanade.tachiyomi.ui.browse.anime.source.globalsearch.GlobalAnimeSearchScreen
 import eu.kanade.tachiyomi.ui.category.CategoriesTab
 import eu.kanade.tachiyomi.ui.entries.anime.AnimeScreen
+import eu.kanade.tachiyomi.ui.entries.merge.CombinedEntriesScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
@@ -62,6 +63,7 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.domain.category.model.Category
 import tachiyomi.domain.entries.anime.model.Anime
+import tachiyomi.domain.entries.merge.model.MergeMedia
 import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.library.anime.LibraryAnime
 import tachiyomi.domain.library.anime.model.AnimeLibraryGroup
@@ -164,6 +166,15 @@ data object AnimeLibraryTab : Tab {
         }
         val defaultTitle = stringResource(AYMR.strings.label_anime_library)
 
+        fun openEntry(id: Long) {
+            val group = state.linkedRows[id]?.group
+            if (group != null) {
+                navigator.push(CombinedEntriesScreen(MergeMedia.Anime, group.metadata.sourceId, group.metadata.url))
+            } else {
+                navigator.push(AnimeScreen(id))
+            }
+        }
+
         Scaffold(
             topBar = { scrollBehavior ->
                 val title = state.getToolbarTitle(
@@ -193,7 +204,7 @@ data object AnimeLibraryTab : Tab {
                         scope.launch {
                             val randomItem = viewModel.getRandomAnimelibItemForCurrentCategory()
                             if (randomItem != null) {
-                                navigator.push(AnimeScreen(randomItem.libraryAnime.anime.id))
+                                openEntry(randomItem.id)
                             } else {
                                 snackbarHostState.showSnackbar(
                                     context.stringResource(MR.strings.information_no_entries_found),
@@ -220,10 +231,10 @@ data object AnimeLibraryTab : Tab {
                     onMarkAsViewedClicked = { viewModel.markSeenSelection(true) },
                     onMarkAsUnviewedClicked = { viewModel.markSeenSelection(false) },
                     onDownloadClicked = viewModel::runDownloadActionSelection
-                        .takeIf { state.selection.fastAll { !it.anime.isLocal() } },
+                        .takeIf { state.selection.fastAll { it.id in state.linkedRows || !it.anime.isLocal() } },
                     onDeleteClicked = viewModel::openDeleteAnimeDialog,
                     onMigrateClicked = {
-                        val selection = state.selection.map { it.anime.id }
+                        val selection = state.selectedEntries.map { it.id }
                         navigator.push(AnimeMigrationConfigScreen(selection))
                     },
                     onClickResetInfo = viewModel::resetInfo.takeIf { state.showResetInfo },
@@ -260,7 +271,7 @@ data object AnimeLibraryTab : Tab {
                         hasActiveFilters = state.hasActiveFilters,
                         showPageTabs = state.showCategoryTabs || !state.searchQuery.isNullOrEmpty(),
                         onChangeCurrentPage = { viewModel.activeCategoryIndex = it },
-                        onAnimeClicked = { navigator.push(AnimeScreen(it)) },
+                        onAnimeClicked = ::openEntry,
                         onContinueWatchingClicked = { it: LibraryAnime ->
                             scope.launchIO {
                                 val episode = viewModel.getNextUnseenEpisode(it.anime)

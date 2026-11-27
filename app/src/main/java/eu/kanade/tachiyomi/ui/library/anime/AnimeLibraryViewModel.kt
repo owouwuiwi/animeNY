@@ -34,6 +34,8 @@ import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadCache
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.track.TrackStatus
 import eu.kanade.tachiyomi.data.track.TrackerManager
+import eu.kanade.tachiyomi.ui.library.LibrarySearchAlias
+import eu.kanade.tachiyomi.ui.library.LinkedLibraryRow
 import eu.kanade.tachiyomi.util.episode.getNextUnseen
 import eu.kanade.tachiyomi.util.removeBackgrounds
 import eu.kanade.tachiyomi.util.removeCovers
@@ -74,6 +76,14 @@ import tachiyomi.domain.entries.anime.interactor.GetLibraryAnime
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.anime.model.AnimeUpdate
 import tachiyomi.domain.entries.applyFilter
+import tachiyomi.domain.entries.merge.interactor.MergedEntry
+import tachiyomi.domain.entries.merge.interactor.ObserveMergedEntry
+import tachiyomi.domain.entries.merge.model.EntryMerge
+import tachiyomi.domain.entries.merge.model.MergeEntryRef
+import tachiyomi.domain.entries.merge.model.MergeMedia
+import tachiyomi.domain.entries.merge.repository.EntryMergeRepository
+import tachiyomi.domain.entries.merge.service.observeLibraryLinks
+import tachiyomi.domain.entries.merge.service.projectLinkedLibrary
 import tachiyomi.domain.history.anime.interactor.GetNextEpisodes
 import tachiyomi.domain.items.episode.interactor.GetEpisodesByAnimeId
 import tachiyomi.domain.items.episode.model.Episode
@@ -104,6 +114,8 @@ typealias AnimeLibraryMap = Map<Category, List<AnimeLibraryItem>>
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 @Suppress("LargeClass")
 class AnimeLibraryViewModel(
+    entryMerges: EntryMergeRepository,
+    observeMergedEntry: ObserveMergedEntry,
     private val getLibraryAnime: GetLibraryAnime,
     private val getCategories: GetVisibleAnimeCategories,
     private val getTracksPerAnime: GetTracksPerAnime,
@@ -136,14 +148,18 @@ class AnimeLibraryViewModel(
         viewModelScope.launchIO {
             combine<
                 String?,
-                AnimeLibraryMap,
+                Pair<AnimeLibraryMap, Map<EntryMerge, MergedEntry<Anime, Episode>>>,
                 Map<Long, List<AnimeTrack>>,
                 Pair<Map<Long, TriState>, Unit>,
                 Pair<Int, AnimeLibrarySort>,
-                AnimeLibraryMap,
+                Pair<AnimeLibraryMap, Map<Long, LinkedLibraryRow<Anime, Episode>>>,
                 >(
                 state.map { it.searchQuery }.debounce(0.25.seconds),
-                getLibraryFlow(),
+                combine(
+                    getLibraryFlow(),
+                    entryMerges.observeLibraryLinks(MergeMedia.Anime, observeMergedEntry::anime),
+                    ::Pair,
+                ),
                 getTracksPerAnime.subscribe(),
                 combine<Map<Long, TriState>, Unit, Pair<Map<Long, TriState>, Unit>>(
                     getTrackingFilterFlow(),
@@ -157,11 +173,26 @@ class AnimeLibraryViewModel(
                     ::Pair,
                 ),
                 // SY <--
-            ) { searchQuery, library, tracks, (trackingFilter, _), (groupType, sort) ->
-                library
-                    // SY -->
-                    .applyGrouping(groupType)
-                    // SY <--
+            ) { searchQuery, (library, merges), tracks, (trackingFilter, _), (groupType, sort) ->
+                val grouped = library.applyGrouping(groupType)
+                val projected = if (merges.isEmpty()) {
+                    grouped
+                } else {
+                    val prefs = getAnimelibItemPreferencesFlow().first()
+                    projectLinkedLibrary(
+                        grouped,
+                        merges,
+                        { row ->
+                            row.anime.url.takeIf(String::isNotBlank)?.let { MergeEntryRef(row.anime.source, it) }
+                        },
+                    ) { category, representative, favorites, group, merged ->
+                        linkedLibraryItem(category, representative, favorites, group, merged, prefs)
+                    }
+                }
+                val linkedRows = projected.values.asSequence().flatten()
+                    .mapNotNull { row -> row.linked?.let { row.id to it } }
+                    .toMap()
+                val visible = projected
                     .applyFilters(tracks, trackingFilter)
                     .applySort(tracks, sort.takeIf { groupType != AnimeLibraryGroup.BY_DEFAULT }, trackingFilter.keys)
                     .mapValues { (_, value) ->
@@ -172,12 +203,14 @@ class AnimeLibraryViewModel(
                             value.filter { queryNode.matches(it) }
                         }
                     }
+                visible to linkedRows
             }
-                .collectLatest {
+                .collectLatest { (library, linkedRows) ->
                     state.update { state ->
                         state.copy(
                             isLoading = false,
-                            library = it,
+                            library = library,
+                            linkedRows = linkedRows,
                         )
                     }
                 }
@@ -271,7 +304,7 @@ class AnimeLibraryViewModel(
         }
 
         val filterFnCompleted: (AnimeLibraryItem) -> Boolean = {
-            applyFilter(filterCompleted) { it.libraryAnime.anime.status.toInt() == SAnime.COMPLETED }
+            applyFilter(filterCompleted) { it.displayAnime.status.toInt() == SAnime.COMPLETED }
         }
 
         val filterFnIntervalCustom: (AnimeLibraryItem) -> Boolean = {
@@ -285,9 +318,8 @@ class AnimeLibraryViewModel(
         val filterFnTracking: (AnimeLibraryItem) -> Boolean = tracking@{ item ->
             if (isNotLoggedInAnyTrack || trackFiltersIsIgnored) return@tracking true
 
-            val animeTracks = trackMap
-                .mapValues { entry -> entry.value.map { it.trackerId } }[item.libraryAnime.id]
-                .orEmpty()
+            val memberIds = item.linked?.snapshot?.members?.values?.map { it.id }.orEmpty().ifEmpty { listOf(item.id) }
+            val animeTracks = memberIds.flatMap { id -> trackMap[id].orEmpty().map { it.trackerId } }
 
             val isExcluded = excludedTracks.isNotEmpty() && animeTracks.fastAny { it in excludedTracks }
             val isIncluded = includedTracks.isEmpty() || animeTracks.fastAny { it in includedTracks }
@@ -314,7 +346,7 @@ class AnimeLibraryViewModel(
         loggedInTrackerIds: Set<Long>,
     ): AnimeLibraryMap {
         val sortAlphabetically: (AnimeLibraryItem, AnimeLibraryItem) -> Int = { i1, i2 ->
-            i1.libraryAnime.anime.title.lowercase().compareToWithCollator(i2.libraryAnime.anime.title.lowercase())
+            i1.displayAnime.title.lowercase().compareToWithCollator(i2.displayAnime.title.lowercase())
         }
 
         val defaultTrackerScoreSortValue = -1.0
@@ -518,6 +550,66 @@ class AnimeLibraryViewModel(
         }
     }
 
+    private suspend fun linkedLibraryItem(
+        category: Category,
+        representative: AnimeLibraryItem,
+        favorites: List<AnimeLibraryItem>,
+        group: EntryMerge,
+        merged: MergedEntry<Anime, Episode>,
+        prefs: ItemPreferences,
+    ): AnimeLibraryItem {
+        val metadata = merged.metadata ?: representative.anime
+        val source = sourceManager.getOrStub(metadata.source)
+        val parts = merged.parts.map { it.value }
+        val progress = representative.libraryAnime.copy(
+            category = category.id,
+            totalCount = parts.size.toLong(),
+            seenCount = parts.count { it.seen }.toLong(),
+            bookmarkCount = parts.count { it.bookmark }.toLong(),
+            fillermarkCount = parts.count { it.fillermark }.toLong(),
+            latestUpload = parts.maxOfOrNull { it.dateUpload } ?: 0L,
+            episodeFetchedAt = parts.maxOfOrNull { it.dateFetch } ?: 0L,
+            lastSeen = favorites.maxOf { it.libraryAnime.lastSeen },
+        )
+        val downloadCount = merged.parts.count { part ->
+            val owner = merged.members[part.member] ?: return@count false
+            isDownloaded(owner, part.value)
+        }
+        val linked = LinkedLibraryRow(
+            group = group,
+            snapshot = merged,
+            favoriteMembers = favorites.map { it.anime },
+            aliases = merged.members.values.map { member ->
+                val memberSource = sourceManager.getOrStub(member.source)
+                LibrarySearchAlias(member, memberSource.name.lowercase(), memberSource.lang)
+            },
+        )
+        return AnimeLibraryItem(
+            libraryAnime = progress,
+            downloadCount = downloadCount,
+            unseenCount = progress.unseenCount,
+            isLocal = merged.members.values.any { it.isLocal() },
+            sourceName = source.name.lowercase(),
+            sourceLanguage = source.lang,
+            badges = AnimeLibraryItem.Badges(
+                downloadCount = if (prefs.downloadBadge) downloadCount else 0,
+                unseenCount = if (prefs.unseenBadge) progress.unseenCount else 0L,
+                isLocal = prefs.localBadge && metadata.isLocal(),
+                sourceLanguage = if (prefs.languageBadge) source.lang else "",
+            ),
+            displayAnime = metadata,
+            linked = linked,
+        )
+    }
+
+    private fun isDownloaded(owner: Anime, part: Episode) = downloadManager.isEpisodeDownloaded(
+        part.name,
+        part.scanlator,
+        part.url,
+        owner.title,
+        owner.source,
+    )
+
     // SY -->
     private fun AnimeLibraryMap.applyGrouping(groupType: Int): AnimeLibraryMap {
         val items = when (groupType) {
@@ -581,6 +673,13 @@ class AnimeLibraryViewModel(
     }
 
     suspend fun getNextUnseenEpisode(anime: Anime): Episode? {
+        state.value.linkedRows[anime.id]?.let { linked ->
+            val downloadedOnly = preferences.downloadedOnly.get()
+            return linked.snapshot.parts.firstOrNull { part ->
+                val owner = linked.snapshot.members[part.member] ?: return@firstOrNull false
+                !part.value.seen && (!downloadedOnly || owner.isLocal() || isDownloaded(owner, part.value))
+            }?.value
+        }
         return getEpisodesByAnimeId.await(anime.id).getNextUnseen(anime, downloadManager)
     }
 
@@ -597,15 +696,40 @@ class AnimeLibraryViewModel(
     }
 
     fun runDownloadActionSelection(action: DownloadAction) {
-        val selection = state.value.selection
-        val animes = selection.map { it.anime }.toList()
-        when (action) {
-            DownloadAction.NEXT_1_ITEM -> downloadUnseenEpisodes(animes, 1)
-            DownloadAction.NEXT_5_ITEMS -> downloadUnseenEpisodes(animes, 5)
-            DownloadAction.NEXT_10_ITEMS -> downloadUnseenEpisodes(animes, 10)
-            DownloadAction.NEXT_25_ITEMS -> downloadUnseenEpisodes(animes, 25)
-            DownloadAction.UNVIEWED_ITEMS -> downloadUnseenEpisodes(animes, null)
-            DownloadAction.BOOKMARKED_ITEMS -> Unit
+        val snapshot = state.value
+        val amount = when (action) {
+            DownloadAction.NEXT_1_ITEM -> 1
+
+            DownloadAction.NEXT_5_ITEMS -> 5
+
+            DownloadAction.NEXT_10_ITEMS -> 10
+
+            DownloadAction.NEXT_25_ITEMS -> 25
+
+            DownloadAction.UNVIEWED_ITEMS -> null
+
+            DownloadAction.BOOKMARKED_ITEMS -> {
+                clearSelection()
+                return
+            }
+        }
+        downloadUnseenEpisodes(snapshot.selection.filterNot { it.id in snapshot.linkedRows }.map { it.anime }, amount)
+        viewModelScope.launchNonCancellable {
+            snapshot.selection.mapNotNull { snapshot.linkedRows[it.id] }.forEach { linked ->
+                val episodes = linked.snapshot.parts.asSequence().mapNotNull { part ->
+                    val owner = linked.snapshot.members[part.member] ?: return@mapNotNull null
+                    if (owner.isLocal() || part.value.seen || isDownloaded(owner, part.value) ||
+                        downloadManager.getQueuedDownloadOrNull(part.partId) != null
+                    ) {
+                        return@mapNotNull null
+                    }
+                    owner to part.value
+                }
+                val pending = if (amount == null) episodes else episodes.take(amount)
+                pending.groupBy({ it.first }, { it.second }).forEach { (owner, items) ->
+                    downloadManager.downloadEpisodes(owner, items)
+                }
+            }
         }
         clearSelection()
     }
@@ -638,7 +762,7 @@ class AnimeLibraryViewModel(
     }
 
     fun resetInfo() {
-        state.value.selection.fastForEach { (anime) ->
+        state.value.selectedEntries.fastForEach { anime ->
             val animeInfo = AnimeUpdate(
                 id = anime.id,
                 title = null,
@@ -660,13 +784,16 @@ class AnimeLibraryViewModel(
      * Marks animes' episodes seen status.
      */
     fun markSeenSelection(seen: Boolean) {
-        val animes = state.value.selection.toList()
+        val snapshot = state.value
         viewModelScope.launchNonCancellable {
-            animes.forEach { anime ->
-                setSeenStatus.await(
-                    anime = anime.anime,
-                    seen = seen,
-                )
+            snapshot.selection.forEach { row ->
+                val linked = snapshot.linkedRows[row.id]
+                if (linked == null) {
+                    setSeenStatus.await(anime = row.anime, seen = seen)
+                } else {
+                    val parts = linked.snapshot.parts.map { it.value }.toTypedArray()
+                    setSeenStatus.await(seen = seen, episodes = parts)
+                }
             }
         }
         clearSelection()
@@ -791,8 +918,12 @@ class AnimeLibraryViewModel(
 
                 val items = state.getAnimelibItemsByCategoryId(anime.category)
                     ?.fastMap { it.libraryAnime }.orEmpty()
-                val lastAnimeIndex = items.indexOf(lastSelected)
-                val curAnimeIndex = items.indexOf(anime)
+                val lastAnimeIndex = items.indexOfFirst { it.id == lastSelected.id }
+                val curAnimeIndex = items.indexOfFirst { it.id == anime.id }
+                if (lastAnimeIndex < 0 || curAnimeIndex < 0) {
+                    if (list.none { it.id == anime.id }) list.add(anime)
+                    return@mutate
+                }
 
                 val selectedIds = list.fastMap { it.id }
                 val selectionRange = when {
@@ -849,7 +980,7 @@ class AnimeLibraryViewModel(
     fun openChangeCategoryDialog() {
         viewModelScope.launchIO {
             // Create a copy of selected anime
-            val animeList = state.value.selection.map { it.anime }
+            val animeList = state.value.selectedEntries
 
             // Hide the default category because it has a different behavior than the ones from db.
             val categories = state.value.categories.filter { it.id != 0L }
@@ -872,7 +1003,7 @@ class AnimeLibraryViewModel(
     }
 
     fun openDeleteAnimeDialog() {
-        val nimeList = state.value.selection.map { it.anime }
+        val nimeList = state.value.selectedEntries
         state.update { it.copy(dialog = Dialog.DeleteAnime(nimeList)) }
     }
 
@@ -1029,6 +1160,7 @@ class AnimeLibraryViewModel(
     data class State(
         val isLoading: Boolean = true,
         val library: AnimeLibraryMap = emptyMap(),
+        val linkedRows: Map<Long, LinkedLibraryRow<Anime, Episode>> = emptyMap(),
         val searchQuery: String? = null,
         val selection: PersistentList<LibraryAnime> = persistentListOf(),
         val hasActiveFilters: Boolean = false,
@@ -1051,10 +1183,14 @@ class AnimeLibraryViewModel(
 
         val selectionMode = selection.isNotEmpty()
 
+        val selectedEntries: List<Anime>
+            get() = selection.flatMap { item -> linkedRows[item.id]?.favoriteMembers ?: listOf(item.anime) }
+                .distinctBy { it.id }
+
         val categories = library.keys.toList()
 
         val showResetInfo: Boolean by lazy {
-            selection.fastAny { (anime) ->
+            selectedEntries.fastAny { anime ->
                 anime.title != anime.ogTitle ||
                     anime.author != anime.ogAuthor ||
                     anime.artist != anime.ogArtist ||

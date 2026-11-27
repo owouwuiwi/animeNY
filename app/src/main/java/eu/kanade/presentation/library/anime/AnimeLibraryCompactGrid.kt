@@ -40,7 +40,7 @@ fun AnimeLibraryCompactGrid(
             items = items,
             contentType = { "anime_library_compact_grid_item" },
         ) { libraryItem ->
-            val anime = libraryItem.libraryAnime.anime
+            val anime = libraryItem.displayAnime
             EntryCompactGridItem(
                 isSelected = selection.fastAny { it.id == libraryItem.libraryAnime.id },
                 title = anime.title.takeIf { showTitle },

@@ -50,7 +50,7 @@ internal fun MangaLibraryList(
             items = items,
             contentType = { "manga_library_list_item" },
         ) { libraryItem ->
-            val manga = libraryItem.libraryManga.manga
+            val manga = libraryItem.displayManga
             EntryListItem(
                 isSelected = selection.fastAny { it.id == libraryItem.libraryManga.id },
                 title = manga.title,

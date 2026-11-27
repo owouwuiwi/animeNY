@@ -1,5 +1,6 @@
 package mihon.feature.library
 
+import eu.kanade.tachiyomi.ui.library.LibrarySearchAlias
 import eu.kanade.tachiyomi.ui.library.anime.AnimeLibraryItem
 import eu.kanade.tachiyomi.ui.library.manga.MangaLibraryItem
 import kotlinx.datetime.LocalDate
@@ -16,6 +17,8 @@ import mihon.domain.library.model.search.MangaField
 import mihon.domain.library.model.search.NotNode
 import mihon.domain.library.model.search.OrNode
 import mihon.domain.library.model.search.QueryNode
+import tachiyomi.domain.entries.anime.model.Anime
+import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.source.local.LocalSource
 import tachiyomi.source.local.entries.anime.LocalAnimeSource
 import kotlin.math.abs
@@ -51,8 +54,11 @@ private fun compareDates(comparator: Comparator, timestamp: Long, value: String)
     return comparator.apply(date, inputDate)
 }
 
-private fun GeneralQueryNode.matches(item: MangaLibraryItem): Boolean {
-    val manga = item.libraryManga.manga
+private fun GeneralQueryNode.matches(item: MangaLibraryItem): Boolean =
+    item.searchAliases.any { matchesMangaAlias(it) } != negated
+
+private fun GeneralQueryNode.matchesMangaAlias(alias: LibrarySearchAlias<Manga>): Boolean {
+    val manga = alias.entry
 
     // Use when so each added field has to be handled explicitly
     val match = MangaField.entries.any { field ->
@@ -70,12 +76,12 @@ private fun GeneralQueryNode.matches(item: MangaLibraryItem): Boolean {
             MangaField.GENRE -> manga.genre?.any { g -> g.contains(value, ignoreCase = true) } ?: false
 
             MangaField.SOURCE -> {
-                val fullSourceName = if (item.sourceLanguage.isNotBlank()) {
-                    "${item.sourceName} (${item.sourceLanguage})"
+                val fullSourceName = if (alias.sourceLanguage.isNotBlank()) {
+                    "${alias.sourceName} (${alias.sourceLanguage})"
                 } else {
-                    item.sourceName
+                    alias.sourceName
                 }
-                item.sourceName.contains(value, ignoreCase = true) ||
+                alias.sourceName.contains(value, ignoreCase = true) ||
                     fullSourceName.contains(value, ignoreCase = true) ||
                     (value.equals("local", ignoreCase = true) && manga.source == LocalSource.ID)
             }
@@ -86,11 +92,14 @@ private fun GeneralQueryNode.matches(item: MangaLibraryItem): Boolean {
             MangaField.LANGUAGE, MangaField.SOURCE_ID -> error("How did we get here?")
         }
     }
-    return if (negated) !match else match
+    return match
 }
 
-private fun GeneralQueryNode.matches(item: AnimeLibraryItem): Boolean {
-    val anime = item.libraryAnime.anime
+private fun GeneralQueryNode.matches(item: AnimeLibraryItem): Boolean =
+    item.searchAliases.any { matchesAnimeAlias(it) } != negated
+
+private fun GeneralQueryNode.matchesAnimeAlias(alias: LibrarySearchAlias<Anime>): Boolean {
+    val anime = alias.entry
 
     // Use when so each added field has to be handled explicitly
     val match = MangaField.entries.any { field ->
@@ -108,12 +117,12 @@ private fun GeneralQueryNode.matches(item: AnimeLibraryItem): Boolean {
             MangaField.GENRE -> anime.genre?.any { g -> g.contains(value, ignoreCase = true) } ?: false
 
             MangaField.SOURCE -> {
-                val fullSourceName = if (item.sourceLanguage.isNotBlank()) {
-                    "${item.sourceName} (${item.sourceLanguage})"
+                val fullSourceName = if (alias.sourceLanguage.isNotBlank()) {
+                    "${alias.sourceName} (${alias.sourceLanguage})"
                 } else {
-                    item.sourceName
+                    alias.sourceName
                 }
-                item.sourceName.contains(value, ignoreCase = true) ||
+                alias.sourceName.contains(value, ignoreCase = true) ||
                     fullSourceName.contains(value, ignoreCase = true) ||
                     (value.equals("local", ignoreCase = true) && anime.source == LocalAnimeSource.ID)
             }
@@ -124,11 +133,14 @@ private fun GeneralQueryNode.matches(item: AnimeLibraryItem): Boolean {
             MangaField.LANGUAGE, MangaField.SOURCE_ID -> error("How did we get here?")
         }
     }
-    return if (negated) !match else match
+    return match
 }
 
-private fun FieldQueryNode.matches(item: MangaLibraryItem): Boolean {
-    val manga = item.libraryManga.manga
+private fun FieldQueryNode.matches(item: MangaLibraryItem): Boolean =
+    item.searchAliases.any { matchesMangaAlias(it) } != negated
+
+private fun FieldQueryNode.matchesMangaAlias(alias: LibrarySearchAlias<Manga>): Boolean {
+    val manga = alias.entry
 
     val match = when (field) {
         MangaField.GENRE -> {
@@ -141,14 +153,14 @@ private fun FieldQueryNode.matches(item: MangaLibraryItem): Boolean {
 
         MangaField.SOURCE -> {
             if (value.isEmpty()) {
-                item.sourceName.isEmpty()
+                alias.sourceName.isEmpty()
             } else {
-                val fullSourceName = if (item.sourceLanguage.isNotBlank()) {
-                    "${item.sourceName} (${item.sourceLanguage})"
+                val fullSourceName = if (alias.sourceLanguage.isNotBlank()) {
+                    "${alias.sourceName} (${alias.sourceLanguage})"
                 } else {
-                    item.sourceName
+                    alias.sourceName
                 }
-                item.sourceName.contains(value, ignoreCase = true) ||
+                alias.sourceName.contains(value, ignoreCase = true) ||
                     fullSourceName.contains(value, ignoreCase = true) ||
                     (value.equals("local", ignoreCase = true) && manga.source == LocalSource.ID)
             }
@@ -170,7 +182,7 @@ private fun FieldQueryNode.matches(item: MangaLibraryItem): Boolean {
 
                 MangaField.NOTES -> manga.notes
 
-                MangaField.LANGUAGE -> item.sourceLanguage
+                MangaField.LANGUAGE -> alias.sourceLanguage
 
                 // unreachable; added here to make `when` exhaustive
                 MangaField.GENRE, MangaField.SOURCE, MangaField.SOURCE_ID -> error("How did we get here?")
@@ -184,11 +196,14 @@ private fun FieldQueryNode.matches(item: MangaLibraryItem): Boolean {
         }
     }
 
-    return if (negated) !match else match
+    return match
 }
 
-private fun FieldQueryNode.matches(item: AnimeLibraryItem): Boolean {
-    val anime = item.libraryAnime.anime
+private fun FieldQueryNode.matches(item: AnimeLibraryItem): Boolean =
+    item.searchAliases.any { matchesAnimeAlias(it) } != negated
+
+private fun FieldQueryNode.matchesAnimeAlias(alias: LibrarySearchAlias<Anime>): Boolean {
+    val anime = alias.entry
 
     val match = when (field) {
         MangaField.GENRE -> {
@@ -201,14 +216,14 @@ private fun FieldQueryNode.matches(item: AnimeLibraryItem): Boolean {
 
         MangaField.SOURCE -> {
             if (value.isEmpty()) {
-                item.sourceName.isEmpty()
+                alias.sourceName.isEmpty()
             } else {
-                val fullSourceName = if (item.sourceLanguage.isNotBlank()) {
-                    "${item.sourceName} (${item.sourceLanguage})"
+                val fullSourceName = if (alias.sourceLanguage.isNotBlank()) {
+                    "${alias.sourceName} (${alias.sourceLanguage})"
                 } else {
-                    item.sourceName
+                    alias.sourceName
                 }
-                item.sourceName.contains(value, ignoreCase = true) ||
+                alias.sourceName.contains(value, ignoreCase = true) ||
                     fullSourceName.contains(value, ignoreCase = true) ||
                     (value.equals("local", ignoreCase = true) && anime.source == LocalAnimeSource.ID)
             }
@@ -230,7 +245,7 @@ private fun FieldQueryNode.matches(item: AnimeLibraryItem): Boolean {
 
                 MangaField.NOTES -> anime.notes
 
-                MangaField.LANGUAGE -> item.sourceLanguage
+                MangaField.LANGUAGE -> alias.sourceLanguage
 
                 // unreachable; added here to make `when` exhaustive
                 MangaField.GENRE, MangaField.SOURCE, MangaField.SOURCE_ID -> error("How did we get here?")
@@ -244,7 +259,7 @@ private fun FieldQueryNode.matches(item: AnimeLibraryItem): Boolean {
         }
     }
 
-    return if (negated) !match else match
+    return match
 }
 
 private fun ComparisonQueryNode.matches(item: MangaLibraryItem): Boolean {

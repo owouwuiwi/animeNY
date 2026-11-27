@@ -45,6 +45,7 @@ import eu.kanade.tachiyomi.data.sync.SyncDataJob
 import eu.kanade.tachiyomi.ui.browse.manga.source.globalsearch.GlobalMangaSearchScreen
 import eu.kanade.tachiyomi.ui.category.CategoriesTab
 import eu.kanade.tachiyomi.ui.entries.manga.MangaScreen
+import eu.kanade.tachiyomi.ui.entries.merge.CombinedEntriesScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
@@ -60,6 +61,7 @@ import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.domain.category.model.Category
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.entries.merge.model.MergeMedia
 import tachiyomi.domain.library.manga.LibraryManga
 import tachiyomi.domain.library.manga.model.MangaLibraryGroup
 import tachiyomi.i18n.MR
@@ -154,6 +156,15 @@ data object MangaLibraryTab : Tab {
 
         val defaultTitle = stringResource(AYMR.strings.label_manga_library)
 
+        fun openEntry(id: Long) {
+            val group = state.linkedRows[id]?.group
+            if (group != null) {
+                navigator.push(CombinedEntriesScreen(MergeMedia.Manga, group.metadata.sourceId, group.metadata.url))
+            } else {
+                navigator.push(MangaScreen(id))
+            }
+        }
+
         Scaffold(
             topBar = { scrollBehavior ->
                 val title = state.getToolbarTitle(
@@ -182,7 +193,7 @@ data object MangaLibraryTab : Tab {
                         scope.launch {
                             val randomItem = viewModel.getRandomLibraryItemForCurrentCategory()
                             if (randomItem != null) {
-                                navigator.push(MangaScreen(randomItem.libraryManga.manga.id))
+                                openEntry(randomItem.id)
                             } else {
                                 snackbarHostState.showSnackbar(
                                     context.stringResource(MR.strings.information_no_entries_found),
@@ -210,10 +221,10 @@ data object MangaLibraryTab : Tab {
                     onMarkAsViewedClicked = { viewModel.markReadSelection(true) },
                     onMarkAsUnviewedClicked = { viewModel.markReadSelection(false) },
                     onDownloadClicked = viewModel::runDownloadActionSelection
-                        .takeIf { state.selection.fastAll { !it.manga.isLocal() } },
+                        .takeIf { state.selection.fastAll { it.id in state.linkedRows || !it.manga.isLocal() } },
                     onDeleteClicked = viewModel::openDeleteMangaDialog,
                     onMigrateClicked = {
-                        val selection = state.selection.map { it.manga.id }
+                        val selection = state.selectedEntries.map { it.id }
                         navigator.push(MangaMigrationConfigScreen(selection))
                     },
                     // SY -->
@@ -252,7 +263,7 @@ data object MangaLibraryTab : Tab {
                         hasActiveFilters = state.hasActiveFilters,
                         showPageTabs = state.showCategoryTabs || !state.searchQuery.isNullOrEmpty(),
                         onChangeCurrentPage = { viewModel.activeCategoryIndex = it },
-                        onMangaClicked = { navigator.push(MangaScreen(it)) },
+                        onMangaClicked = ::openEntry,
                         onContinueReadingClicked = { it: LibraryManga ->
                             scope.launchIO {
                                 val chapter = viewModel.getNextUnreadChapter(it.manga)

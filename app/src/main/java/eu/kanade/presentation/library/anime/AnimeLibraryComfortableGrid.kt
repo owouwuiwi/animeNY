@@ -39,7 +39,7 @@ internal fun AnimeLibraryComfortableGrid(
             items = items,
             contentType = { "anime_library_comfortable_grid_item" },
         ) { libraryItem ->
-            val anime = libraryItem.libraryAnime.anime
+            val anime = libraryItem.displayAnime
             EntryComfortableGridItem(
                 isSelected = selection.fastAny { it.id == libraryItem.libraryAnime.id },
                 title = anime.title,

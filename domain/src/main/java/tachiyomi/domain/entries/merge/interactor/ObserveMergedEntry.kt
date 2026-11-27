@@ -75,7 +75,14 @@ class ObserveMergedEntry(
         val resolved = members.associateBy { it.reference }
         val metadata = resolved[merge.metadata]?.entry
         val parts = projectMergedParts(merge, resolved.mapValues { it.value.parts })
-        return MergedEntry(metadata, parts, merge.members.filterNot(resolved::containsKey))
+        return MergedEntry(
+            metadata,
+            parts,
+            merge.members.filterNot(resolved::containsKey),
+            resolved.mapValues {
+                it.value.entry
+            },
+        )
     }
 
     private data class ResolvedMember<E, T>(
@@ -89,4 +96,5 @@ data class MergedEntry<E, T>(
     val metadata: E?,
     val parts: List<MergedPart<T>>,
     val unavailableMembers: List<MergeEntryRef>,
+    val members: Map<MergeEntryRef, E>,
 )

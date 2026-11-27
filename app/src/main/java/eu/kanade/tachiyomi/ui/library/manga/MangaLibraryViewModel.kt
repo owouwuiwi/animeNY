@@ -33,6 +33,8 @@ import eu.kanade.tachiyomi.data.track.TrackStatus
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
+import eu.kanade.tachiyomi.ui.library.LibrarySearchAlias
+import eu.kanade.tachiyomi.ui.library.LinkedLibraryRow
 import eu.kanade.tachiyomi.util.chapter.getNextUnread
 import eu.kanade.tachiyomi.util.removeCovers
 import kotlinx.collections.immutable.ImmutableList
@@ -73,6 +75,14 @@ import tachiyomi.domain.entries.manga.interactor.GetLibraryManga
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.entries.manga.model.MangaRemoteUpdate
 import tachiyomi.domain.entries.manga.model.MangaUpdate
+import tachiyomi.domain.entries.merge.interactor.MergedEntry
+import tachiyomi.domain.entries.merge.interactor.ObserveMergedEntry
+import tachiyomi.domain.entries.merge.model.EntryMerge
+import tachiyomi.domain.entries.merge.model.MergeEntryRef
+import tachiyomi.domain.entries.merge.model.MergeMedia
+import tachiyomi.domain.entries.merge.repository.EntryMergeRepository
+import tachiyomi.domain.entries.merge.service.observeLibraryLinks
+import tachiyomi.domain.entries.merge.service.projectLinkedLibrary
 import tachiyomi.domain.history.manga.interactor.GetNextChapters
 import tachiyomi.domain.items.chapter.interactor.GetChaptersByMangaId
 import tachiyomi.domain.items.chapter.model.Chapter
@@ -103,6 +113,8 @@ typealias MangaLibraryMap = Map<Category, List<MangaLibraryItem>>
 @ContributesIntoMap(AppScope::class, binding = binding<ViewModel>())
 @Suppress("LargeClass")
 class MangaLibraryViewModel(
+    entryMerges: EntryMergeRepository,
+    observeMergedEntry: ObserveMergedEntry,
     private val getLibraryManga: GetLibraryManga,
     private val getCategories: GetVisibleMangaCategories,
     private val getTracksPerManga: GetTracksPerManga,
@@ -134,7 +146,11 @@ class MangaLibraryViewModel(
         viewModelScope.launchIO {
             combine(
                 state.map { it.searchQuery }.debounce(0.25.seconds),
-                getLibraryFlow(),
+                combine(
+                    getLibraryFlow(),
+                    entryMerges.observeLibraryLinks(MergeMedia.Manga, observeMergedEntry::manga),
+                    ::Pair,
+                ),
                 getTracksPerManga.subscribe(),
                 combine(
                     getTrackingFilterFlow(),
@@ -148,11 +164,26 @@ class MangaLibraryViewModel(
                     ::Pair,
                 ),
                 // SY <--
-            ) { searchQuery, library, tracks, (trackingFilter, _), (groupType, sort) ->
-                library
-                    // SY -->
-                    .applyGrouping(groupType)
-                    // SY <--
+            ) { searchQuery, (library, merges), tracks, (trackingFilter, _), (groupType, sort) ->
+                val grouped = library.applyGrouping(groupType)
+                val projected = if (merges.isEmpty()) {
+                    grouped
+                } else {
+                    val prefs = getLibraryItemPreferencesFlow().first()
+                    projectLinkedLibrary(
+                        grouped,
+                        merges,
+                        { row ->
+                            row.manga.url.takeIf(String::isNotBlank)?.let { MergeEntryRef(row.manga.source, it) }
+                        },
+                    ) { category, representative, favorites, group, merged ->
+                        linkedLibraryItem(category, representative, favorites, group, merged, prefs)
+                    }
+                }
+                val linkedRows = projected.values.asSequence().flatten()
+                    .mapNotNull { row -> row.linked?.let { row.id to it } }
+                    .toMap()
+                val visible = projected
                     .applyFilters(tracks, trackingFilter)
                     .applySort(tracks, sort.takeIf { groupType != MangaLibraryGroup.BY_DEFAULT }, trackingFilter.keys)
                     .mapValues { (_, value) ->
@@ -163,12 +194,14 @@ class MangaLibraryViewModel(
                             value.filter { queryNode.matches(it) }
                         }
                     }
+                visible to linkedRows
             }
-                .collectLatest {
+                .collectLatest { (library, linkedRows) ->
                     state.update { state ->
                         state.copy(
                             isLoading = false,
-                            library = it,
+                            library = library,
+                            linkedRows = linkedRows,
                         )
                     }
                 }
@@ -262,7 +295,7 @@ class MangaLibraryViewModel(
         }
 
         val filterFnCompleted: (MangaLibraryItem) -> Boolean = {
-            applyFilter(filterCompleted) { it.libraryManga.manga.status.toInt() == SManga.COMPLETED }
+            applyFilter(filterCompleted) { it.displayManga.status.toInt() == SManga.COMPLETED }
         }
 
         val filterFnIntervalCustom: (MangaLibraryItem) -> Boolean = {
@@ -276,9 +309,8 @@ class MangaLibraryViewModel(
         val filterFnTracking: (MangaLibraryItem) -> Boolean = tracking@{ item ->
             if (isNotLoggedInAnyTrack || trackFiltersIsIgnored) return@tracking true
 
-            val mangaTracks = trackMap
-                .mapValues { entry -> entry.value.map { it.trackerId } }[item.libraryManga.id]
-                .orEmpty()
+            val memberIds = item.linked?.snapshot?.members?.values?.map { it.id }.orEmpty().ifEmpty { listOf(item.id) }
+            val mangaTracks = memberIds.flatMap { id -> trackMap[id].orEmpty().map { it.trackerId } }
 
             val isExcluded = excludedTracks.isNotEmpty() && mangaTracks.fastAny { it in excludedTracks }
             val isIncluded = includedTracks.isEmpty() || mangaTracks.fastAny { it in includedTracks }
@@ -305,7 +337,7 @@ class MangaLibraryViewModel(
         loggedInTrackerIds: Set<Long>,
     ): MangaLibraryMap {
         val sortAlphabetically: (MangaLibraryItem, MangaLibraryItem) -> Int = { i1, i2 ->
-            i1.libraryManga.manga.title.lowercase().compareToWithCollator(i2.libraryManga.manga.title.lowercase())
+            i1.displayManga.title.lowercase().compareToWithCollator(i2.displayManga.title.lowercase())
         }
 
         val defaultTrackerScoreSortValue = -1.0
@@ -488,6 +520,65 @@ class MangaLibraryViewModel(
         }
     }
 
+    private suspend fun linkedLibraryItem(
+        category: Category,
+        representative: MangaLibraryItem,
+        favorites: List<MangaLibraryItem>,
+        group: EntryMerge,
+        merged: MergedEntry<Manga, Chapter>,
+        prefs: ItemPreferences,
+    ): MangaLibraryItem {
+        val metadata = merged.metadata ?: representative.manga
+        val source = sourceManager.getOrStub(metadata.source)
+        val parts = merged.parts.map { it.value }
+        val progress = representative.libraryManga.copy(
+            category = category.id,
+            totalChapters = parts.size.toLong(),
+            readCount = parts.count { it.read }.toLong(),
+            bookmarkCount = parts.count { it.bookmark }.toLong(),
+            latestUpload = parts.maxOfOrNull { it.dateUpload } ?: 0L,
+            chapterFetchedAt = parts.maxOfOrNull { it.dateFetch } ?: 0L,
+            lastRead = favorites.maxOf { it.libraryManga.lastRead },
+        )
+        val downloadCount = merged.parts.count { part ->
+            val owner = merged.members[part.member] ?: return@count false
+            isDownloaded(owner, part.value)
+        }
+        val linked = LinkedLibraryRow(
+            group = group,
+            snapshot = merged,
+            favoriteMembers = favorites.map { it.manga },
+            aliases = merged.members.values.map { member ->
+                val memberSource = sourceManager.getOrStub(member.source)
+                LibrarySearchAlias(member, memberSource.name.lowercase(), memberSource.lang)
+            },
+        )
+        return MangaLibraryItem(
+            libraryManga = progress,
+            downloadCount = downloadCount,
+            unreadCount = progress.unreadCount,
+            isLocal = merged.members.values.any { it.isLocal() },
+            sourceName = source.name.lowercase(),
+            sourceLanguage = source.lang,
+            badges = MangaLibraryItem.Badges(
+                downloadCount = if (prefs.downloadBadge) downloadCount else 0,
+                unreadCount = if (prefs.unreadBadge) progress.unreadCount else 0L,
+                isLocal = prefs.localBadge && metadata.isLocal(),
+                sourceLanguage = if (prefs.languageBadge) source.lang else "",
+            ),
+            displayManga = metadata,
+            linked = linked,
+        )
+    }
+
+    private fun isDownloaded(owner: Manga, part: Chapter) = downloadManager.isChapterDownloaded(
+        part.name,
+        part.scanlator,
+        part.url,
+        owner.title,
+        owner.source,
+    )
+
     // SY -->
     private fun MangaLibraryMap.applyGrouping(groupType: Int): MangaLibraryMap {
         val items = when (groupType) {
@@ -551,6 +642,13 @@ class MangaLibraryViewModel(
     }
 
     suspend fun getNextUnreadChapter(manga: Manga): Chapter? {
+        state.value.linkedRows[manga.id]?.let { linked ->
+            val downloadedOnly = preferences.downloadedOnly.get()
+            return linked.snapshot.parts.firstOrNull { part ->
+                val owner = linked.snapshot.members[part.member] ?: return@firstOrNull false
+                !part.value.read && (!downloadedOnly || owner.isLocal() || isDownloaded(owner, part.value))
+            }?.value
+        }
         return getChaptersByMangaId.await(manga.id, applyScanlatorFilter = true).getNextUnread(manga, downloadManager)
     }
 
@@ -567,15 +665,40 @@ class MangaLibraryViewModel(
     }
 
     fun runDownloadActionSelection(action: DownloadAction) {
-        val selection = state.value.selection
-        val mangas = selection.map { it.manga }.toList()
-        when (action) {
-            DownloadAction.NEXT_1_ITEM -> downloadUnreadChapters(mangas, 1)
-            DownloadAction.NEXT_5_ITEMS -> downloadUnreadChapters(mangas, 5)
-            DownloadAction.NEXT_10_ITEMS -> downloadUnreadChapters(mangas, 10)
-            DownloadAction.NEXT_25_ITEMS -> downloadUnreadChapters(mangas, 25)
-            DownloadAction.UNVIEWED_ITEMS -> downloadUnreadChapters(mangas, null)
-            DownloadAction.BOOKMARKED_ITEMS -> Unit
+        val snapshot = state.value
+        val amount = when (action) {
+            DownloadAction.NEXT_1_ITEM -> 1
+
+            DownloadAction.NEXT_5_ITEMS -> 5
+
+            DownloadAction.NEXT_10_ITEMS -> 10
+
+            DownloadAction.NEXT_25_ITEMS -> 25
+
+            DownloadAction.UNVIEWED_ITEMS -> null
+
+            DownloadAction.BOOKMARKED_ITEMS -> {
+                clearSelection()
+                return
+            }
+        }
+        downloadUnreadChapters(snapshot.selection.filterNot { it.id in snapshot.linkedRows }.map { it.manga }, amount)
+        viewModelScope.launchNonCancellable {
+            snapshot.selection.mapNotNull { snapshot.linkedRows[it.id] }.forEach { linked ->
+                val chapters = linked.snapshot.parts.asSequence().mapNotNull { part ->
+                    val owner = linked.snapshot.members[part.member] ?: return@mapNotNull null
+                    if (owner.isLocal() || part.value.read || isDownloaded(owner, part.value) ||
+                        downloadManager.getQueuedDownloadOrNull(part.partId) != null
+                    ) {
+                        return@mapNotNull null
+                    }
+                    owner to part.value
+                }
+                val pending = if (amount == null) chapters else chapters.take(amount)
+                pending.groupBy({ it.first }, { it.second }).forEach { (owner, items) ->
+                    downloadManager.downloadChapters(owner, items)
+                }
+            }
         }
         clearSelection()
     }
@@ -611,13 +734,16 @@ class MangaLibraryViewModel(
      * Marks mangas' chapters read status.
      */
     fun markReadSelection(read: Boolean) {
-        val mangas = state.value.selection.toList()
+        val snapshot = state.value
         viewModelScope.launchNonCancellable {
-            mangas.forEach { manga ->
-                setReadStatus.await(
-                    manga = manga.manga,
-                    read = read,
-                )
+            snapshot.selection.forEach { row ->
+                val linked = snapshot.linkedRows[row.id]
+                if (linked == null) {
+                    setReadStatus.await(manga = row.manga, read = read)
+                } else {
+                    val parts = linked.snapshot.parts.map { it.value }.toTypedArray()
+                    setReadStatus.await(read = read, chapters = parts)
+                }
             }
         }
         clearSelection()
@@ -625,7 +751,7 @@ class MangaLibraryViewModel(
 
 // SY -->
     fun resetInfo() {
-        state.value.selection.fastForEach { (manga) ->
+        state.value.selectedEntries.fastForEach { manga ->
             val mangaInfo = MangaRemoteUpdate(
                 id = manga.id,
                 title = null,
@@ -766,8 +892,12 @@ class MangaLibraryViewModel(
 
                 val items = state.getLibraryItemsByCategoryId(manga.category)
                     ?.fastMap { it.libraryManga }.orEmpty()
-                val lastMangaIndex = items.indexOf(lastSelected)
-                val curMangaIndex = items.indexOf(manga)
+                val lastMangaIndex = items.indexOfFirst { it.id == lastSelected.id }
+                val curMangaIndex = items.indexOfFirst { it.id == manga.id }
+                if (lastMangaIndex < 0 || curMangaIndex < 0) {
+                    if (list.none { it.id == manga.id }) list.add(manga)
+                    return@mutate
+                }
 
                 val selectedIds = list.fastMap { it.id }
                 val selectionRange = when {
@@ -824,7 +954,7 @@ class MangaLibraryViewModel(
     fun openChangeCategoryDialog() {
         viewModelScope.launchIO {
             // Create a copy of selected manga
-            val mangaList = state.value.selection.map { it.manga }
+            val mangaList = state.value.selectedEntries
 
             // Hide the default category because it has a different behavior than the ones from db.
             val categories = state.value.categories.filter { it.id != 0L }
@@ -847,7 +977,7 @@ class MangaLibraryViewModel(
     }
 
     fun openDeleteMangaDialog() {
-        val mangaList = state.value.selection.map { it.manga }
+        val mangaList = state.value.selectedEntries
         state.update { it.copy(dialog = Dialog.DeleteManga(mangaList)) }
     }
 
@@ -1007,6 +1137,7 @@ class MangaLibraryViewModel(
     data class State(
         val isLoading: Boolean = true,
         val library: MangaLibraryMap = emptyMap(),
+        val linkedRows: Map<Long, LinkedLibraryRow<Manga, Chapter>> = emptyMap(),
         val searchQuery: String? = null,
         val selection: PersistentList<LibraryManga> = persistentListOf(),
         val hasActiveFilters: Boolean = false,
@@ -1029,11 +1160,15 @@ class MangaLibraryViewModel(
 
         val selectionMode = selection.isNotEmpty()
 
+        val selectedEntries: List<Manga>
+            get() = selection.flatMap { item -> linkedRows[item.id]?.favoriteMembers ?: listOf(item.manga) }
+                .distinctBy { it.id }
+
         val categories = library.keys.toList()
 
         // SY -->
         val showResetInfo: Boolean by lazy {
-            selection.fastAny { (manga) ->
+            selectedEntries.fastAny { manga ->
                 manga.title != manga.ogTitle ||
                     manga.author != manga.ogAuthor ||
                     manga.artist != manga.ogArtist ||
