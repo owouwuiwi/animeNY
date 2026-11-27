@@ -550,6 +550,7 @@
     <string name="upcoming_week_next">Next week</string>
     <string name="upcoming_empty_period">No upcoming entries for these dates.</string>
     <string name="upcoming_confirmed_airing_only">Confirmed airing times only</string>
+    <string name="next_episode_airing_countdown">Airing in %s</string>
     <string name="anilist_recommendations">AniList recommendations</string>
     <string name="anilist_recommendations_needs_link">Link this title to AniList or MyAnimeList in Tracking to see its recommendations.</string>
     <string name="anilist_recommendations_failed">Could not load recommendations from AniList.</string>

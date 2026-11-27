@@ -423,6 +423,7 @@
     <string name="upcoming_week_next">Settimana successiva</string>
     <string name="upcoming_empty_period">Nessuna uscita prevista per queste date.</string>
     <string name="upcoming_confirmed_airing_only">Solo orari di uscita confermati</string>
+    <string name="next_episode_airing_countdown">In uscita tra %s</string>
     <string name="anilist_recommendations">Suggerimenti di AniList</string>
     <string name="anilist_recommendations_needs_link">Collega il titolo ad AniList o MyAnimeList in Tracciamento per vedere i suggerimenti.</string>
     <string name="anilist_recommendations_failed">Impossibile caricare i suggerimenti di AniList.</string>

@@ -55,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 import androidx.compose.ui.util.fastAll
@@ -67,6 +68,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.domain.entries.anime.model.episodesFiltered
 import eu.kanade.domain.entries.anime.model.seasonsFiltered
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.browse.anime.RelatedAnimeTitle
 import eu.kanade.presentation.components.relativeDateTimeText
 import eu.kanade.presentation.entries.DownloadAction
@@ -86,10 +88,11 @@ import eu.kanade.presentation.entries.components.EntryToolbar
 import eu.kanade.presentation.entries.components.ItemHeader
 import eu.kanade.presentation.entries.components.MissingItemCountListItem
 import eu.kanade.presentation.util.formatEpisodeNumber
+import eu.kanade.presentation.util.rememberIs24HourSystem
+import eu.kanade.presentation.util.toDurationString
 import eu.kanade.tachiyomi.animesource.AnimeSource
 import eu.kanade.tachiyomi.animesource.ConfigurableAnimeSource
 import eu.kanade.tachiyomi.animesource.model.FetchType
-import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadProvider
 import eu.kanade.tachiyomi.data.download.anime.model.AnimeDownload
 import eu.kanade.tachiyomi.source.anime.getNameForAnimeInfo
@@ -124,7 +127,9 @@ import tachiyomi.source.local.entries.anime.isLocal
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
+import java.time.ZoneId
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 @Composable
@@ -798,10 +803,7 @@ private fun AnimeScreenSmallImpl(
                         }
 
                         FetchType.Episodes -> {
-                            if (
-                                showNextEpisodeAirTime && state.airingTime > 0L &&
-                                state.anime.status.toInt() != SAnime.COMPLETED
-                            ) {
+                            if (showNextEpisodeAirTime && state.airingTime > 0L) {
                                 item(
                                     key = EntryScreenItem.AIRING_TIME,
                                     contentType = EntryScreenItem.AIRING_TIME,
@@ -1251,10 +1253,7 @@ fun AnimeScreenLargeImpl(
                                 }
 
                                 FetchType.Episodes -> {
-                                    if (
-                                        showNextEpisodeAirTime && state.airingTime > 0L &&
-                                        state.anime.status.toInt() != SAnime.COMPLETED
-                                    ) {
+                                    if (showNextEpisodeAirTime && state.airingTime > 0L) {
                                         item(
                                             key = EntryScreenItem.AIRING_TIME,
                                             contentType = EntryScreenItem.AIRING_TIME,
@@ -1551,27 +1550,33 @@ private fun AiringEpisodeCountdown(schedule: Pair<Int, Long>, modifier: Modifier
         }
     }
     if (remaining > 0L) {
+        val context = LocalContext.current
+        val locale = LocalLocale.current.platformLocale
+        val uiPreferences = remember(context) { context.appGraph.uiPreferences }
+        val dateFormat by uiPreferences.dateFormat.collectAsState()
+        val timeFormat by uiPreferences.timeFormat.collectAsState()
+        val is24HourSystem = rememberIs24HourSystem()
+        val timeZone = ZoneId.systemDefault()
+        val dateTime = remember(airingAtSeconds, dateFormat, timeFormat, locale, is24HourSystem, timeZone) {
+            val localAiring = java.time.Instant.ofEpochSecond(airingAtSeconds).atZone(timeZone)
+            val date = UiPreferences.dateFormat(dateFormat, locale).format(localAiring)
+            val time = UiPreferences.timeFormat(timeFormat, locale, is24HourSystem).format(localAiring)
+            "$date · $time"
+        }
         NextEpisodeAiringListItem(
             title = stringResource(AYMR.strings.display_mode_episode, formatEpisodeNumber(episode.toDouble())),
-            date = formatTime(remaining, useDayFormat = true),
+            date = dateTime,
+            countdown = stringResource(
+                TLMR.strings.next_episode_airing_countdown,
+                remaining.milliseconds.toDurationString(context, stringResource(MR.strings.seconds_short, 0)),
+            ),
             modifier = modifier,
         )
     }
 }
 
-private fun formatTime(milliseconds: Long, useDayFormat: Boolean = false): String {
-    return if (useDayFormat) {
-        String.format(
-            "Airing in %02dd %02dh %02dm %02ds",
-            TimeUnit.MILLISECONDS.toDays(milliseconds),
-            TimeUnit.MILLISECONDS.toHours(milliseconds) -
-                TimeUnit.DAYS.toHours(TimeUnit.MILLISECONDS.toDays(milliseconds)),
-            TimeUnit.MILLISECONDS.toMinutes(milliseconds) -
-                TimeUnit.HOURS.toMinutes(TimeUnit.MILLISECONDS.toHours(milliseconds)),
-            TimeUnit.MILLISECONDS.toSeconds(milliseconds) -
-                TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(milliseconds)),
-        )
-    } else if (milliseconds > 3600000L) {
+private fun formatTime(milliseconds: Long): String {
+    return if (milliseconds > 3600000L) {
         String.format(
             "%d:%02d:%02d",
             TimeUnit.MILLISECONDS.toHours(milliseconds),

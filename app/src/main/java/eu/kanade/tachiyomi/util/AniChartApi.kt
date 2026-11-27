@@ -1,7 +1,6 @@
 package eu.kanade.tachiyomi.util
 
 import dev.zacsweers.metro.Inject
-import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.data.track.anilist.Anilist
 import eu.kanade.tachiyomi.data.track.myanimelist.MyAnimeList
 import eu.kanade.tachiyomi.data.track.simkl.Simkl
@@ -21,6 +20,7 @@ import tachiyomi.domain.entries.anime.model.Anime
 import java.io.IOException
 import java.time.OffsetDateTime
 import java.util.Calendar
+import kotlin.time.Clock
 
 @Inject
 class AniChartApi(
@@ -30,10 +30,8 @@ class AniChartApi(
     internal suspend fun loadAiringTime(
         anime: Anime,
         trackItems: List<AnimeTrackItem>,
-        manualFetch: Boolean,
     ): Pair<Int, Long> {
         val cached = anime.nextEpisodeToAir to anime.nextEpisodeAiringAt
-        if (anime.status == SAnime.COMPLETED.toLong() && !manualFetch) return cached
 
         return withIOContext {
             var queriedBinding = false
@@ -49,7 +47,7 @@ class AniChartApi(
                 queriedBinding = true
                 if (airing == null) continue
                 receivedSchedule = true
-                if (airing.second > 0L) return@withIOContext airing
+                if (airing.second > Clock.System.now().epochSeconds) return@withIOContext airing
             }
             if (queriedBinding && !receivedSchedule) cached else NO_UPCOMING_EPISODE
         }

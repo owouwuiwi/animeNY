@@ -252,7 +252,7 @@ class AnimeViewModel(
     val episodeSwipeEndAction = libraryPreferences.swipeEpisodeStartAction.get()
     var autoTrackState = trackPreferences.autoUpdateTrackOnMarkRead.get()
 
-    val showNextEpisodeAirTime = trackPreferences.showNextEpisodeAiringTime.get()
+    val showNextEpisodeAirTime = trackPreferences.showNextEpisodeAiringTime
     val alwaysUseExternalPlayer = playerPreferences.alwaysUseExternalPlayer().get()
     val useExternalDownloader = downloadPreferences.useExternalDownloader.get()
 
@@ -405,24 +405,25 @@ class AnimeViewModel(
     fun fetchAllFromSource(manualFetch: Boolean = true) {
         viewModelScope.launch {
             updateSuccessState { it.copy(isRefreshingData = true) }
-            val fetchFromSourceTasks = listOf(
-                // AM -->
-                async { syncTrackers() },
-                // <-- AM
-                async {
-                    fetchAllFromSource(
-                        manualFetch = manualFetch,
-                        fetchDetails = true,
-                        fetchEpisodes = true,
-                        fetchSeasons = true,
-                    )
-                },
-            )
-            updateSuccessState { it.copy(isRefreshingData = false) }
-            val anime = successState?.anime ?: return@launch
-            val tracks = getTracks.await(anime.id).associateBy { it.trackerId }
-            val linkedTrackers = trackerManager.loggedInTrackers().map { AnimeTrackItem(tracks[it.id], it) }
-            updateAiringTime(anime, linkedTrackers, manualFetch)
+            try {
+                listOf(
+                    async { syncTrackers() },
+                    async {
+                        fetchAllFromSource(
+                            manualFetch = manualFetch,
+                            fetchDetails = true,
+                            fetchEpisodes = true,
+                            fetchSeasons = true,
+                        )
+                    },
+                ).awaitAll()
+                val anime = successState?.anime ?: return@launch
+                val tracks = getTracks.await(anime.id).associateBy { it.trackerId }
+                val linkedTrackers = trackerManager.loggedInTrackers().map { AnimeTrackItem(tracks[it.id], it) }
+                updateAiringTime(anime, linkedTrackers)
+            } finally {
+                updateSuccessState { it.copy(isRefreshingData = false) }
+            }
         }
     }
 
@@ -2003,7 +2004,7 @@ class AnimeViewModel(
             }
                 .distinctUntilChanged()
                 .collectLatest { trackItems ->
-                    successState?.let { updateAiringTime(it.anime, trackItems, manualFetch = false) }
+                    successState?.let { updateAiringTime(it.anime, trackItems) }
                 }
         }
     }
@@ -2011,9 +2012,8 @@ class AnimeViewModel(
     private suspend fun updateAiringTime(
         anime: Anime,
         trackItems: List<AnimeTrackItem>,
-        manualFetch: Boolean,
     ) {
-        val airingEpisodeData = airingSchedule.loadAiringTime(anime, trackItems, manualFetch)
+        val airingEpisodeData = airingSchedule.loadAiringTime(anime, trackItems)
         setAnimeViewerFlags.awaitSetNextEpisodeAiring(anime.id, airingEpisodeData)
         updateSuccessState { it.copy(nextAiringEpisode = airingEpisodeData) }
     }

@@ -102,6 +102,7 @@ import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.LoadingScreen
+import tachiyomi.presentation.core.util.collectAsState
 
 class AnimeScreen(
     private val animeId: Long,
@@ -123,6 +124,7 @@ class AnimeScreen(
         val navigator = LocalNavigator.currentOrThrow
         val context = LocalContext.current
         val haptic = LocalHapticFeedback.current
+        val showNextEpisodeAirTime by viewModel.showNextEpisodeAirTime.collectAsState()
         val scope = rememberCoroutineScope()
         val lifecycleOwner = LocalLifecycleOwner.current
         val viewModel =
@@ -238,7 +240,7 @@ class AnimeScreen(
             isTabletUi = isTabletUi(),
             episodeSwipeStartAction = viewModel.episodeSwipeStartAction,
             episodeSwipeEndAction = viewModel.episodeSwipeEndAction,
-            showNextEpisodeAirTime = viewModel.showNextEpisodeAirTime,
+            showNextEpisodeAirTime = showNextEpisodeAirTime,
             alwaysUseExternalPlayer = viewModel.alwaysUseExternalPlayer,
             // AM (FILE_SIZE) -->
             showFileSize = viewModel.showFileSize,

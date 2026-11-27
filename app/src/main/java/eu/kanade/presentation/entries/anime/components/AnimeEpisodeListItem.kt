@@ -313,6 +313,7 @@ private fun getSwipeAction(
 fun NextEpisodeAiringListItem(
     title: String,
     date: String,
+    countdown: String,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -330,15 +331,19 @@ fun NextEpisodeAiringListItem(
                 )
             }
             Spacer(modifier = Modifier.height(6.dp))
-            Row(modifier = Modifier.alpha(SECONDARY_ALPHA)) {
+            Column(modifier = Modifier.alpha(SECONDARY_ALPHA)) {
                 ProvideTextStyle(
-                    value = MaterialTheme.typography.bodySmall,
+                    value = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.primary),
                 ) {
                     Text(
                         text = date,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = countdown,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
