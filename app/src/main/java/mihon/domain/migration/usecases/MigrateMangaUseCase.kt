@@ -11,19 +11,19 @@ import eu.kanade.tachiyomi.data.download.manga.MangaDownloadManager
 import eu.kanade.tachiyomi.data.track.EnhancedMangaTracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import logcat.LogPriority
 import mihon.domain.migration.models.MigrationFlag
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.category.manga.interactor.GetMangaCategories
-import tachiyomi.domain.category.manga.interactor.SetMangaCategories
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.entries.manga.model.MangaUpdate
-import tachiyomi.domain.items.chapter.interactor.GetChaptersByMangaId
-import tachiyomi.domain.items.chapter.interactor.UpdateChapter
+import tachiyomi.domain.entries.manga.repository.MangaRepository
 import tachiyomi.domain.items.chapter.model.ChapterUpdate
+import tachiyomi.domain.items.chapter.repository.ChapterRepository
 import tachiyomi.domain.source.manga.service.MangaSourceManager
-import tachiyomi.domain.track.manga.interactor.GetMangaTracks
-import tachiyomi.domain.track.manga.interactor.UpsertMangaTrack
+import tachiyomi.domain.track.manga.repository.MangaTrackRepository
 import kotlin.time.Clock
 
 @Inject
@@ -33,13 +33,11 @@ class MigrateMangaUseCase(
     private val sourceManager: MangaSourceManager,
     private val downloadManager: MangaDownloadManager,
     private val updateManga: UpdateManga,
-    private val getChaptersByMangaId: GetChaptersByMangaId,
+    private val chapterRepository: ChapterRepository,
     private val syncChaptersWithSource: SyncChaptersWithSource,
-    private val updateChapter: UpdateChapter,
     private val getCategories: GetMangaCategories,
-    private val setMangaCategories: SetMangaCategories,
-    private val getTracks: GetMangaTracks,
-    private val upsertTrack: UpsertMangaTrack,
+    private val mangaRepository: MangaRepository,
+    private val trackRepository: MangaTrackRepository,
     private val migrateEntryTags: MigrateEntryTags,
     private val coverCache: MangaCoverCache,
 ) {
@@ -57,8 +55,8 @@ class MigrateMangaUseCase(
 
             // Update chapters read, bookmark and dateFetch
             if (MigrationFlag.CHAPTER in flags) {
-                val prevMangaChapters = getChaptersByMangaId.await(current.id)
-                val mangaChapters = getChaptersByMangaId.await(target.id)
+                val prevMangaChapters = chapterRepository.getChapterByMangaId(current.id)
+                val mangaChapters = chapterRepository.getChapterByMangaId(target.id)
 
                 val maxChapterRead = prevMangaChapters
                     .filter { it.read }
@@ -84,13 +82,13 @@ class MigrateMangaUseCase(
                             }
                         }
                     }
-                updateChapter.awaitAll(chapterUpdates)
+                chapterRepository.updateAllChapters(chapterUpdates)
             }
 
             // Update categories
             if (MigrationFlag.CATEGORY in flags) {
                 val categoryIds = getCategories.await(current.id).map { it.id }
-                setMangaCategories.await(target.id, categoryIds)
+                mangaRepository.setMangaCategories(target.id, categoryIds)
             }
 
             if (MigrationFlag.TAGS in flags) {
@@ -98,7 +96,7 @@ class MigrateMangaUseCase(
             }
 
             // Update track
-            getTracks.await(current.id).mapNotNull { track ->
+            trackRepository.getTracksByMangaId(current.id).mapNotNull { track ->
                 val updatedTrack = track.copy(mangaId = target.id)
 
                 val service = enhancedServices
@@ -117,15 +115,12 @@ class MigrateMangaUseCase(
                 }
             }
                 .takeIf { it.isNotEmpty() }
-                ?.let { upsertTrack.awaitAll(it) }
+                ?.let { trackRepository.upsertAllManga(it) }
 
             // Update custom cover (recheck if custom cover exists)
             if (MigrationFlag.CUSTOM_COVER in flags && current.hasCustomCover(coverCache)) {
-                try {
-                    coverCache.setCustomCoverToCache(target, coverCache.getCustomCoverFile(current.id).inputStream())
-                } catch (e: Throwable) {
-                    if (e is CancellationException) throw e
-                    logcat(LogPriority.ERROR, e)
+                coverCache.getCustomCoverFile(current.id).inputStream().use { input ->
+                    coverCache.setCustomCoverToCache(target, input)
                 }
             }
 
@@ -140,7 +135,11 @@ class MigrateMangaUseCase(
                 if (MigrationFlag.NOTES in flags) notes = current.notes
             }
 
-            if (!updateManga.awaitAll(listOfNotNull(currentMangaUpdate, targetMangaUpdate))) return false
+            currentCoroutineContext().ensureActive()
+            if (!updateManga.awaitAll(listOfNotNull(currentMangaUpdate, targetMangaUpdate))) {
+                currentCoroutineContext().ensureActive()
+                return false
+            }
 
             if (MigrationFlag.REMOVE_DOWNLOAD in flags && currentSource != null) {
                 try {

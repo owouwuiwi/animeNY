@@ -16,15 +16,22 @@ import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import mihon.domain.migration.models.MigrationFlag
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import tachiyomi.core.common.preference.InMemoryPreferenceStore
+import tachiyomi.domain.category.manga.interactor.GetMangaCategories
+import tachiyomi.domain.category.model.Category
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.manga.model.Manga
+import tachiyomi.domain.entries.manga.repository.MangaRepository
+import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.items.episode.model.NoEpisodesException
+import tachiyomi.domain.items.episode.repository.EpisodeRepository
 
 class BatchMigrationSafetyTest {
     private val preferences = SourcePreferences(InMemoryPreferenceStore()).apply {
@@ -42,6 +49,7 @@ class BatchMigrationSafetyTest {
     private val animeDownloads = mockk<AnimeDownloadManager>()
     private val syncEpisodes = mockk<SyncEpisodesWithSource>()
     private val updateAnime = mockk<UpdateAnime>()
+    private val episodeRepository = mockk<EpisodeRepository>()
     private val migrateAnime = MigrateAnimeUseCase(
         sourcePreferences = preferences,
         trackerManager = mockk(),
@@ -51,15 +59,13 @@ class BatchMigrationSafetyTest {
         },
         downloadManager = animeDownloads,
         updateAnime = updateAnime,
-        getEpisodesByAnimeId = mockk(),
+        episodeRepository = episodeRepository,
         syncEpisodesWithSource = syncEpisodes,
-        updateEpisode = mockk(),
         getCategories = mockk(),
-        setAnimeCategories = mockk(),
-        getTracks = mockk {
-            coEvery { await(1L) } returns emptyList()
+        animeRepository = mockk(),
+        trackRepository = mockk {
+            coEvery { getTracksByAnimeId(1L) } returns emptyList()
         },
-        upsertTrack = mockk(),
         migrateEntryTags = mockk(),
         coverCache = mockk(),
     )
@@ -76,6 +82,8 @@ class BatchMigrationSafetyTest {
     }
     private val mangaDownloads = mockk<MangaDownloadManager>()
     private val updateManga = mockk<UpdateManga>()
+    private val mangaRepository = mockk<MangaRepository>()
+    private val getMangaCategories = mockk<GetMangaCategories>()
     private val migrateManga = MigrateMangaUseCase(
         sourcePreferences = preferences,
         trackerManager = mockk(),
@@ -85,17 +93,15 @@ class BatchMigrationSafetyTest {
         },
         downloadManager = mangaDownloads,
         updateManga = updateManga,
-        getChaptersByMangaId = mockk(),
+        chapterRepository = mockk(),
         syncChaptersWithSource = mockk {
             coEvery { await(any(), targetManga, targetMangaSource) } returns emptyList()
         },
-        updateChapter = mockk(),
-        getCategories = mockk(),
-        setMangaCategories = mockk(),
-        getTracks = mockk {
-            coEvery { await(3L) } returns emptyList()
+        getCategories = getMangaCategories,
+        mangaRepository = mangaRepository,
+        trackRepository = mockk {
+            coEvery { getTracksByMangaId(3L) } returns emptyList()
         },
-        upsertTrack = mockk(),
         migrateEntryTags = mockk(),
         coverCache = mockk(),
     )
@@ -122,6 +128,62 @@ class BatchMigrationSafetyTest {
         coVerify(exactly = 1) { syncEpisodes.await(emptyList(), targetAnime, targetAnimeSource) }
         coVerify(exactly = 0) { updateAnime.awaitAll(any()) }
         verify(exactly = 0) { animeDownloads.deleteAnime(any(), any(), any()) }
+    }
+
+    @Test
+    fun `failed episode progress write preserves the source favorite and downloads`() = runBlocking {
+        preferences.migrationFlags.set(MigrationFlag.CHAPTER.flag or MigrationFlag.REMOVE_DOWNLOAD.flag)
+        val previous = Episode.create().copy(id = 1, episodeNumber = 1.0, seen = true)
+        val destination = Episode.create().copy(id = 2, episodeNumber = 1.0)
+        coEvery { targetAnimeSource.getEpisodeList(any()) } returns emptyList()
+        coEvery { syncEpisodes.await(emptyList(), targetAnime, targetAnimeSource) } returns emptyList()
+        coEvery { episodeRepository.getEpisodeByAnimeId(1L) } returns listOf(previous)
+        coEvery { episodeRepository.getEpisodeByAnimeId(targetAnime.id) } returns listOf(destination)
+        coEvery { episodeRepository.updateAllEpisodes(any()) } throws IllegalStateException("Write failed")
+
+        assertFalse(migrateAnime(currentAnime, targetAnime, replace = true))
+
+        coVerify(exactly = 1) {
+            episodeRepository.updateAllEpisodes(match { it.single().id == destination.id && it.single().seen == true })
+        }
+        coVerify(exactly = 0) { updateAnime.awaitAll(any()) }
+        verify(exactly = 0) { animeDownloads.deleteAnime(any(), any(), any()) }
+    }
+
+    @Test
+    fun `failed category write preserves the source until a successful retry`() = runBlocking {
+        preferences.migrationFlags.set(MigrationFlag.CATEGORY.flag or MigrationFlag.REMOVE_DOWNLOAD.flag)
+        val category = Category(id = 5, name = "Reading", order = 0, flags = 0, hidden = false)
+        val categoryIds = listOf(category.id)
+        coEvery { getMangaCategories.await(3L) } returns listOf(category)
+        coEvery { mangaRepository.setMangaCategories(targetManga.id, categoryIds) } throws IllegalStateException("Write failed")
+
+        assertFalse(migrateManga(currentManga, targetManga, replace = true))
+        coVerify(exactly = 0) { updateManga.awaitAll(any()) }
+        verify(exactly = 0) { mangaDownloads.deleteManga(any(), any(), any()) }
+
+        coEvery { mangaRepository.setMangaCategories(targetManga.id, categoryIds) } returns Unit
+        coEvery { updateManga.awaitAll(any()) } returns true
+        every { mangaDownloads.deleteManga(currentManga, currentMangaSource) } returns Unit
+
+        assertTrue(migrateManga(currentManga, targetManga, replace = true))
+        coVerify(exactly = 2) { mangaRepository.setMangaCategories(targetManga.id, categoryIds) }
+        coVerify(exactly = 1) { updateManga.awaitAll(any()) }
+        verify(exactly = 1) { mangaDownloads.deleteManga(currentManga, currentMangaSource) }
+    }
+
+    @Test
+    fun `cancellation during a category write is propagated without a favorite switch`() = runBlocking {
+        preferences.migrationFlags.set(MigrationFlag.CATEGORY.flag or MigrationFlag.REMOVE_DOWNLOAD.flag)
+        val cancellation = CancellationException()
+        coEvery { getMangaCategories.await(3L) } returns emptyList()
+        coEvery { mangaRepository.setMangaCategories(targetManga.id, emptyList()) } throws cancellation
+
+        val failure = runCatching { migrateManga(currentManga, targetManga, replace = true) }.exceptionOrNull()
+
+        assertSame(cancellation, failure)
+        coVerify(exactly = 0) { updateManga.awaitAll(any()) }
+        verify(exactly = 0) { mangaDownloads.deleteManga(any(), any(), any()) }
     }
 
     @Test

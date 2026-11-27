@@ -11,19 +11,19 @@ import eu.kanade.tachiyomi.data.download.anime.AnimeDownloadManager
 import eu.kanade.tachiyomi.data.track.EnhancedAnimeTracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import logcat.LogPriority
 import mihon.domain.migration.models.MigrationFlag
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.category.anime.interactor.GetAnimeCategories
-import tachiyomi.domain.category.anime.interactor.SetAnimeCategories
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.entries.anime.model.AnimeUpdate
-import tachiyomi.domain.items.episode.interactor.GetEpisodesByAnimeId
-import tachiyomi.domain.items.episode.interactor.UpdateEpisode
+import tachiyomi.domain.entries.anime.repository.AnimeRepository
 import tachiyomi.domain.items.episode.model.toEpisodeUpdate
+import tachiyomi.domain.items.episode.repository.EpisodeRepository
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
-import tachiyomi.domain.track.anime.interactor.GetAnimeTracks
-import tachiyomi.domain.track.anime.interactor.UpsertAnimeTrack
+import tachiyomi.domain.track.anime.repository.AnimeTrackRepository
 import java.time.Instant
 
 @Inject
@@ -33,13 +33,11 @@ class MigrateAnimeUseCase(
     private val sourceManager: AnimeSourceManager,
     private val downloadManager: AnimeDownloadManager,
     private val updateAnime: UpdateAnime,
-    private val getEpisodesByAnimeId: GetEpisodesByAnimeId,
+    private val episodeRepository: EpisodeRepository,
     private val syncEpisodesWithSource: SyncEpisodesWithSource,
-    private val updateEpisode: UpdateEpisode,
     private val getCategories: GetAnimeCategories,
-    private val setAnimeCategories: SetAnimeCategories,
-    private val getTracks: GetAnimeTracks,
-    private val upsertTrack: UpsertAnimeTrack,
+    private val animeRepository: AnimeRepository,
+    private val trackRepository: AnimeTrackRepository,
     private val migrateEntryTags: MigrateEntryTags,
     private val coverCache: AnimeCoverCache,
 ) {
@@ -57,8 +55,8 @@ class MigrateAnimeUseCase(
 
             // Update episodes seen, bookmark and dateFetch
             if (MigrationFlag.CHAPTER in flags) {
-                val prevAnimeEpisodes = getEpisodesByAnimeId.await(current.id)
-                val animeEpisodes = getEpisodesByAnimeId.await(target.id)
+                val prevAnimeEpisodes = episodeRepository.getEpisodeByAnimeId(current.id)
+                val animeEpisodes = episodeRepository.getEpisodeByAnimeId(target.id)
 
                 val maxEpisodeSeen = prevAnimeEpisodes
                     .filter { it.seen }
@@ -91,13 +89,13 @@ class MigrateAnimeUseCase(
                 }
 
                 val episodeUpdates = updatedAnimeEpisodes.map { it.toEpisodeUpdate() }
-                updateEpisode.awaitAll(episodeUpdates)
+                episodeRepository.updateAllEpisodes(episodeUpdates)
             }
 
             // Update categories
             if (MigrationFlag.CATEGORY in flags) {
                 val categoryIds = getCategories.await(current.id).map { it.id }
-                setAnimeCategories.await(target.id, categoryIds)
+                animeRepository.setAnimeCategories(target.id, categoryIds)
             }
 
             if (MigrationFlag.TAGS in flags) {
@@ -105,7 +103,7 @@ class MigrateAnimeUseCase(
             }
 
             // Update track
-            getTracks.await(current.id).mapNotNull { track ->
+            trackRepository.getTracksByAnimeId(current.id).mapNotNull { track ->
                 val updatedTrack = track.copy(animeId = target.id)
 
                 val service = enhancedServices
@@ -124,15 +122,12 @@ class MigrateAnimeUseCase(
                 }
             }
                 .takeIf { it.isNotEmpty() }
-                ?.let { upsertTrack.awaitAll(it) }
+                ?.let { trackRepository.upsertAllAnime(it) }
 
             // Update custom cover (recheck if custom cover exists)
             if (MigrationFlag.CUSTOM_COVER in flags && current.hasCustomCover(coverCache)) {
-                try {
-                    coverCache.setCustomCoverToCache(target, coverCache.getCustomCoverFile(current.id).inputStream())
-                } catch (e: Throwable) {
-                    if (e is CancellationException) throw e
-                    logcat(LogPriority.ERROR, e)
+                coverCache.getCustomCoverFile(current.id).inputStream().use { input ->
+                    coverCache.setCustomCoverToCache(target, input)
                 }
             }
 
@@ -151,7 +146,11 @@ class MigrateAnimeUseCase(
                 notes = if (MigrationFlag.NOTES in flags) current.notes else null,
             )
 
-            if (!updateAnime.awaitAll(listOfNotNull(currentAnimeUpdate, targetAnimeUpdate))) return false
+            currentCoroutineContext().ensureActive()
+            if (!updateAnime.awaitAll(listOfNotNull(currentAnimeUpdate, targetAnimeUpdate))) {
+                currentCoroutineContext().ensureActive()
+                return false
+            }
 
             if (MigrationFlag.REMOVE_DOWNLOAD in flags && currentSource != null) {
                 try {
