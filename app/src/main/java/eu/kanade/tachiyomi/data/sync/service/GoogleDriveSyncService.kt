@@ -10,7 +10,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeToken
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential
 import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse
-import com.google.api.client.http.InputStreamContent
+import com.google.api.client.http.FileContent
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.JsonFactory
 import com.google.api.client.json.jackson2.JacksonFactory
@@ -19,7 +19,7 @@ import com.google.api.services.drive.DriveScopes
 import com.google.api.services.drive.model.File
 import eu.kanade.domain.sync.SyncPreferences
 import eu.kanade.tachiyomi.data.backup.models.Backup
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
 import logcat.LogPriority
@@ -32,10 +32,9 @@ import tachiyomi.i18n.tail.TLMR
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.io.IOException
-import java.io.PipedInputStream
-import java.io.PipedOutputStream
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import java.io.File as LocalFile
 
 class GoogleDriveSyncService(context: Context, json: Json, syncPreferences: SyncPreferences) : SyncService(
     context,
@@ -66,149 +65,57 @@ class GoogleDriveSyncService(context: Context, json: Json, syncPreferences: Sync
 
     private val protoBuf: ProtoBuf = Injekt.get()
 
-    @Suppress("ReturnCount", "TooGenericExceptionCaught")
+    @Suppress("TooGenericExceptionCaught")
     override suspend fun doSync(syncData: SyncData): Backup? {
-        beforeSync()
-
-        try {
-            val remoteSData = pullSyncData()
-
-            if (remoteSData != null) {
-                // Get local unique device ID
-                val localDeviceId = syncPreferences.uniqueDeviceID()
-                val lastSyncDeviceId = remoteSData.deviceId
-
-                // Log the device IDs
-                logcat(LogPriority.DEBUG, "SyncService") {
-                    "Local device ID: $localDeviceId, Last sync device ID: $lastSyncDeviceId"
-                }
-
-                // check if the last sync was done by the same device if so
-                // overwrite the remote data with the local data
-                return if (lastSyncDeviceId == localDeviceId) {
-                    pushSyncData(syncData)
-                    syncData.backup
+        return try {
+            googleDriveService.refreshToken()
+            withIOContext {
+                val drive = googleDriveService.driveService
+                    ?: throw IOException(context.stringResource(TLMR.strings.google_drive_not_signed_in))
+                val remoteFile = drive.listSyncBackups(remoteFileName).firstOrNull()
+                val remoteData = remoteFile?.let { pullSyncData(drive, it) }
+                val updated = if (remoteData != null && remoteData.deviceId != syncData.deviceId) {
+                    mergeSyncData(syncData, remoteData)
                 } else {
-                    // Merge the local and remote sync data
-                    val mergedSyncData = mergeSyncData(syncData, remoteSData)
-                    pushSyncData(mergedSyncData)
-                    mergedSyncData.backup
+                    syncData
                 }
+                pushSyncData(drive, remoteFile, updated)
+                updated.backup
             }
-
-            pushSyncData(syncData)
-            return syncData.backup
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, "SyncService") { "Error syncing: ${e.message}" }
-            return null
+            null
         }
     }
 
-    private suspend fun beforeSync() {
-        googleDriveService.refreshToken()
-    }
-
-    @Suppress("TooGenericExceptionThrown", "TooGenericExceptionCaught")
-    private fun pullSyncData(): SyncData? {
-        val drive = googleDriveService.driveService
-            ?: throw Exception(context.stringResource(TLMR.strings.google_drive_not_signed_in))
-
-        val fileList = getAppDataFileList(drive)
-        if (fileList.isEmpty()) {
-            logcat(LogPriority.INFO) { "No files found in app data" }
-            return null
-        }
-
-        val gdriveFileId = fileList[0].id
-        logcat(LogPriority.DEBUG) { "Google Drive File ID: $gdriveFileId" }
-
-        try {
-            drive.files().get(gdriveFileId).executeMediaAsInputStream().use { inputStream ->
-                GZIPInputStream(inputStream).use { gzipInputStream ->
-                    val byteArray = gzipInputStream.readBytes()
-                    val backup = protoBuf.decodeFromByteArray(Backup.serializer(), byteArray)
-                    val deviceId = fileList[0].appProperties["deviceId"] ?: ""
-                    return SyncData(deviceId = deviceId, backup = backup)
-                }
+    private fun pullSyncData(drive: Drive, file: File): SyncData {
+        drive.files().get(file.id).executeMediaAsInputStream().use { input ->
+            GZIPInputStream(input).use { gzip ->
+                val backup = protoBuf.decodeFromByteArray(Backup.serializer(), gzip.readBytes())
+                return SyncData(deviceId = file.appProperties?.get("deviceId").orEmpty(), backup = backup)
             }
-        } catch (e: Exception) {
-            logcat(LogPriority.ERROR, throwable = e) { "Error downloading file: ${e.message}" }
-            throw Exception("Failed to download sync data: ${e.message}", e)
         }
     }
 
-    @Suppress("TooGenericExceptionThrown")
-    private suspend fun pushSyncData(syncData: SyncData) {
-        val drive = googleDriveService.driveService
-            ?: throw Exception(context.stringResource(TLMR.strings.google_drive_not_signed_in))
-
-        val fileList = getAppDataFileList(drive)
+    private fun pushSyncData(drive: Drive, remoteFile: File?, syncData: SyncData) {
         val backup = syncData.backup ?: return
-
         val byteArray = protoBuf.encodeToByteArray(Backup.serializer(), backup)
-        if (byteArray.isEmpty()) {
-            throw IllegalStateException(context.stringResource(MR.strings.empty_backup_error))
+        check(byteArray.isNotEmpty()) { context.stringResource(MR.strings.empty_backup_error) }
+
+        val metadata = File().apply {
+            name = remoteFileName
+            mimeType = DRIVE_SYNC_MIME_TYPE
+            appProperties = mapOf("deviceId" to syncData.deviceId)
         }
-
-        PipedOutputStream().use { pos ->
-            PipedInputStream(pos).use { pis ->
-                withIOContext {
-                    launch {
-                        GZIPOutputStream(pos).use { gzipOutputStream ->
-                            gzipOutputStream.write(byteArray)
-                        }
-                    }
-
-                    val mediaContent = InputStreamContent("application/octet-stream", pis)
-
-                    if (fileList.isNotEmpty()) {
-                        val fileId = fileList[0].id
-                        val fileMetadata = File().apply {
-                            name = remoteFileName
-                            mimeType = "application/octet-stream"
-                            appProperties = mapOf("deviceId" to syncData.deviceId)
-                        }
-                        drive.files().update(fileId, fileMetadata, mediaContent).execute()
-                        logcat(
-                            LogPriority.DEBUG,
-                        ) { "Updated existing sync data file in Google Drive with file ID: $fileId" }
-                    } else {
-                        val fileMetadata = File().apply {
-                            name = remoteFileName
-                            mimeType = "application/octet-stream"
-                            parents = listOf("appDataFolder")
-                            appProperties = mapOf("deviceId" to syncData.deviceId)
-                        }
-                        val uploadedFile = drive.files().create(fileMetadata, mediaContent)
-                            .setFields("id")
-                            .execute()
-                        logcat(
-                            LogPriority.DEBUG,
-                        ) { "Created new sync data file in Google Drive with file ID: ${uploadedFile.id}" }
-                    }
-                }
+        withDriveBackupContent(context.cacheDir, byteArray) { content ->
+            if (remoteFile == null) {
+                metadata.parents = listOf("appDataFolder")
+                drive.files().create(metadata, content).setFields("id").execute()
+            } else {
+                drive.files().update(remoteFile.id, metadata, content).execute()
             }
-        }
-    }
-
-    @Suppress("TooGenericExceptionCaught")
-    private fun getAppDataFileList(drive: Drive): MutableList<File> {
-        try {
-            // Search for the existing file by name in the appData folder
-            val query = "mimeType='application/x-gzip' and name = '$remoteFileName'"
-            val fileList = drive.files()
-                .list()
-                .setSpaces("appDataFolder")
-                .setQ(query)
-                .setFields("files(id, name, createdTime, appProperties)")
-                .execute()
-                .files
-            logcat { "AppData folder file list: $fileList" }
-
-            return fileList
-        } catch (e: Exception) {
-            logcat(LogPriority.ERROR, throwable = e) { "Error no sync data found in appData folder" }
-            return mutableListOf()
         }
     }
 
@@ -224,7 +131,7 @@ class GoogleDriveSyncService(context: Context, json: Json, syncPreferences: Sync
 
         return withIOContext {
             try {
-                val appDataFileList = getAppDataFileList(drive)
+                val appDataFileList = drive.listSyncBackups(remoteFileName)
 
                 if (appDataFileList.isEmpty()) {
                     this@GoogleDriveSyncService
@@ -239,6 +146,8 @@ class GoogleDriveSyncService(context: Context, json: Json, syncPreferences: Sync
                     }
                     DeleteSyncDataStatus.SUCCESS
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 this@GoogleDriveSyncService.logcat(LogPriority.ERROR, throwable = e) {
                     "Error occurred while interacting with Google Drive"
@@ -246,6 +155,36 @@ class GoogleDriveSyncService(context: Context, json: Json, syncPreferences: Sync
                 DeleteSyncDataStatus.ERROR
             }
         }
+    }
+}
+
+private const val DRIVE_SYNC_MIME_TYPE = "application/x-gzip"
+
+internal fun Drive.listSyncBackups(name: String): List<File> {
+    val escapedName = name.replace("\\", "\\\\").replace("'", "\\'")
+    val request = files().list()
+        .setSpaces("appDataFolder")
+        .setQ("name = '$escapedName' and (mimeType = '$DRIVE_SYNC_MIME_TYPE' or mimeType = 'application/octet-stream')")
+        .setOrderBy("modifiedTime desc")
+        .setFields("nextPageToken,files(id,appProperties)")
+    return buildList {
+        do {
+            val page = request.execute()
+            addAll(page.files.orEmpty())
+            request.pageToken = page.nextPageToken
+        } while (!request.pageToken.isNullOrEmpty())
+    }
+}
+
+internal inline fun <T> withDriveBackupContent(directory: LocalFile, backup: ByteArray, upload: (FileContent) -> T): T {
+    val file = LocalFile.createTempFile("sync-backup", ".gz", directory)
+    try {
+        file.outputStream().buffered().use { output ->
+            GZIPOutputStream(output).use { it.write(backup) }
+        }
+        return upload(FileContent(DRIVE_SYNC_MIME_TYPE, file))
+    } finally {
+        file.delete()
     }
 }
 
