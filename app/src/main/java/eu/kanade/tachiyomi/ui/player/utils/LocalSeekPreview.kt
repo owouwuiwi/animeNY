@@ -7,7 +7,9 @@ import android.net.Uri
 import android.os.Build
 import android.os.SystemClock
 import android.util.LruCache
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -48,7 +50,7 @@ internal class LocalSeekPreview {
             var retriever: MediaMetadataRetriever? = null
             try {
                 positions
-                    .map { it.toLong().coerceAtLeast(0L) }
+                    .map { it.previewSecond() }
                     .distinctUntilChanged()
                     .collect { second ->
                         cache.get(second)?.let {
@@ -60,12 +62,19 @@ internal class LocalSeekPreview {
                             retriever = it
                             it.setDataSource(context, uri)
                         }
-                        decoder.decodeFrame(second)?.let {
-                            cache.put(second, it)
-                            emit(it)
-                        }
+                        // A nearby keyframe can be shown without decoding through the whole GOP.
+                        val keyframe = decoder.decodeFrame(second, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        if (keyframe != null && positions.value.previewSecond() == second) emit(keyframe)
+
                         val elapsed = SystemClock.elapsedRealtime() - startedAt
                         delay(MIN_DECODE_INTERVAL_MILLIS - elapsed)
+                        currentCoroutineContext().ensureActive()
+                        if (positions.value.previewSecond() != second) return@collect
+
+                        decoder.decodeFrame(second, MediaMetadataRetriever.OPTION_CLOSEST)?.let {
+                            cache.put(second, it)
+                            if (positions.value.previewSecond() == second) emit(it)
+                        }
                     }
             } finally {
                 retriever?.release()
@@ -73,9 +82,10 @@ internal class LocalSeekPreview {
         }
     }
 
-    private fun MediaMetadataRetriever.decodeFrame(second: Long): Bitmap? {
+    private fun Float.previewSecond() = toLong().coerceAtLeast(0L)
+
+    private fun MediaMetadataRetriever.decodeFrame(second: Long, option: Int): Bitmap? {
         val timestamp = second * 1_000_000L
-        val option = MediaMetadataRetriever.OPTION_CLOSEST
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             getScaledFrameAtTime(timestamp, option, 320, 180)
         } else {
