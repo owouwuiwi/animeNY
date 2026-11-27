@@ -363,7 +363,6 @@ private fun MangaScreenSmallImpl(
     val relatedMangasEnabled by sourcePreferences.relatedAnimes.collectAsState()
     val expandRelatedMangas by uiPreferences.expandRelatedAnimes.collectAsState()
     val showRelatedMangasInOverflow by uiPreferences.relatedAnimesInOverflow.collectAsState()
-    val showRelatedMangasInOverflow by uiPreferences.relatedAnimesInOverflow.collectAsState()
     // KMK <--
 
     BackHandler(onBack = {
@@ -703,7 +702,6 @@ fun MangaScreenLargeImpl(
     val sourcePreferences = remember { context.appGraph.sourcePreferences }
     val relatedMangasEnabled by sourcePreferences.relatedAnimes.collectAsState()
     val expandRelatedMangas by uiPreferences.expandRelatedAnimes.collectAsState()
-    val showRelatedMangasInOverflow by uiPreferences.relatedAnimesInOverflow.collectAsState()
     val showRelatedMangasInOverflow by uiPreferences.relatedAnimesInOverflow.collectAsState()
     // KMK <--
 
