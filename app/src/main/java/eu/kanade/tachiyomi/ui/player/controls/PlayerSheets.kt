@@ -93,6 +93,7 @@ fun PlayerSheets(
     sleepTimerTimeRemaining: Int,
     onStartSleepTimer: (Int) -> Unit,
     buttons: ImmutableList<CustomButton>,
+    onOpenDlna: (() -> Unit)?,
 
     // Screenshot sheet
     isLocalSource: Boolean,
@@ -197,6 +198,7 @@ fun PlayerSheets(
                 onDismissRequest = onDismissRequest,
                 onEnterFiltersPanel = { onOpenPanel(Panels.VideoFilters) },
                 customButtons = buttons,
+                onOpenDlna = onOpenDlna,
             )
         }
 

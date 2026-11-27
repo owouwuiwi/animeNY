@@ -71,7 +71,7 @@ object PlayerSettingsPlayerScreen : Screen(), SearchableSettings {
                 preference = playerPreferences.preserveWatchingPosition(),
                 title = stringResource(AYMR.strings.pref_preserve_watching_position),
             ),
-            if (GOOGLE_CAST_AVAILABLE) getCastGroup(playerPreferences) else null,
+            getCastGroup(playerPreferences),
             Preference.PreferenceItem.ListPreference(
                 preference = playerPreferences.defaultPlayerOrientationType(),
                 entries = PlayerOrientation.entries.associateWith {
@@ -392,15 +392,25 @@ object PlayerSettingsPlayerScreen : Screen(), SearchableSettings {
     // habilita o desabilita el uso de cast que habilitarlo o deshabilitarlo sea con switch
     @Composable
     private fun getCastGroup(playerPreferences: PlayerPreferences): Preference.PreferenceGroup {
-        val enableCast = playerPreferences.enableCast()
-        return Preference.PreferenceGroup(
-            title = stringResource(TLMR.strings.pref_category_cast),
-            preferenceItems = persistentListOf(
+        val dlna = Preference.PreferenceItem.SwitchPreference(
+            preference = playerPreferences.enableDlna(),
+            title = stringResource(TLMR.strings.pref_enable_dlna),
+            subtitle = stringResource(TLMR.strings.pref_enable_dlna_summary),
+        )
+        val castingOptions = if (GOOGLE_CAST_AVAILABLE) {
+            persistentListOf(
                 Preference.PreferenceItem.SwitchPreference(
-                    preference = enableCast,
+                    preference = playerPreferences.enableCast(),
                     title = stringResource(TLMR.strings.pref_enable_cast),
                 ),
-            ),
+                dlna,
+            )
+        } else {
+            persistentListOf(dlna)
+        }
+        return Preference.PreferenceGroup(
+            title = stringResource(TLMR.strings.pref_category_cast),
+            preferenceItems = castingOptions,
         )
     }
 

@@ -58,6 +58,7 @@ import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import eu.kanade.presentation.more.settings.screen.player.custombutton.getButtons
 import eu.kanade.presentation.theme.playerRippleConfiguration
+import eu.kanade.tachiyomi.animesource.online.AnimeHttpSource
 import eu.kanade.tachiyomi.ui.player.Dialogs
 import eu.kanade.tachiyomi.ui.player.Panels
 import eu.kanade.tachiyomi.ui.player.PlayerActivity
@@ -73,6 +74,9 @@ import eu.kanade.tachiyomi.ui.player.controls.components.TextPlayerUpdate
 import eu.kanade.tachiyomi.ui.player.controls.components.ThumbnailPreview
 import eu.kanade.tachiyomi.ui.player.controls.components.VolumeSlider
 import eu.kanade.tachiyomi.ui.player.controls.components.sheets.toFixed
+import eu.kanade.tachiyomi.ui.player.dlna.DlnaCastDialog
+import eu.kanade.tachiyomi.ui.player.dlna.DlnaMedia
+import eu.kanade.tachiyomi.ui.player.dlna.DlnaSession
 import eu.kanade.tachiyomi.ui.player.loader.HosterPriority
 import eu.kanade.tachiyomi.ui.player.settings.AudioPreferences
 import eu.kanade.tachiyomi.ui.player.settings.GesturePreferences
@@ -612,6 +616,33 @@ fun PlayerControls(
         val currentSource by viewModel.currentSource.collectAsState()
         val showFailedHosters by playerPreferences.showFailedHosters().collectAsState()
         val emptyHosters by playerPreferences.showEmptyHosters().collectAsState()
+        val dlnaEnabled by playerPreferences.enableDlna().collectAsState()
+        val googleCasting by viewModel.isCasting.collectAsState()
+        var dlnaDialogOpen by remember { mutableStateOf(false) }
+        var dlnaMedia by remember { mutableStateOf<DlnaMedia?>(null) }
+        var dlnaSession by remember { mutableStateOf<DlnaSession?>(null) }
+        val onOpenDlna: (() -> Unit)? = if (dlnaSession != null || (dlnaEnabled && !googleCasting)) {
+            {
+                val video = viewModel.currentVideo.value
+                dlnaMedia = video
+                    ?.takeUnless {
+                        it.usesHttpServer() || it.audioTracks.isNotEmpty() || it.subtitleTracks.isNotEmpty()
+                    }
+                    ?.let {
+                        val headers = it.headers ?: (currentSource as? AnimeHttpSource)?.headers
+                        val title = listOf(viewModel.animeTitle.value, viewModel.mediaTitle.value)
+                            .filterNotNull()
+                            .filter(String::isNotBlank)
+                            .distinct()
+                            .joinToString(" · ")
+                        DlnaMedia.fromDirectVideo(it.videoUrl, title, headers)
+                    }
+                viewModel.showSheet(Sheets.None)
+                dlnaDialogOpen = true
+            }
+        } else {
+            null
+        }
 
         PlayerSheets(
             mpv = viewModel.mpv,
@@ -658,6 +689,7 @@ fun PlayerControls(
             sleepTimerTimeRemaining = sleepTimerTimeRemaining,
             onStartSleepTimer = viewModel::startTimer,
             buttons = customButtons.getButtons().toImmutableList(),
+            onOpenDlna = onOpenDlna,
 
             isLocalSource = currentSource?.id == LocalAnimeSource.ID,
             showSubtitles = showSubtitles,
@@ -675,6 +707,21 @@ fun PlayerControls(
             onDismissRequest = { viewModel.showSheet(Sheets.None) },
             dismissSheet = dismissSheet,
         )
+        if (dlnaDialogOpen) {
+            DlnaCastDialog(
+                media = dlnaMedia,
+                session = dlnaSession,
+                onStarted = { session ->
+                    dlnaSession = session
+                    viewModel.pause()
+                },
+                onStopped = {
+                    dlnaSession = null
+                    dlnaDialogOpen = false
+                },
+                onDismissRequest = { dlnaDialogOpen = false },
+            )
+        }
         val panel by viewModel.panelShown.collectAsState()
         PlayerPanels(
             mpv = viewModel.mpv,

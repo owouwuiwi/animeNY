@@ -75,6 +75,7 @@ import kotlinx.collections.immutable.ImmutableList
 import tachiyomi.domain.custombuttons.model.CustomButton
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.i18n.tail.TLMR
 import tachiyomi.presentation.core.components.material.padding
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.collectAsState
@@ -91,6 +92,7 @@ fun MoreSheet(
     onDismissRequest: () -> Unit,
     onEnterFiltersPanel: () -> Unit,
     customButtons: ImmutableList<CustomButton>,
+    onOpenDlna: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val advancedPreferences = remember { Injekt.get<AdvancedPlayerPreferences>() }
@@ -157,6 +159,12 @@ fun MoreSheet(
                             Text(text = stringResource(AYMR.strings.player_sheets_filters_title))
                         }
                     }
+                }
+            }
+
+            if (onOpenDlna != null) {
+                TextButton(onClick = onOpenDlna) {
+                    Text(stringResource(TLMR.strings.action_dlna))
                 }
             }
 

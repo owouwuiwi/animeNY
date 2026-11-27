@@ -213,6 +213,18 @@
 
     <string name="pref_category_cast">Cast Settings</string>
     <string name="pref_enable_cast">Enable or disable Cast</string>
+    <string name="pref_enable_dlna">DLNA playback</string>
+    <string name="pref_enable_dlna_summary">Show a TV playback action in the player menu for direct video links</string>
+    <string name="action_dlna">Play on a DLNA TV</string>
+    <string name="dlna_direct_video_required">Choose a direct MP4, MKV, or WebM link that your TV can open.</string>
+    <string name="dlna_searching">Looking for TVs on your network…</string>
+    <string name="dlna_no_devices">No compatible TVs found on this network.</string>
+    <string name="dlna_no_wifi">Connect to the same Wi-Fi or Ethernet network as your TV.</string>
+    <string name="dlna_search_again">Search again</string>
+    <string name="dlna_cast_sent">Playback sent to %1$s.</string>
+    <string name="dlna_stop">Stop playback</string>
+    <string name="dlna_working">Waiting for the TV…</string>
+    <string name="dlna_command_error">The TV could not complete the playback command.</string>
     <string name="action_cast">Send to Cast</string>
     <string name="title_cast_quality">Choose Cast Quality/Provider</string>
     <string name="cast_not_connected">Cast not connected</string>
