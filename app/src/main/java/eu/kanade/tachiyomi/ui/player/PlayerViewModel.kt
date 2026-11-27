@@ -103,9 +103,9 @@ import eu.kanade.tachiyomi.ui.player.utils.AniSkipApi
 import eu.kanade.tachiyomi.ui.player.utils.AudioLanguageTarget
 import eu.kanade.tachiyomi.ui.player.utils.ChapterUtils.Companion.getStringRes
 import eu.kanade.tachiyomi.ui.player.utils.LanguageTags
+import eu.kanade.tachiyomi.ui.player.utils.LocalSeekPreview
 import eu.kanade.tachiyomi.ui.player.utils.TrackSelect
 import eu.kanade.tachiyomi.ui.player.utils.applyVideoAspect
-import eu.kanade.tachiyomi.ui.player.utils.localSeekPreviewFrames
 import eu.kanade.tachiyomi.ui.player.utils.localSeekPreviewUri
 import eu.kanade.tachiyomi.ui.reader.SaveImageNotifier
 import eu.kanade.tachiyomi.util.editBackground
@@ -362,6 +362,7 @@ class PlayerViewModel(
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, Bitmap>?) = size > 3
         }
     private var thumbnailFetchJob: Job? = null
+    private val localSeekPreview = LocalSeekPreview()
     private var localSeekPreviewJob: Job? = null
 
     val duration = MutableStateFlow(0f)
@@ -719,10 +720,14 @@ class PlayerViewModel(
         val localUri = videoUrl?.let(::localSeekPreviewUri)
         if (localUri != null) {
             if (localSeekPreviewJob == null) {
+                val previewPlaybackId = playbackId
                 localSeekPreviewJob = viewModelScope.launchIO {
                     try {
-                        localSeekPreviewFrames(context, localUri, seekPosition).collect { frame ->
-                            if (isSeeking.value && currentVideo.value?.videoUrl == videoUrl) {
+                        localSeekPreview.frames(context, localUri, previewPlaybackId, seekPosition).collect { frame ->
+                            if (
+                                isSeeking.value && playbackId == previewPlaybackId &&
+                                currentVideo.value?.videoUrl == videoUrl
+                            ) {
                                 _thumbnailImage.value = frame.asImageBitmap()
                             }
                         }
@@ -1947,6 +1952,7 @@ class PlayerViewModel(
      */
     fun onVideoHandedToPlayer() {
         playbackId++
+        updateIsSeeking(false)
     }
 
     /**
