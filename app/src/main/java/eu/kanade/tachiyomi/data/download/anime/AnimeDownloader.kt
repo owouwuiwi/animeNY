@@ -68,6 +68,7 @@ import logcat.LogPriority
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Request
 import tachiyomi.core.common.i18n.stringResource
+import tachiyomi.core.common.storage.displayablePath
 import tachiyomi.core.common.storage.extension
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.lang.withIOContext
@@ -77,6 +78,7 @@ import tachiyomi.domain.download.service.DownloadPreferences
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.domain.items.episode.model.Episode
 import tachiyomi.domain.source.anime.service.AnimeSourceManager
+import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
 import tachiyomi.i18n.tail.TLMR
 import java.io.File
@@ -363,28 +365,30 @@ class AnimeDownloader(
      * @param download the episode to be downloaded.
      */
     private suspend fun downloadEpisode(download: AnimeDownload) {
-        val animeDir = provider.getAnimeDir(download.anime.title, download.source)
-
-        val availSpace = DiskUtil.getAvailableStorageSpace(animeDir)
-        if (availSpace != -1L && availSpace < MIN_DISK_SPACE) {
-            download.status = AnimeDownload.State.ERROR
-            notifier.onError(
-                context.stringResource(AYMR.strings.download_insufficient_space),
-                download.episode.name,
-                download.anime.title,
-                download.anime.id,
-            )
-            return
-        }
-
-        val episodeDirname = provider.getEpisodeDirName(
-            download.episode.name,
-            download.episode.scanlator,
-            download.episode.url,
-        )
-        val tmpDir = animeDir.createDirectory(episodeDirname + TMP_DIR_SUFFIX)!!
-
         try {
+            val animeDir = provider.getAnimeDir(download.anime.title, download.source)
+
+            val availSpace = DiskUtil.getAvailableStorageSpace(animeDir)
+            if (availSpace != -1L && availSpace < MIN_DISK_SPACE) {
+                download.status = AnimeDownload.State.ERROR
+                notifier.onError(
+                    context.stringResource(AYMR.strings.download_insufficient_space),
+                    download.episode.name,
+                    download.anime.title,
+                    download.anime.id,
+                )
+                return
+            }
+
+            val episodeDirname = provider.getEpisodeDirName(
+                download.episode.name,
+                download.episode.scanlator,
+                download.episode.url,
+            )
+            val temporaryName = episodeDirname + TMP_DIR_SUFFIX
+            val tmpDir = animeDir.createDirectory(temporaryName)
+                ?: throw IOException(context.stringResource(MR.strings.invalid_location, animeDir.displayablePath))
+
             // A video chosen by the user is kept; otherwise every failed video is skipped on the
             // next pick, so the download moves on to the next hoster. Failures are keyed by hoster
             // too because titles like "1080p" repeat across hosters.
@@ -442,7 +446,6 @@ class AnimeDownloader(
             download.status = AnimeDownload.State.DOWNLOADED
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
-            // If the video threw, it will resume here
             logcat(LogPriority.ERROR, error)
             EpisodeLoader.invalidateCache(download.episode, download.source)
             download.status = AnimeDownload.State.ERROR
