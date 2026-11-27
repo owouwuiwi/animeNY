@@ -33,8 +33,7 @@ internal fun UniFile.renameDownloadedEpisode(targetStem: String): Boolean {
     } else {
         targetStem
     }
-    val parent = parentFile ?: return false
-    return parent.findFile(targetName) == null && renameTo(targetName)
+    return renameToOrCopy(targetName) != null
 }
 
 internal suspend fun copyDownloadedEpisodeVideo(

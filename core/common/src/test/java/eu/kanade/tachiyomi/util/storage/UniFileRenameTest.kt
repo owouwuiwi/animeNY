@@ -122,13 +122,27 @@ class UniFileRenameTest {
     fun `Existing file at the new name is not overwritten`() {
         val file = spyk(createFile("page.tmp", "new"))
         createFile("page.jpg", "existing")
-        every { file.renameTo(any()) } returns false
+        // RawFile can replace an existing file on filesystems that permit it.
+        every { file.renameTo(any()) } throws AssertionError("must check the existing destination before renaming")
 
         val result = file.renameToOrCopy("page.jpg")
 
         result.shouldBeNull()
         File(root, "page.tmp").readText() shouldBe "new"
         File(root, "page.jpg").readText() shouldBe "existing"
+    }
+
+    @Test
+    fun `An unreadable source directory is preserved`() {
+        File(root, "episode_tmp").mkdir()
+        File(root, "episode_tmp/episode.mkv").writeText("video")
+        val directory = spyk(child("episode_tmp"))
+        every { directory.renameTo(any()) } returns false
+        every { directory.listFiles() } returns null
+
+        directory.renameToOrCopy("episode").shouldBeNull()
+        File(root, "episode_tmp/episode.mkv").readText() shouldBe "video"
+        File(root, "episode").exists() shouldBe false
     }
 
     @Test

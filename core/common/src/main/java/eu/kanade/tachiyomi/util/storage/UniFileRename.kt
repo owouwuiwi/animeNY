@@ -10,6 +10,10 @@ import tachiyomi.core.common.util.system.logcat
  * failure, in which case the original is left in place.
  */
 fun UniFile.renameToOrCopy(displayName: String): UniFile? {
+    if (name == displayName) return takeIf { exists() }
+    val parent = parentFile
+    if (parent?.findFile(displayName) != null) return null
+
     val renamed = try {
         renameTo(displayName)
     } catch (e: Exception) {
@@ -17,7 +21,7 @@ fun UniFile.renameToOrCopy(displayName: String): UniFile? {
         false
     }
     if (renamed) return this
-    val parent = parentFile ?: return null
+    if (parent == null) return null
     parent.findFile(displayName)?.let { target ->
         // Some providers rename and still report a failure; the original is gone then
         if (exists()) return null
@@ -31,25 +35,31 @@ fun UniFile.renameToOrCopy(displayName: String): UniFile? {
         logcat(LogPriority.ERROR, e) { "Failed to copy $name to $displayName" }
         null
     }
-    if (copy == null) {
-        parent.findFile(displayName)?.delete()
-        return null
-    }
+    if (copy == null) return null
     delete()
     return copy
 }
 
 private fun UniFile.copyInto(parent: UniFile, name: String): UniFile? {
-    if (isDirectory) {
-        val dir = parent.createDirectory(name) ?: return null
-        for (child in listFiles().orEmpty()) {
-            child.copyInto(dir, child.name ?: return null) ?: return null
+    if (parent.findFile(name) != null) return null
+    val children = if (isDirectory) listFiles() ?: return null else null
+    val target = if (children != null) parent.createDirectory(name) else parent.createFile(name)
+    if (target == null) return null
+
+    var copied = false
+    try {
+        if (children != null) {
+            for (child in children) {
+                child.copyInto(target, child.name ?: return null) ?: return null
+            }
+        } else {
+            openInputStream().use { input ->
+                target.openOutputStream().use { output -> input.copyTo(output) }
+            }
         }
-        return dir
+        copied = true
+        return target
+    } finally {
+        if (!copied) target.delete()
     }
-    val target = parent.createFile(name) ?: return null
-    openInputStream().use { input ->
-        target.openOutputStream().use { output -> input.copyTo(output) }
-    }
-    return target
 }

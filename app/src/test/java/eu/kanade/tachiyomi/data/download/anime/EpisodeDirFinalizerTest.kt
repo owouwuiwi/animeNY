@@ -139,6 +139,17 @@ class EpisodeDirFinalizerTest {
         File(root, "New episode.mkv").readText() shouldBe "existing"
     }
 
+    @Test
+    fun `A downloaded episode can move when a provider rejects renames`() {
+        writeVideo("Old episode", "original")
+        val directory = spyk(child("Old episode"))
+        every { directory.renameTo(any()) } returns false
+
+        directory.renameDownloadedEpisode("New episode") shouldBe true
+        File(root, "New episode/Ep 1.mkv").readText() shouldBe "original"
+        File(root, "Old episode").exists() shouldBe false
+    }
+
     private fun writeVideo(dir: String, content: String) {
         File(root, dir).mkdir()
         File(root, "$dir/Ep 1.mkv").writeText(content)
