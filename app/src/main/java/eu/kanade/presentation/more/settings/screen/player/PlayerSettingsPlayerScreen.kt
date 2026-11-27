@@ -16,6 +16,7 @@ import eu.kanade.presentation.more.settings.screen.SearchableSettings
 import eu.kanade.presentation.util.Screen
 import eu.kanade.tachiyomi.ui.player.PlayerOrientation
 import eu.kanade.tachiyomi.ui.player.cast.GOOGLE_CAST_AVAILABLE
+import eu.kanade.tachiyomi.ui.player.cast.stopCastServer
 import eu.kanade.tachiyomi.ui.player.controls.OptionalPlayerControl
 import eu.kanade.tachiyomi.ui.player.externalVideoPlayers
 import eu.kanade.tachiyomi.ui.player.loader.HosterCache
@@ -25,7 +26,6 @@ import eu.kanade.tachiyomi.ui.player.settings.HOSTER_LIST_CACHE_DURATIONS
 import eu.kanade.tachiyomi.ui.player.settings.PlayerPreferences
 import eu.kanade.tachiyomi.ui.player.settings.hosterCacheDurationLabel
 import eu.kanade.tachiyomi.util.LocalHttpServerHolder
-import eu.kanade.tachiyomi.util.LocalHttpServerService
 import eu.kanade.tachiyomi.util.system.toast
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
@@ -452,7 +452,7 @@ object PlayerSettingsPlayerScreen : Screen(), SearchableSettings {
                     onValueChanged = {
                         try {
                             Integer.parseInt(it)
-                            LocalHttpServerService.stop()
+                            stopCastServer()
                             true
                         } catch (e: Exception) {
                             false

@@ -10,6 +10,8 @@ import tachiyomi.core.common.preference.PreferenceStore
 
 internal const val GOOGLE_CAST_AVAILABLE = false
 
+internal fun stopCastServer() = Unit
+
 internal fun createPlayerCastController(
     activity: ComponentActivity,
     preferences: PreferenceStore,

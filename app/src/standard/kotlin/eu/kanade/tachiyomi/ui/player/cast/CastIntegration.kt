@@ -25,10 +25,13 @@ import com.google.android.gms.cast.framework.CastButtonFactory
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.common.images.WebImage
 import eu.kanade.tachiyomi.ui.player.CastManager
+import eu.kanade.tachiyomi.util.LocalHttpServerService
 import mihon.app.di.appGraph
 import tachiyomi.core.common.preference.PreferenceStore
 
 internal const val GOOGLE_CAST_AVAILABLE = true
+
+internal fun stopCastServer() = LocalHttpServerService.stop()
 
 internal fun createPlayerCastController(
     activity: ComponentActivity,
