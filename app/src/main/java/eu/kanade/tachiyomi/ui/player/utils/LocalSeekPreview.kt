@@ -8,15 +8,16 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.LruCache
 import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 internal fun localSeekPreviewUri(url: String): Uri? {
@@ -35,6 +36,7 @@ internal class LocalSeekPreview {
     }
     private var cachedUri: Uri? = null
     private var cachedPlaybackId: Int? = null
+    private var nextDecodeAt = 0L
 
     /**
      * The current position is conflated while decoding. If the user starts a new drag while
@@ -48,30 +50,41 @@ internal class LocalSeekPreview {
                 cachedPlaybackId = playbackId
             }
             var retriever: MediaMetadataRetriever? = null
+
+            suspend fun decode(second: Long, option: Int): Bitmap? {
+                val waitMillis = nextDecodeAt - SystemClock.elapsedRealtime()
+                val moved = waitMillis > 0 && withTimeoutOrNull(waitMillis) {
+                    positions.first { it.previewSecond() != second }
+                } != null
+                if (moved) return null
+                currentCoroutineContext().ensureActive()
+                if (positions.value.previewSecond() != second) return null
+
+                val decoder = retriever ?: MediaMetadataRetriever().also {
+                    retriever = it
+                    it.setDataSource(context, uri)
+                }
+                nextDecodeAt = SystemClock.elapsedRealtime() + MIN_DECODE_INTERVAL_MILLIS
+                return decoder.decodeFrame(second, option)
+            }
+
             try {
                 positions
                     .map { it.previewSecond() }
                     .distinctUntilChanged()
                     .collect { second ->
                         cache.get(second)?.let {
-                            emit(it)
+                            if (positions.value.previewSecond() == second) emit(it)
                             return@collect
                         }
-                        val startedAt = SystemClock.elapsedRealtime()
-                        val decoder = retriever ?: MediaMetadataRetriever().also {
-                            retriever = it
-                            it.setDataSource(context, uri)
+                        // Two passes are only affordable when the retriever can scale its output.
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                            decode(second, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)?.let {
+                                if (positions.value.previewSecond() == second) emit(it)
+                            }
                         }
-                        // A nearby keyframe can be shown without decoding through the whole GOP.
-                        val keyframe = decoder.decodeFrame(second, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                        if (keyframe != null && positions.value.previewSecond() == second) emit(keyframe)
 
-                        val elapsed = SystemClock.elapsedRealtime() - startedAt
-                        delay(MIN_DECODE_INTERVAL_MILLIS - elapsed)
-                        currentCoroutineContext().ensureActive()
-                        if (positions.value.previewSecond() != second) return@collect
-
-                        decoder.decodeFrame(second, MediaMetadataRetriever.OPTION_CLOSEST)?.let {
+                        decode(second, MediaMetadataRetriever.OPTION_CLOSEST)?.let {
                             cache.put(second, it)
                             if (positions.value.previewSecond() == second) emit(it)
                         }
