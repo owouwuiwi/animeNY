@@ -124,7 +124,6 @@ class AnimeScreen(
         val navigator = LocalNavigator.currentOrThrow
         val context = LocalContext.current
         val haptic = LocalHapticFeedback.current
-        val showNextEpisodeAirTime by viewModel.showNextEpisodeAirTime.collectAsState()
         val scope = rememberCoroutineScope()
         val lifecycleOwner = LocalLifecycleOwner.current
         val viewModel =
@@ -195,6 +194,7 @@ class AnimeScreen(
         val isAnimeHttpSource = remember { successState.source is AnimeHttpSource }
         val canDownloadEpisodes =
             !successState.source.isLocalOrStub() && successState.anime.fetchType == FetchType.Episodes
+        val showNextEpisodeAirTime by viewModel.showNextEpisodeAirTime.collectAsState()
         val episodeFiles = rememberLauncherForActivityResult(
             ActivityResultContracts.OpenMultipleDocuments(),
             viewModel::previewEpisodeImport,
