@@ -79,37 +79,35 @@ class ExtensionStoresViewModel(
      *
      * @param baseUrl The baseUrl of the repo to create.
      */
-    fun createRepo(baseUrl: String) {
+    fun createRepo(baseUrl: String, submittingDialog: ExtensionStoreDialog) {
+        val processingDialog = when (submittingDialog) {
+            is ExtensionStoreDialog.Create -> submittingDialog.takeUnless { it.processing }?.copy(processing = true)
+
+            is ExtensionStoreDialog.Confirm -> submittingDialog.takeUnless { it.processing || it.alreadyExists }
+                ?.copy(processing = true)
+
+            is ExtensionStoreDialog.Delete -> null
+        } ?: return
+        dialog.update { if (it === submittingDialog) processingDialog else it }
+        if (dialog.value !== processingDialog) return
+
         viewModelScope.launch {
-            dialog.update {
-                when (it) {
-                    is ExtensionStoreDialog.Create -> it.copy(processing = true)
-                    is ExtensionStoreDialog.Confirm -> it.copy(processing = true)
-                    else -> it
-                }
-            }
             val result = if (isManga) addMangaExtensionStore(baseUrl) else addAnimeExtensionStore(baseUrl)
             result.onSuccess {
+                dialog.update { if (it === processingDialog) null else it }
                 if (isManga) {
                     mangaExtensionManager.findAvailableExtensions()
                 } else {
                     animeExtensionManager.findAvailableExtensions()
                 }
-                dismissDialog()
             }
                 .onFailure { throwable ->
+                    val message = throwable.message ?: "unknown error"
                     dialog.update {
+                        if (it !== processingDialog) return@update it
                         when (it) {
-                            is ExtensionStoreDialog.Create -> it.copy(
-                                processing = false,
-                                errorMessage = throwable.message ?: "unknown error",
-                            )
-
-                            is ExtensionStoreDialog.Confirm -> it.copy(
-                                processing = false,
-                                errorMessage = throwable.message ?: "unknown error",
-                            )
-
+                            is ExtensionStoreDialog.Create -> it.copy(processing = false, errorMessage = message)
+                            is ExtensionStoreDialog.Confirm -> it.copy(processing = false, errorMessage = message)
                             else -> it
                         }
                     }

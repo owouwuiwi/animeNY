@@ -70,7 +70,7 @@ class ExtensionStoresScreen(
             is ExtensionStoreDialog.Create -> {
                 ExtensionStoreCreateDialog(
                     onDismissRequest = viewModel::dismissDialog,
-                    onCreate = { viewModel.createRepo(it) },
+                    onCreate = { viewModel.createRepo(it, dialog) },
                     storeIndexUrls = successState.stores.map { it.indexUrl }.toSet(),
                     processing = dialog.processing,
                     errorMessage = dialog.errorMessage,
@@ -89,7 +89,7 @@ class ExtensionStoresScreen(
             is ExtensionStoreDialog.Confirm -> {
                 ExtensionStoreConfirmDialog(
                     onDismissRequest = viewModel::dismissDialog,
-                    onCreate = { viewModel.createRepo(dialog.url) },
+                    onCreate = { viewModel.createRepo(dialog.url, dialog) },
                     storeIndexUrl = dialog.url,
                     storeAlreadyExists = dialog.alreadyExists,
                     processing = dialog.processing,
