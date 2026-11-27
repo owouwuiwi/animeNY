@@ -36,11 +36,13 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 import java.io.File as LocalFile
 
-class GoogleDriveSyncService(context: Context, json: Json, syncPreferences: SyncPreferences) : SyncService(
-    context,
-    json,
-    syncPreferences,
-) {
+class GoogleDriveSyncService(
+    context: Context,
+    json: Json,
+    syncPreferences: SyncPreferences,
+    private val googleDriveService: GoogleDriveService = GoogleDriveService(context),
+    private val protoBuf: ProtoBuf = Injekt.get(),
+) : SyncService(context, json, syncPreferences) {
     constructor(context: Context) : this(
         context,
         Json {
@@ -61,14 +63,10 @@ class GoogleDriveSyncService(context: Context, json: Json, syncPreferences: Sync
 
     private val remoteFileName = "${appName}_sync.proto.gz"
 
-    private val googleDriveService = GoogleDriveService(context)
-
-    private val protoBuf: ProtoBuf = Injekt.get()
-
     @Suppress("TooGenericExceptionCaught")
     override suspend fun doSync(syncData: SyncData): Backup? {
+        googleDriveService.refreshToken()
         return try {
-            googleDriveService.refreshToken()
             withIOContext {
                 val drive = googleDriveService.driveService
                     ?: throw IOException(context.stringResource(TLMR.strings.google_drive_not_signed_in))

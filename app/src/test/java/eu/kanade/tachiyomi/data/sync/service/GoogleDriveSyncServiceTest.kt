@@ -1,11 +1,20 @@
 package eu.kanade.tachiyomi.data.sync.service
 
+import android.content.Context
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.services.drive.Drive
 import com.sun.net.httpserver.HttpServer
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.protobuf.ProtoBuf
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -19,6 +28,25 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.zip.GZIPInputStream
 
 class GoogleDriveSyncServiceTest {
+    @Test
+    fun `Token refresh errors reach the worker error handler`() {
+        val rejection = IOException("Refresh token expired")
+        val driveService = mockk<GoogleDriveService> {
+            coEvery { refreshToken() } throws rejection
+        }
+        val context = mockk<Context> {
+            every { resources.getString(any()) } returns "Backup test"
+        }
+        val service = GoogleDriveSyncService(context, Json, mockk(), driveService, ProtoBuf)
+
+        val thrown = assertThrows<IOException> {
+            runBlocking { service.doSync(SyncData()) }
+        }
+
+        assertSame(rejection, thrown)
+        verify(exactly = 0) { driveService.driveService }
+    }
+
     @Test
     fun `Lookup keeps both backup formats and paginates in newest first order`() {
         val requests = CopyOnWriteArrayList<String>()
