@@ -9,6 +9,7 @@ import dev.zacsweers.metro.AssistedInject
 import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.data.backup.BackupFileValidator
 import eu.kanade.tachiyomi.data.backup.BackupWriter
+import eu.kanade.tachiyomi.data.backup.EntryMergeBackup
 import eu.kanade.tachiyomi.data.backup.create.creators.AnimeBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.AnimeCategoriesBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.AnimeExtensionStoresBackupCreator
@@ -31,6 +32,7 @@ import eu.kanade.tachiyomi.data.backup.models.BackupManga
 import eu.kanade.tachiyomi.data.backup.models.BackupPreference
 import eu.kanade.tachiyomi.data.backup.models.BackupSource
 import eu.kanade.tachiyomi.data.backup.models.BackupSourcePreferences
+import eu.kanade.tachiyomi.data.backup.models.backupEntryMerges
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -47,6 +49,8 @@ import tachiyomi.domain.entries.anime.repository.AnimeRepository
 import tachiyomi.domain.entries.manga.interactor.GetMangaFavorites
 import tachiyomi.domain.entries.manga.model.Manga
 import tachiyomi.domain.entries.manga.repository.MangaRepository
+import tachiyomi.domain.entries.merge.model.MergeEntryRef
+import tachiyomi.domain.entries.merge.model.MergeMedia
 import tachiyomi.i18n.MR
 import java.io.FileOutputStream
 import java.io.IOException
@@ -77,6 +81,7 @@ class BackupCreator(
     private val mangaSourcesBackupCreator: MangaSourcesBackupCreator,
     private val extensionsBackupCreator: ExtensionsBackupCreator,
     private val backupFileValidator: BackupFileValidator,
+    private val entryMergeBackup: EntryMergeBackup,
 ) {
     @AssistedFactory
     fun interface Factory {
@@ -110,6 +115,9 @@ class BackupCreator(
                 emptyList()
             }
             val backupManga = backupMangas(getMangaFavorites.await() + nonFavoriteManga, options)
+            val groups = if (options.libraryEntries) entryMergeBackup.snapshot() else emptyList()
+            val mergeMembers = groups.groupBy { it.media }
+                .mapValues { (_, related) -> related.flatMapTo(hashSetOf()) { it.members } }
 
             file.openOutputStream()
                 .also {
@@ -119,14 +127,26 @@ class BackupCreator(
                 .sink().gzip().buffer().use {
                     val writer = BackupWriter(it, parser)
                     val mangaSourceIds = mutableSetOf<Long>()
+                    val exportedMangaMergeMembers = mutableSetOf<MergeEntryRef>()
+                    val mangaMergeMembers = mergeMembers[MergeMedia.Manga].orEmpty()
                     backupManga.collect { manga ->
                         writer.writeMangaEntry(manga)
                         mangaSourceIds += manga.source
+                        if (mangaMergeMembers.isNotEmpty() && manga.url.isNotBlank()) {
+                            val member = MergeEntryRef(manga.source, manga.url)
+                            if (member in mangaMergeMembers) exportedMangaMergeMembers += member
+                        }
                     }
                     val animeSourceIds = mutableSetOf<Long>()
+                    val exportedAnimeMergeMembers = mutableSetOf<MergeEntryRef>()
+                    val animeMergeMembers = mergeMembers[MergeMedia.Anime].orEmpty()
                     backupAnime.collect { anime ->
                         writer.writeAnimeEntry(anime)
                         animeSourceIds += anime.source
+                        if (animeMergeMembers.isNotEmpty() && anime.url.isNotBlank()) {
+                            val member = MergeEntryRef(anime.source, anime.url)
+                            if (member in animeMergeMembers) exportedAnimeMergeMembers += member
+                        }
                     }
                     writer.writeMetadata(
                         Backup(
@@ -144,6 +164,11 @@ class BackupCreator(
                             backupExtensions = backupExtensions(options),
                             backupAnimeExtensionStore = backupAnimeExtensionStores(options),
                             backupCustomButton = backupCustomButtons(options),
+                            backupEntryMerges = backupEntryMerges(
+                                groups,
+                                exportedMangaMergeMembers,
+                                exportedAnimeMergeMembers,
+                            ),
                         ),
                     )
                     if (writer.isEmpty) {

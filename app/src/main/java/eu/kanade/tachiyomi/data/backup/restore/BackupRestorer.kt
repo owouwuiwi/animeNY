@@ -7,12 +7,14 @@ import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
 import eu.kanade.tachiyomi.data.backup.BackupDecoder
 import eu.kanade.tachiyomi.data.backup.BackupNotifier
+import eu.kanade.tachiyomi.data.backup.EntryMergeBackup
 import eu.kanade.tachiyomi.data.backup.MAX_CUSTOM_COVER_BYTES
 import eu.kanade.tachiyomi.data.backup.MangaCoverBackup
 import eu.kanade.tachiyomi.data.backup.models.BackupAnime
 import eu.kanade.tachiyomi.data.backup.models.BackupAnimeSource
 import eu.kanade.tachiyomi.data.backup.models.BackupCategory
 import eu.kanade.tachiyomi.data.backup.models.BackupCustomButtons
+import eu.kanade.tachiyomi.data.backup.models.BackupEntryMerge
 import eu.kanade.tachiyomi.data.backup.models.BackupExtension
 import eu.kanade.tachiyomi.data.backup.models.BackupExtensionStore
 import eu.kanade.tachiyomi.data.backup.models.BackupManga
@@ -47,6 +49,7 @@ import tachiyomi.domain.source.manga.repository.MangaStubSourceRepository
 import tachiyomi.domain.source.manga.service.MangaSourceManager
 import tachiyomi.i18n.MR
 import tachiyomi.i18n.aniyomi.AYMR
+import tachiyomi.i18n.tail.TLMR
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -76,6 +79,7 @@ class BackupRestorer(
     private val mangaStubSourceRepository: MangaStubSourceRepository,
     private val animeStubSourceRepository: AnimeStubSourceRepository,
     private val backupDecoder: BackupDecoder,
+    private val entryMergeBackup: EntryMergeBackup,
 ) {
 
     @AssistedFactory
@@ -123,6 +127,7 @@ class BackupRestorer(
 
     private suspend fun restoreFromFile(uri: Uri, options: RestoreOptions) {
         val (mangaCount, animeCount, backup) = backupDecoder.decodeMetadata(uri)
+        val entryMerges = backup.backupEntryMerges.takeIf { options.libraryEntries && !isSync }.orEmpty()
 
         // Store source mapping for error messages
         val backupAnimeMaps = backup.backupAnimeSources
@@ -132,7 +137,7 @@ class BackupRestorer(
 
         if (options.libraryEntries) {
             restoreSourceNames(backupMangaMaps, backupAnimeMaps)
-            restoreAmount += mangaCount + animeCount
+            restoreAmount += mangaCount + animeCount + entryMerges.size
         }
         if (options.categories) {
             restoreAmount += 2 // +2 for anime and manga categories
@@ -173,16 +178,23 @@ class BackupRestorer(
                 restoreSourcePreferences(backup.backupSourcePreferences)
             }
             if (options.libraryEntries) {
-                restoreAnime(
+                val animeRestoreJob = restoreAnime(
                     uri,
                     if (options.categories) backup.backupAnimeCategories else emptyList(),
                     restoreCategoriesJob,
                 )
-                restoreManga(
+                val mangaRestoreJob = restoreManga(
                     uri,
                     if (options.categories) backup.backupCategories else emptyList(),
                     restoreCategoriesJob,
                 )
+                if (entryMerges.isNotEmpty()) {
+                    launch {
+                        animeRestoreJob.join()
+                        mangaRestoreJob.join()
+                        restoreEntryMerges(entryMerges)
+                    }
+                }
             }
             if (options.extensionStores) {
                 restoreExtensionStores(backup.backupAnimeExtensionStore, backup.backupMangaExtensionStore)
@@ -195,6 +207,23 @@ class BackupRestorer(
             }
 
             // TODO: optionally trigger online library + tracker update
+        }
+    }
+
+    private suspend fun restoreEntryMerges(groups: List<BackupEntryMerge>) {
+        val label = context.stringResource(TLMR.strings.entry_merge_title)
+        val skipped = context.stringResource(TLMR.strings.entry_merge_restore_skipped)
+        for (group in groups) {
+            currentCoroutineContext().ensureActive()
+            val restored = try {
+                entryMergeBackup.restore(group)
+            } catch (e: Exception) {
+                currentCoroutineContext().ensureActive()
+                logcat(LogPriority.WARN, e) { "Could not restore a group of linked entries" }
+                false
+            }
+            if (!restored) errors.add(Date() to skipped)
+            notifier.showRestoreProgress(label, restoreProgress.incrementAndGet(), restoreAmount, isSync)
         }
     }
 

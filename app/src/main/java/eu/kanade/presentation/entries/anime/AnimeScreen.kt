@@ -208,6 +208,7 @@ fun AnimeScreen(
     downloadProgressProvider: (Long) -> Int = { 0 },
     onTrackRepeat: (() -> Unit)? = null,
     onTrackerRecommendations: (() -> Unit)? = null,
+    onMergeEntries: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val onCopyTagToClipboard: (tag: String) -> Unit = {
@@ -257,6 +258,7 @@ fun AnimeScreen(
             onMigrateClicked = onMigrateClicked,
             onTrackRepeat = onTrackRepeat,
             onTrackerRecommendations = onTrackerRecommendations,
+            onMergeEntries = onMergeEntries,
             onEditNotesClicked = onEditNotesClicked,
             // SY -->
             onEditInfoClicked = onEditInfoClicked,
@@ -325,6 +327,7 @@ fun AnimeScreen(
             onMigrateClicked = onMigrateClicked,
             onTrackRepeat = onTrackRepeat,
             onTrackerRecommendations = onTrackerRecommendations,
+            onMergeEntries = onMergeEntries,
             onEditNotesClicked = onEditNotesClicked,
             // SY -->
             onEditInfoClicked = onEditInfoClicked,
@@ -439,6 +442,7 @@ private fun AnimeScreenSmallImpl(
     downloadProgressProvider: (Long) -> Int = { 0 },
     onTrackRepeat: (() -> Unit)? = null,
     onTrackerRecommendations: (() -> Unit)? = null,
+    onMergeEntries: (() -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     val offsetGridPaddingPx = with(density) { GRID_PADDING.roundToPx() }
@@ -519,6 +523,7 @@ private fun AnimeScreenSmallImpl(
                     onClickMigrate = onMigrateClicked,
                     onTrackRepeat = onTrackRepeat,
                     onTrackerRecommendations = onTrackerRecommendations,
+                    onMergeEntries = onMergeEntries,
                     onClickEditNotes = onEditNotesClicked,
                     // SY -->
                     onClickEditInfo = onEditInfoClicked.takeIf { state.anime.favorite },
@@ -921,6 +926,7 @@ fun AnimeScreenLargeImpl(
     downloadProgressProvider: (Long) -> Int = { 0 },
     onTrackRepeat: (() -> Unit)? = null,
     onTrackerRecommendations: (() -> Unit)? = null,
+    onMergeEntries: (() -> Unit)? = null,
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val density = LocalDensity.current
@@ -989,6 +995,7 @@ fun AnimeScreenLargeImpl(
                     onClickMigrate = onMigrateClicked,
                     onTrackRepeat = onTrackRepeat,
                     onTrackerRecommendations = onTrackerRecommendations,
+                    onMergeEntries = onMergeEntries,
                     onClickEditNotes = onEditNotesClicked,
                     onCancelActionMode = { onAllEpisodeSelected(false) },
                     // SY -->
