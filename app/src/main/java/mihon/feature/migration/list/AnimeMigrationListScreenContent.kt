@@ -57,6 +57,7 @@ import eu.kanade.tachiyomi.R
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import mihon.feature.migration.list.models.MigratingAnime
+import mihon.feature.migration.list.models.MigrationProblem
 import tachiyomi.domain.entries.anime.model.Anime
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.Badge
@@ -171,7 +172,7 @@ fun AnimeMigrationListItem(
     source: String,
     episodeCount: Int,
     latestEpisode: Double?,
-    migrationFailed: Boolean = false,
+    migrationProblem: MigrationProblem? = null,
     onClick: () -> Unit,
 ) {
     Column(
@@ -241,9 +242,14 @@ fun AnimeMigrationListItem(
                 maxLines = 1,
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (migrationFailed) {
+            if (migrationProblem != null) {
                 Text(
-                    text = stringResource(MR.strings.migrationListScreen_migrationFailedText),
+                    text = stringResource(
+                        when (migrationProblem) {
+                            MigrationProblem.TransferFailed -> MR.strings.migrationListScreen_migrationFailedText
+                            MigrationProblem.DestinationConflict -> MR.strings.migrationListScreen_destinationConflictText
+                        },
+                    ),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -303,7 +309,7 @@ fun AnimeMigrationListItemResult(
                     source = result.source,
                     episodeCount = result.episodeCount,
                     latestEpisode = result.latestEpisode,
-                    migrationFailed = result.migrationFailed,
+                    migrationProblem = result.migrationProblem,
                     onClick = { onItemClick(result.anime) },
                 )
             }

@@ -49,6 +49,7 @@ import eu.kanade.tachiyomi.R
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import mihon.feature.migration.list.models.MigratingManga
+import mihon.feature.migration.list.models.MigrationProblem
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.automirroredrounded.ArrowForward
 import mihon.icons.materialsymbols.rounded.Close
@@ -183,7 +184,7 @@ fun MigrationListItem(
     source: String,
     chapterCount: Int,
     latestChapter: Double?,
-    migrationFailed: Boolean = false,
+    migrationProblem: MigrationProblem? = null,
     onClick: () -> Unit,
 ) {
     Column(
@@ -253,9 +254,14 @@ fun MigrationListItem(
                 maxLines = 1,
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (migrationFailed) {
+            if (migrationProblem != null) {
                 Text(
-                    text = stringResource(MR.strings.migrationListScreen_migrationFailedText),
+                    text = stringResource(
+                        when (migrationProblem) {
+                            MigrationProblem.TransferFailed -> MR.strings.migrationListScreen_migrationFailedText
+                            MigrationProblem.DestinationConflict -> MR.strings.migrationListScreen_destinationConflictText
+                        },
+                    ),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -315,7 +321,7 @@ fun MangaMigrationListItemResult(
                     source = result.source,
                     chapterCount = result.chapterCount,
                     latestChapter = result.latestChapter,
-                    migrationFailed = result.migrationFailed,
+                    migrationProblem = result.migrationProblem,
                     onClick = { onItemClick(result.manga) },
                 )
             }

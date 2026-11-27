@@ -37,6 +37,7 @@ import logcat.LogPriority
 import mihon.domain.migration.usecases.MigrateMangaUseCase
 import mihon.feature.migration.list.models.MigratingManga
 import mihon.feature.migration.list.models.MigratingManga.SearchResult
+import mihon.feature.migration.list.models.MigrationProblem
 import mihon.feature.migration.list.search.SmartSourceSearchEngine
 import tachiyomi.core.common.util.lang.launchIO
 import tachiyomi.core.common.util.system.logcat
@@ -236,24 +237,33 @@ class MangaMigrationListViewModel(
     }
 
     fun migrateNow(mangaId: Long, replace: Boolean) {
-        if (migrateJob?.isCompleted == false) return
-        val item = items.find { it.manga.id == mangaId } ?: return
-        migrateJob = viewModelScope.launchIO {
-            migrateItem(item, replace)
-        }
+        migrateSelection(replace, onlyId = mangaId)
     }
 
     fun migrateMangas(replace: Boolean) {
+        migrateSelection(replace)
+    }
+
+    private fun migrateSelection(replace: Boolean, onlyId: Long? = null) {
         if (migrateJob?.isCompleted == false) return
         migrateJob = viewModelScope.launchIO {
+            val targets = items.associateWith { it.searchResult.value as? SearchResult.Success }
+            val conflicts = findMigrationConflicts(
+                targets.entries.associate { (item, target) -> item.manga.id to target?.manga?.id },
+            )
+            if (onlyId != null) {
+                val (item, target) = targets.entries.firstOrNull { it.key.manga.id == onlyId } ?: return@launchIO
+                migrateItem(item, target, replace, onlyId in conflicts)
+                return@launchIO
+            }
+
             state.update { it.copy(dialog = Dialog.Progress(0f)) }
-            val items = items
             try {
                 var failed = false
-                items.forEachIndexed { index, item ->
-                    if (!migrateItem(item, replace)) failed = true
+                targets.entries.forEachIndexed { index, (item, target) ->
+                    if (!migrateItem(item, target, replace, item.manga.id in conflicts)) failed = true
                     state.update {
-                        it.copy(dialog = Dialog.Progress((index + 1).toFloat() / items.size))
+                        it.copy(dialog = Dialog.Progress((index + 1).toFloat() / targets.size))
                     }
                 }
                 if (!failed) navigateBack()
@@ -263,13 +273,24 @@ class MangaMigrationListViewModel(
         }
     }
 
-    private suspend fun migrateItem(item: MigratingManga, replace: Boolean): Boolean {
-        val target = item.searchResult.value as? SearchResult.Success ?: return true
-        val migrated = migrateManga(current = item.manga, target = target.manga, replace = replace)
+    private suspend fun migrateItem(
+        item: MigratingManga,
+        target: SearchResult.Success?,
+        replace: Boolean,
+        destinationConflict: Boolean,
+    ): Boolean {
+        if (target == null) return true
+        val selected = item.searchResult.value as? SearchResult.Success ?: return false
+        if (selected.manga.id != target.manga.id) return false
+        if (destinationConflict) {
+            item.searchResult.compareAndSet(selected, selected.copy(migrationProblem = MigrationProblem.DestinationConflict))
+            return false
+        }
+        val migrated = migrateManga(current = item.manga, target = selected.manga, replace = replace)
         if (migrated) {
             removeManga(item.manga.id)
         } else {
-            item.searchResult.compareAndSet(target, target.copy(migrationFailed = true))
+            item.searchResult.compareAndSet(selected, selected.copy(migrationProblem = MigrationProblem.TransferFailed))
         }
         return migrated
     }
